@@ -8,6 +8,7 @@ import { Shift, User } from '@/types';
 import { getWeekStart, formatDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
+import Logo from '@/components/Logo';
 
 export default function AdminHoursPage() {
     const router = useRouter();
@@ -83,19 +84,21 @@ export default function AdminHoursPage() {
 
     return (
         <ProtectedRoute requiredRole="ADMIN">
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen bg-background text-gray-900">
                 {/* Header */}
-                <header className="bg-white shadow-sm border-b">
+                <header className="bg-white border-b border-gray-200">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div>
-                            <button
-                                onClick={() => router.push('/dashboard')}
-                                className="btn-ghost-primary mb-2"
-                            >
-                                ← Back to Dashboard
-                            </button>
-                            <h1 className="text-2xl font-bold text-gray-900">Hours Summary</h1>
-                            <p className="text-sm text-gray-600">View staff hours and pay</p>
+                        <div className="flex items-center gap-6">
+                            <Logo width={100} height={35} />
+                            <div className="border-l border-gray-200 pl-6">
+                                <button
+                                    onClick={() => router.push('/dashboard')}
+                                    className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
+                                >
+                                    ← Dashboard
+                                </button>
+                                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Hours & Payroll Summary</h1>
+                            </div>
                         </div>
                     </div>
                 </header>
@@ -103,86 +106,115 @@ export default function AdminHoursPage() {
                 {/* Main Content */}
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     {/* Week Selector */}
-                    <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
-                        <div className="flex items-center justify-between">
+                    <div className="card-base p-6 mb-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100">
                             <button
                                 onClick={() => changeWeek('prev')}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                title="Previous Week"
                             >
-                                ← Previous Week
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
                             </button>
-                            <h2 className="text-lg font-semibold text-gray-900">
+                            <div className="px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap min-w-[200px] text-center">
                                 Week of {formatDate(selectedWeek)}
-                            </h2>
+                            </div>
                             <button
                                 onClick={() => changeWeek('next')}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                title="Next Week"
                             >
-                                Next Week →
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                </svg>
                             </button>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 self-center">Status Filter:</span>
+                            <span className="px-3 py-1 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-widest rounded border border-green-100 flex items-center">
+                                Approved Shifts Only
+                            </span>
                         </div>
                     </div>
 
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div className="bg-white rounded-xl shadow-sm border p-6">
-                            <p className="text-sm text-gray-600 mb-1">Total Hours (All Staff)</p>
-                            <p className="text-4xl font-bold text-gray-900">{totalHours.toFixed(2)}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                        <div className="card-base p-8 border-l-4 border-l-blue-600">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Operating Hours (Total)</p>
+                            <div className="flex items-baseline gap-2">
+                                <p className="text-5xl font-black text-gray-900 tracking-tighter tabular-nums">{totalHours.toFixed(2)}</p>
+                                <p className="text-lg font-bold text-gray-400">hrs</p>
+                            </div>
                         </div>
-                        <div className="bg-white rounded-xl shadow-sm border p-6">
-                            <p className="text-sm text-gray-600 mb-1">Total Gross Pay</p>
-                            <p className="text-4xl font-bold text-green-600">${totalPay.toFixed(2)}</p>
+                        <div className="card-base p-8 border-l-4 border-l-green-600">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Gross Labor Cost</p>
+                            <div className="flex items-baseline gap-1">
+                                <p className="text-lg font-bold text-green-600/50">$</p>
+                                <p className="text-5xl font-black text-green-600 tracking-tighter tabular-nums">{totalPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Loading State */}
+                    {/* Table Section */}
                     {loading ? (
-                        <div className="flex justify-center py-12">
+                        <div className="flex justify-center py-20">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
                     ) : (
-                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                        <div className="card-base">
+                            <div className="px-6 py-4 border-b border-gray-100">
+                                <h3 className="font-bold text-gray-900">Detailed Payroll Report</h3>
+                            </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full">
-                                    <thead className="bg-gray-50 border-b">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Staff Name
+                                    <thead>
+                                        <tr className="bg-gray-50/50">
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                                Staff Member
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Hourly Rate
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                                Rate
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Hours Worked
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                                Total Hours
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Gross Pay
+                                            <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                                Estimated Pay
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-200">
+                                    <tbody className="divide-y divide-gray-100">
                                         {Object.entries(staffMap).map(([staffId, staff]) => {
                                             const hours = staffHours[staffId]?.hours || 0;
                                             const pay = staffHours[staffId]?.pay || 0;
                                             return (
-                                                <tr key={staffId}>
+                                                <tr key={staffId} className="hover:bg-gray-50/80 transition-colors">
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="font-medium text-gray-900">{staff.name}</div>
+                                                        <div className="font-semibold text-gray-900">{staff.name}</div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm text-gray-600">${staff.hourlyRate.toFixed(2)}</div>
+                                                        <div className="text-sm text-gray-500 font-medium tabular-nums">${staff.hourlyRate.toFixed(2)}/hr</div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm text-gray-900">{hours.toFixed(2)} hrs</div>
+                                                        <div className="text-sm font-bold text-gray-900 tabular-nums">{hours.toFixed(2)} hrs</div>
                                                     </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm font-semibold text-green-600">
-                                                            ${pay.toFixed(2)}
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                        <div className="text-sm font-black text-green-600 tabular-nums">
+                                                            ${pay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </div>
                                                     </td>
                                                 </tr>
                                             );
                                         })}
+                                        {Object.keys(staffMap).length === 0 && (
+                                            <tr>
+                                                <td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-400 font-medium italic">
+                                                    No active staff members found
+                                                </td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>

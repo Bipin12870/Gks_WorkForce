@@ -185,21 +185,21 @@ export default function AdminStaffPage() {
 
     return (
         <ProtectedRoute requiredRole="ADMIN">
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen bg-background">
                 {/* Header */}
-                <header className="bg-white shadow-sm border-b">
+                <header className="bg-white border-b border-gray-200">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-6">
                                 <Logo width={100} height={35} />
-                                <div className="border-l pl-4">
+                                <div className="border-l border-gray-200 pl-6">
                                     <button
                                         onClick={() => router.push('/dashboard')}
-                                        className="text-blue-600 hover:text-blue-700 text-sm font-medium mb-1 block"
+                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
                                     >
-                                        ← Back
+                                        ← Dashboard
                                     </button>
-                                    <h1 className="text-xl font-bold text-gray-900">Staff Management</h1>
+                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Staff Management</h1>
                                 </div>
                             </div>
                         </div>
@@ -207,26 +207,26 @@ export default function AdminStaffPage() {
                 </header>
 
                 {/* Main Content */}
-                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
                     {/* Create Staff Button */}
-                    <div className="mb-6">
+                    <div className="mb-8">
                         <button
                             onClick={() => setShowCreateForm(!showCreateForm)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition"
+                            className={showCreateForm ? "btn-secondary" : "btn-primary"}
                         >
-                            {showCreateForm ? 'Cancel' : '+ Create New Staff'}
+                            {showCreateForm ? 'Cancel Creation' : '+ Add New Staff Member'}
                         </button>
                     </div>
 
                     {/* Create Staff Form */}
                     {showCreateForm && (
-                        <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
-                            <h2 className="text-lg font-semibold text-gray-900 mb-4">Create Staff Account</h2>
-                            <form onSubmit={handleCreateStaff} className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="card-base p-8 mb-8 border-blue-100 bg-blue-50/10">
+                            <h2 className="text-lg font-bold text-gray-900 mb-6">Create Staff Account</h2>
+                            <form onSubmit={handleCreateStaff} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                             Full Name
                                         </label>
                                         <input
@@ -235,22 +235,23 @@ export default function AdminStaffPage() {
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                             required
                                             className="input-base"
+                                            placeholder="John Doe"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Username</label>
                                         <input
                                             type="text"
                                             value={formData.username}
                                             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                             required
                                             className="input-base"
-                                            placeholder="e.g. john_doe (No email needed)"
+                                            placeholder="johndoe"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Password
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                            Initial Password
                                         </label>
                                         <input
                                             type="password"
@@ -259,10 +260,11 @@ export default function AdminStaffPage() {
                                             required
                                             minLength={6}
                                             className="input-base"
+                                            placeholder="••••••••"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                             Hourly Rate ($)
                                         </label>
                                         <input
@@ -279,89 +281,98 @@ export default function AdminStaffPage() {
                                         />
                                     </div>
                                 </div>
-                                <button
-                                    type="submit"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition"
-                                >
-                                    Create Staff Account
-                                </button>
+                                <div className="flex justify-end pt-2">
+                                    <button
+                                        type="submit"
+                                        className="btn-primary px-8"
+                                    >
+                                        Create Account
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     )}
 
                     {/* Staff List */}
                     {loading ? (
-                        <div className="flex justify-center py-12">
+                        <div className="flex justify-center py-20">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
                     ) : (
-                        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                        <div className="card-base">
+                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <h3 className="font-bold text-gray-900">Active Staff Directory</h3>
+                                <span className="text-xs font-medium text-gray-500">{staff.length} Members</span>
+                            </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full">
-                                    <thead className="bg-gray-50 border-b">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Name
+                                    <thead>
+                                        <tr className="bg-gray-50/50">
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                                Staff Member
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Username
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                                Username / Login
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
                                                 Hourly Rate
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Status
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                                Acc. Status
                                             </th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Actions
+                                            <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                                Management
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-200">
+                                    <tbody className="divide-y divide-gray-100">
                                         {staff.map((member) => (
-                                            <tr key={member.id}>
+                                            <tr key={member.id} className="hover:bg-gray-50/80 transition-colors group">
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="font-medium text-gray-900">{member.name}</div>
+                                                    <div className="font-semibold text-gray-900">{member.name}</div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm text-gray-600">{member.username || member.email}</div>
+                                                    <div className="text-sm text-gray-500 font-medium">{member.username || member.email}</div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <input
-                                                        type="number"
-                                                        value={isNaN(member.hourlyRate) ? '' : member.hourlyRate}
-                                                        onChange={(e) => {
-                                                            const value = parseFloat(e.target.value);
-                                                            if (!isNaN(value)) {
-                                                                updateHourlyRate(member.id, value);
-                                                            }
-                                                        }}
-                                                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900"
-                                                        step="0.01"
-                                                        min="0"
-                                                    />
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-gray-400 text-sm">$</span>
+                                                        <input
+                                                            type="number"
+                                                            value={isNaN(member.hourlyRate) ? '' : member.hourlyRate}
+                                                            onChange={(e) => {
+                                                                const value = parseFloat(e.target.value);
+                                                                if (!isNaN(value)) {
+                                                                    updateHourlyRate(member.id, value);
+                                                                }
+                                                            }}
+                                                            className="w-20 px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-500 focus:bg-white rounded transition-all text-sm font-semibold text-gray-900 outline-none"
+                                                            step="0.01"
+                                                            min="0"
+                                                        />
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span
-                                                        className={`px-2 py-1 text-xs font-medium rounded-full ${member.isActive
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : 'bg-red-100 text-red-700'
+                                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold tracking-tight uppercase ${member.isActive
+                                                            ? 'bg-green-50 text-green-700'
+                                                            : 'bg-red-50 text-red-700'
                                                             }`}
                                                     >
                                                         {member.isActive ? 'Active' : 'Inactive'}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="flex gap-2">
+                                                <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                    <div className="flex justify-end gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
                                                         <button
                                                             onClick={() => openEditModal(member)}
-                                                            className="text-blue-600 hover:text-blue-700 font-medium px-2 py-1"
+                                                            className="btn-ghost-primary"
                                                         >
                                                             Edit
                                                         </button>
                                                         <button
                                                             onClick={() => toggleStaffStatus(member.id, member.isActive)}
-                                                            className={`font-medium px-2 py-1 ${member.isActive ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}`}
+                                                            className={member.isActive ? "btn-ghost-danger" : "btn-ghost-primary"}
                                                         >
                                                             {member.isActive ? 'Deactivate' : 'Activate'}
                                                         </button>
@@ -378,12 +389,19 @@ export default function AdminStaffPage() {
 
                 {/* Edit Modal */}
                 {showEditModal && editingStaff && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-                            <h2 className="text-xl font-bold text-gray-900 mb-4">Edit Staff: {editingStaff.name}</h2>
-                            <form onSubmit={handleUpdateStaff} className="space-y-4">
+                    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden">
+                            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                                <h2 className="text-lg font-bold text-gray-900 tracking-tight">Modify {editingStaff.name}</h2>
+                                <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <form onSubmit={handleUpdateStaff} className="p-6 space-y-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                         Full Name
                                     </label>
                                     <input
@@ -395,7 +413,7 @@ export default function AdminStaffPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                         Hourly Rate ($)
                                     </label>
                                     <input
@@ -409,44 +427,49 @@ export default function AdminStaffPage() {
                                     />
                                 </div>
 
-                                <div className="border-t pt-4 mt-6">
-                                    <h3 className="text-sm font-bold text-gray-900 mb-2">🔐 Reset Password</h3>
+                                <div className="bg-amber-50/50 p-4 rounded-lg border border-amber-100">
+                                    <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                        </svg>
+                                        Security: Assign New Password
+                                    </h3>
                                     <div className="flex gap-2">
                                         <input
                                             type="text"
                                             value={newPassword}
                                             onChange={(e) => setNewPassword(e.target.value)}
-                                            placeholder="New password"
-                                            className="input-base flex-1"
+                                            placeholder="Assign new password"
+                                            className="input-base flex-1 bg-white"
                                         />
                                         <button
                                             type="button"
                                             onClick={handleResetPassword}
                                             disabled={resettingPassword || !newPassword}
-                                            className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm transition font-medium disabled:opacity-50"
+                                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold tracking-tight uppercase transition-all disabled:opacity-50"
                                         >
                                             {resettingPassword ? '...' : 'Reset'}
                                         </button>
                                     </div>
-                                    <p className="text-[10px] text-gray-500 mt-1 italic italic">
-                                        * No email required. Changes are immediate.
+                                    <p className="text-[10px] text-amber-700/60 mt-2 font-medium">
+                                        * Login using username + new password. No email needed.
                                     </p>
                                 </div>
 
-                                <div className="flex gap-3 pt-4 border-t mt-4">
+                                <div className="flex gap-3 pt-4 border-t border-gray-100">
                                     <button
                                         type="button"
                                         onClick={() => setShowEditModal(false)}
-                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium"
+                                        className="btn-secondary flex-1"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                                        className="btn-primary flex-1"
                                         disabled={loading}
                                     >
-                                        {loading ? 'Saving...' : 'Save Changes'}
+                                        {loading ? 'Updating...' : 'Save Changes'}
                                     </button>
                                 </div>
                             </form>

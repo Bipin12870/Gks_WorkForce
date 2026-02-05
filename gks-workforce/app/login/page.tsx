@@ -36,18 +36,17 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-            <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-                <div className="text-center mb-8">
-                    <Logo className="mb-6 scale-125" />
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">Workforce</h1>
-                    <p className="text-gray-600">Sign in to your account</p>
+        <div className="min-h-screen flex items-center justify-center bg-background px-4">
+            <div className="max-w-md w-full card-base p-8">
+                <div className="text-center mb-10">
+                    <Logo className="mb-6 mx-auto" width={140} height={45} />
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Workforce</h1>
+                    <p className="text-sm text-gray-500 mt-1">Sign in to your shop account</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-
+                <form onSubmit={handleSubmit} className="space-y-5">
                     <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="email" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                             Email or Username
                         </label>
                         <input
@@ -57,12 +56,12 @@ export default function LoginPage() {
                             onChange={(e) => setEmail(e.target.value)}
                             required
                             className="input-base"
-                            placeholder="admin@gks.com or username"
+                            placeholder="e.g. admin@gks.com"
                         />
                     </div>
 
                     <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="password" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                             Password
                         </label>
                         <input
@@ -79,14 +78,14 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="btn-primary"
+                        className="btn-primary w-full"
                     >
                         {loading ? 'Signing in...' : 'Sign In'}
                     </button>
                 </form>
 
-                <p className="mt-6 text-center text-sm text-gray-600">
-                    Contact your administrator for account access
+                <p className="mt-8 text-center text-xs text-gray-400">
+                    Contact your manager for account access
                 </p>
             </div>
         </div>

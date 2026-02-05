@@ -8,6 +8,7 @@ import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore
 import { Shift } from '@/types';
 import { getWeekStart, formatDate, calculateHours } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import Logo from '@/components/Logo';
 
 export default function StaffHoursPage() {
     const { userData } = useAuth();
@@ -65,19 +66,21 @@ export default function StaffHoursPage() {
 
     return (
         <ProtectedRoute requiredRole="STAFF">
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen bg-background text-gray-900">
                 {/* Header */}
-                <header className="bg-white shadow-sm border-b">
+                <header className="bg-white border-b border-gray-200">
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div>
-                            <button
-                                onClick={() => router.push('/dashboard')}
-                                className="btn-ghost-primary mb-2"
-                            >
-                                ← Back to Dashboard
-                            </button>
-                            <h1 className="text-2xl font-bold text-gray-900">Hours & Pay</h1>
-                            <p className="text-sm text-gray-600">View your approved shifts and gross pay</p>
+                        <div className="flex items-center gap-6">
+                            <Logo width={100} height={35} />
+                            <div className="border-l border-gray-200 pl-6">
+                                <button
+                                    onClick={() => router.push('/dashboard')}
+                                    className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
+                                >
+                                    ← Dashboard
+                                </button>
+                                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Hours & Pay Summary</h1>
+                            </div>
                         </div>
                     </div>
                 </header>
@@ -85,77 +88,107 @@ export default function StaffHoursPage() {
                 {/* Main Content */}
                 <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     {/* Week Selector */}
-                    <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
-                        <div className="flex items-center justify-between">
+                    <div className="card-base p-6 mb-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 w-full md:w-auto">
                             <button
                                 onClick={() => changeWeek('prev')}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                title="Previous Week"
                             >
-                                ← Previous Week
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
                             </button>
-                            <h2 className="text-lg font-semibold text-gray-900">
+                            <div className="px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap flex-grow text-center min-w-[180px]">
                                 Week of {formatDate(selectedWeek)}
-                            </h2>
+                            </div>
                             <button
                                 onClick={() => changeWeek('next')}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                title="Next Week"
                             >
-                                Next Week →
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                </svg>
                             </button>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 self-center">Status:</span>
+                            <span className="px-3 py-1 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-widest rounded border border-green-100 flex items-center">
+                                Verified Approved
+                            </span>
                         </div>
                     </div>
 
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div className="bg-white rounded-xl shadow-sm border p-6">
-                            <p className="text-sm text-gray-600 mb-1">Weekly Hours</p>
-                            <p className="text-3xl font-bold text-gray-900">{totalHours.toFixed(2)}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                        <div className="card-base p-6 border-l-4 border-l-blue-600">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Weekly Hours</p>
+                            <div className="flex items-baseline gap-1">
+                                <p className="text-3xl font-black text-gray-900 tracking-tighter tabular-nums">{totalHours.toFixed(2)}</p>
+                                <p className="text-sm font-bold text-gray-400">hrs</p>
+                            </div>
                         </div>
-                        <div className="bg-white rounded-xl shadow-sm border p-6">
-                            <p className="text-sm text-gray-600 mb-1">Hourly Rate</p>
-                            <p className="text-3xl font-bold text-gray-900">${userData?.hourlyRate.toFixed(2)}</p>
+                        <div className="card-base p-6 border-l-4 border-l-gray-400">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Hourly Rate</p>
+                            <div className="flex items-baseline gap-1">
+                                <p className="text-sm font-bold text-gray-400">$</p>
+                                <p className="text-3xl font-black text-gray-900 tracking-tighter tabular-nums">{userData?.hourlyRate.toFixed(2)}</p>
+                            </div>
                         </div>
-                        <div className="bg-white rounded-xl shadow-sm border p-6">
-                            <p className="text-sm text-gray-600 mb-1">Gross Pay</p>
-                            <p className="text-3xl font-bold text-green-600">${grossPay.toFixed(2)}</p>
+                        <div className="card-base p-6 border-l-4 border-l-green-600">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Estimated Gross</p>
+                            <div className="flex items-baseline gap-1">
+                                <p className="text-sm font-bold text-green-600/50">$</p>
+                                <p className="text-3xl font-black text-green-600 tracking-tighter tabular-nums">{grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            </div>
                         </div>
                     </div>
 
                     {/* Loading State */}
                     {loading && (
-                        <div className="flex justify-center py-12">
+                        <div className="flex justify-center py-20">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
                     )}
 
                     {/* Shift Records */}
                     {!loading && (
-                        <div className="bg-white rounded-xl shadow-sm border">
-                            <div className="p-6 border-b">
-                                <h3 className="text-lg font-semibold text-gray-900">Approved Shifts</h3>
-                                <p className="text-xs text-gray-500 mt-1">Based on rostered times</p>
+                        <div className="card-base overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Approved Shift Log</h3>
                             </div>
-                            <div className="divide-y">
+                            <div className="divide-y divide-gray-100">
                                 {shifts.length === 0 ? (
-                                    <p className="p-6 text-gray-500 text-sm">No approved shifts for this week</p>
+                                    <div className="p-10 text-center">
+                                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No approved shifts found for this period</p>
+                                    </div>
                                 ) : (
                                     shifts.map((shift) => {
                                         const hours = calculateHours(shift.startTime, shift.endTime);
                                         return (
-                                            <div key={shift.id} className="p-6 flex items-center justify-between">
-                                                <div>
-                                                    <p className="font-medium text-gray-900">
-                                                        {formatDate(shift.date.toDate())}
-                                                    </p>
-                                                    <p className="text-sm text-gray-600">
-                                                        {shift.startTime} - {shift.endTime}
-                                                    </p>
+                                            <div key={shift.id} className="p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors group">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm group-hover:border-blue-100 transition-colors">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-900 tracking-tight">
+                                                            {formatDate(shift.date.toDate())}
+                                                        </p>
+                                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                                            {shift.startTime} - {shift.endTime}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="font-semibold text-gray-900">
+                                                    <p className="text-sm font-black text-gray-900 tabular-nums">
                                                         {hours.toFixed(2)} hrs
                                                     </p>
-                                                    <p className="text-sm text-gray-600">
+                                                    <p className="text-xs font-bold text-green-600 uppercase tracking-widest tabular-nums">
                                                         ${(hours * (userData?.hourlyRate || 0)).toFixed(2)}
                                                     </p>
                                                 </div>

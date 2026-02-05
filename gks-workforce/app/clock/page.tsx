@@ -92,33 +92,34 @@ export default function ClockInOutPage() {
 
     return (
         <ProtectedRoute requiredRole="STAFF">
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
-                <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+            <div className="min-h-screen bg-background flex items-center justify-center px-4">
+                <div className="max-w-md w-full card-base p-8">
                     <div className="text-center mb-8">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Time Clock</h1>
-                        <p className="text-gray-600">Welcome, {userData?.name}</p>
+                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Time Clock</h1>
+                        <p className="text-sm text-gray-500 mt-1">Hello, {userData?.name}</p>
                     </div>
 
                     {/* Loading State */}
                     {loading ? (
                         <div className="flex justify-center py-12">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
                     ) : activeRecord ? (
                         // Clocked In State
                         <div className="text-center">
-                            <div className="mb-6 p-6 bg-green-50 border border-green-200 rounded-xl">
-                                <p className="text-sm text-gray-600 mb-2">Clocked in at</p>
-                                <p className="text-2xl font-bold text-gray-900">
+                            <div className="mb-8 p-6 bg-green-50/50 border border-green-100 rounded-xl">
+                                <p className="text-xs font-semibold text-green-700 uppercase tracking-wider mb-2">Currently Clocked In</p>
+                                <p className="text-4xl font-black text-gray-900 tabular-nums">
                                     {activeRecord.clockInTime.toDate().toLocaleTimeString('en-US', {
                                         hour: '2-digit',
                                         minute: '2-digit',
+                                        hour12: true,
                                     })}
                                 </p>
-                                <p className="text-sm text-gray-600 mt-2">
+                                <p className="text-sm text-gray-500 mt-2 font-medium">
                                     {activeRecord.clockInTime.toDate().toLocaleDateString('en-US', {
-                                        weekday: 'long',
-                                        month: 'long',
+                                        weekday: 'short',
+                                        month: 'short',
                                         day: 'numeric',
                                     })}
                                 </p>
@@ -126,7 +127,7 @@ export default function ClockInOutPage() {
 
                             <button
                                 onClick={handleClockOut}
-                                className="btn-danger py-4 text-lg"
+                                className="btn-danger w-full py-4 text-base font-bold"
                             >
                                 Clock Out
                             </button>
@@ -134,13 +135,13 @@ export default function ClockInOutPage() {
                     ) : (
                         // Clocked Out State
                         <div className="text-center">
-                            <div className="mb-6 p-6 bg-gray-50 border border-gray-200 rounded-xl">
-                                <p className="text-gray-600">You are currently clocked out</p>
+                            <div className="mb-8 p-10 bg-gray-50 border border-gray-100 rounded-xl border-dashed">
+                                <p className="text-sm text-gray-400 font-medium italic">You are currently clocked out</p>
                             </div>
 
                             <button
                                 onClick={handleClockIn}
-                                className="btn-primary py-4 text-lg"
+                                className="btn-primary w-full py-4 text-base font-bold"
                             >
                                 Clock In
                             </button>
@@ -149,7 +150,7 @@ export default function ClockInOutPage() {
 
                     <button
                         onClick={() => router.push('/dashboard')}
-                        className="btn-secondary mt-6"
+                        className="btn-secondary w-full mt-6 text-sm py-2"
                     >
                         Back to Dashboard
                     </button>

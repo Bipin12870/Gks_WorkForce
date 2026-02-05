@@ -70,3 +70,19 @@ export interface TimeRecord {
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
+export type TimesheetStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface Timesheet {
+    id?: string;
+    staffId: string;
+    shiftId: string; // Reference to approved shift
+    date: Timestamp;
+    weekStartDate: Timestamp; // Monday 00:00
+    approvedShiftStart: string; // HH:mm format
+    approvedShiftEnd: string;   // HH:mm format
+    workedStart: string; // HH:mm format
+    workedEnd: string;   // HH:mm format
+    status: TimesheetStatus;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}

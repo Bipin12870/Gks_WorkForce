@@ -40,8 +40,10 @@ export default function AdminRosterPage() {
 
     // Load staff data
     useEffect(() => {
-        loadStaff();
-    }, []);
+        if (userData?.role === 'ADMIN') {
+            loadStaff();
+        }
+    }, [userData]);
 
     // Real-time listener for availability (RIGHT SECTION)
     useEffect(() => {
@@ -92,9 +94,10 @@ export default function AdminRosterPage() {
         });
 
         return () => unsubscribe();
-    }, [selectedWeek, selectedDay]);
+    }, [selectedWeek, selectedDay, userData]);
 
     const loadStaff = async () => {
+        if (!userData || userData.role !== 'ADMIN') return;
         const snapshot = await getDocs(collection(db, 'users'));
         const map: Record<string, User> = {};
         snapshot.forEach((doc) => {

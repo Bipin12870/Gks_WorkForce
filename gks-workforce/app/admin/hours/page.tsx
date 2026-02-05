@@ -2,15 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { Shift, User } from '@/types';
-import { getWeekStart, formatDate } from '@/lib/utils';
+import { Shift, User, Timesheet } from '@/types';
+import { getWeekStart, formatDate, calculateHours } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
 
 export default function AdminHoursPage() {
+    const { userData } = useAuth();
     const router = useRouter();
     const [selectedWeek, setSelectedWeek] = useState<Date>(getWeekStart(new Date()));
     const [staffHours, setStaffHours] = useState<Record<string, { hours: number; pay: number }>>({});
@@ -19,10 +21,13 @@ export default function AdminHoursPage() {
     const { showNotification } = useNotification();
 
     useEffect(() => {
-        loadData();
-    }, [selectedWeek]);
+        if (userData?.role === 'ADMIN') {
+            loadData();
+        }
+    }, [selectedWeek, userData]);
 
     const loadData = async () => {
+        if (!userData || userData.role !== 'ADMIN') return;
         setLoading(true);
 
         try {
@@ -37,37 +42,59 @@ export default function AdminHoursPage() {
             });
             setStaffMap(map);
 
-            // Load shifts for the week
+            // Week range
             const weekStart = new Date(selectedWeek);
             const weekEnd = new Date(selectedWeek);
             weekEnd.setDate(weekEnd.getDate() + 7);
 
-            const q = query(
+            // Load all approved shifts for the week
+            const shiftsQ = query(
                 collection(db, 'shifts'),
                 where('date', '>=', Timestamp.fromDate(weekStart)),
                 where('date', '<', Timestamp.fromDate(weekEnd)),
                 where('status', '==', 'APPROVED')
             );
+            const shiftsSnapshot = await getDocs(shiftsQ);
+            const loadedShifts: Shift[] = [];
+            shiftsSnapshot.forEach((doc) => {
+                loadedShifts.push({ id: doc.id, ...doc.data() } as Shift);
+            });
 
-            const snapshot = await getDocs(q);
+            // Load all approved timesheets for the week
+            const timesheetsQ = query(
+                collection(db, 'timesheets'),
+                where('weekStartDate', '==', Timestamp.fromDate(weekStart)),
+                where('status', '==', 'APPROVED')
+            );
+            const timesheetsSnapshot = await getDocs(timesheetsQ);
+            const loadedTimesheets: Timesheet[] = [];
+            timesheetsSnapshot.forEach((doc) => {
+                loadedTimesheets.push({ id: doc.id, ...doc.data() } as Timesheet);
+            });
+
             const hours: Record<string, { hours: number; pay: number }> = {};
-            const { calculateHours } = await import('@/lib/utils');
 
-            snapshot.forEach((doc) => {
-                const shift = doc.data() as Shift;
-                if (!hours[shift.staffId]) {
-                    hours[shift.staffId] = { hours: 0, pay: 0 };
+            // Calculate hours per staff member strictly using approved timesheets
+            loadedTimesheets.forEach((ts) => {
+                if (!hours[ts.staffId]) {
+                    hours[ts.staffId] = { hours: 0, pay: 0 };
                 }
-                const duration = calculateHours(shift.startTime, shift.endTime);
-                const hourlyRate = map[shift.staffId]?.hourlyRate || 0;
-                hours[shift.staffId].hours += duration;
-                hours[shift.staffId].pay += duration * hourlyRate;
+
+                const duration = calculateHours(ts.workedStart, ts.workedEnd);
+                const hourlyRate = map[ts.staffId]?.hourlyRate || 0;
+
+                hours[ts.staffId].hours += duration;
+                hours[ts.staffId].pay += duration * hourlyRate;
             });
 
             setStaffHours(hours);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error loading data:', error);
-            showNotification('Failed to load hours data. Please try again.', 'error');
+            if (error?.code === 'permission-denied') {
+                showNotification('Permission denied. Please ensure you are logged in as an admin.', 'error');
+            } else {
+                showNotification('Failed to load hours data. Please try again.', 'error');
+            }
         } finally {
             setLoading(false);
         }
@@ -134,7 +161,7 @@ export default function AdminHoursPage() {
                         <div className="flex gap-4">
                             <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 self-center">Status Filter:</span>
                             <span className="px-3 py-1 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-widest rounded border border-green-100 flex items-center">
-                                Approved Shifts Only
+                                Approved Timesheets Only
                             </span>
                         </div>
                     </div>

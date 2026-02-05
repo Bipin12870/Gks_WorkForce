@@ -61,6 +61,12 @@ export default function DashboardPage() {
                                     onClick={() => handleNavigation('/staff/roster')}
                                 />
                                 <DashboardCard
+                                    title="My Timesheets"
+                                    description="Submit work hours for your shifts"
+                                    icon="⏱️"
+                                    onClick={() => handleNavigation('/staff/timesheets')}
+                                />
+                                <DashboardCard
                                     title="Hours & Pay"
                                     description="Review your worked hours and estimated pay"
                                     icon="💰"
@@ -83,6 +89,12 @@ export default function DashboardPage() {
                                     description="Schedule shifts and approve availability"
                                     icon="📊"
                                     onClick={() => handleNavigation('/admin/roster')}
+                                />
+                                <DashboardCard
+                                    title="Timesheet Approval"
+                                    description="Verify and approve staff timesheets"
+                                    icon="✅"
+                                    onClick={() => handleNavigation('/admin/timesheets')}
                                 />
                                 <DashboardCard
                                     title="Hours Summary"

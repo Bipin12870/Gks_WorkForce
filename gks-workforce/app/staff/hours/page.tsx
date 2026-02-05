@@ -5,7 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { Shift } from '@/types';
+import { Shift, Timesheet } from '@/types';
 import { getWeekStart, formatDate, calculateHours } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
@@ -15,13 +15,14 @@ export default function StaffHoursPage() {
     const router = useRouter();
     const [selectedWeek, setSelectedWeek] = useState<Date>(getWeekStart(new Date()));
     const [shifts, setShifts] = useState<Shift[]>([]);
+    const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        loadShifts();
+        loadData();
     }, [selectedWeek, userData]);
 
-    const loadShifts = async () => {
+    const loadData = async () => {
         if (!userData) return;
 
         setLoading(true);
@@ -30,29 +31,44 @@ export default function StaffHoursPage() {
         const weekEnd = new Date(selectedWeek);
         weekEnd.setDate(weekEnd.getDate() + 7);
 
-        const q = query(
-            collection(db, 'shifts'),
-            where('staffId', '==', userData.id),
-            where('date', '>=', Timestamp.fromDate(weekStart)),
-            where('date', '<', Timestamp.fromDate(weekEnd)),
-            where('status', '==', 'APPROVED')
-        );
+        try {
+            // Load shifts
+            const shiftsQ = query(
+                collection(db, 'shifts'),
+                where('staffId', '==', userData.id),
+                where('date', '>=', Timestamp.fromDate(weekStart)),
+                where('date', '<', Timestamp.fromDate(weekEnd)),
+                where('status', '==', 'APPROVED')
+            );
+            const shiftsSnapshot = await getDocs(shiftsQ);
+            const loadedShifts: Shift[] = [];
+            shiftsSnapshot.forEach((doc) => {
+                loadedShifts.push({ id: doc.id, ...doc.data() } as Shift);
+            });
+            loadedShifts.sort((a, b) => {
+                const dateDiff = a.date.toMillis() - b.date.toMillis();
+                if (dateDiff !== 0) return dateDiff;
+                return a.startTime.localeCompare(b.startTime);
+            });
+            setShifts(loadedShifts);
 
-        const snapshot = await getDocs(q);
-        const loadedShifts: Shift[] = [];
-        snapshot.forEach((doc) => {
-            loadedShifts.push({ id: doc.id, ...doc.data() } as Shift);
-        });
-
-        // Sort by date and then start time
-        loadedShifts.sort((a, b) => {
-            const dateDiff = a.date.toMillis() - b.date.toMillis();
-            if (dateDiff !== 0) return dateDiff;
-            return a.startTime.localeCompare(b.startTime);
-        });
-
-        setShifts(loadedShifts);
-        setLoading(false);
+            // Load timesheets
+            const timesheetsQ = query(
+                collection(db, 'timesheets'),
+                where('staffId', '==', userData.id),
+                where('weekStartDate', '==', Timestamp.fromDate(weekStart))
+            );
+            const timesheetsSnapshot = await getDocs(timesheetsQ);
+            const loadedTimesheets: Timesheet[] = [];
+            timesheetsSnapshot.forEach((doc) => {
+                loadedTimesheets.push({ id: doc.id, ...doc.data() } as Timesheet);
+            });
+            setTimesheets(loadedTimesheets);
+        } catch (error) {
+            console.error('Error loading hours data:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const changeWeek = (direction: 'prev' | 'next') => {
@@ -61,7 +77,12 @@ export default function StaffHoursPage() {
         setSelectedWeek(getWeekStart(newWeek));
     };
 
-    const totalHours = shifts.reduce((sum, shift) => sum + calculateHours(shift.startTime, shift.endTime), 0);
+    // Calculate hours and pay strictly based on approved timesheets
+    let totalHours = 0;
+    timesheets.filter(ts => ts.status === 'APPROVED').forEach((ts) => {
+        totalHours += calculateHours(ts.workedStart, ts.workedEnd);
+    });
+
     const grossPay = totalHours * (userData?.hourlyRate || 0);
 
     return (
@@ -166,12 +187,16 @@ export default function StaffHoursPage() {
                                     </div>
                                 ) : (
                                     shifts.map((shift) => {
-                                        const hours = calculateHours(shift.startTime, shift.endTime);
+                                        const ts = timesheets.find((t) => t.shiftId === shift.id);
+                                        const isApproved = ts?.status === 'APPROVED';
+                                        const hours = isApproved ? calculateHours(ts.workedStart, ts.workedEnd) : 0;
+                                        const rosteredHours = calculateHours(shift.startTime, shift.endTime);
+
                                         return (
                                             <div key={shift.id} className="p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors group">
                                                 <div className="flex items-center gap-4">
                                                     <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm group-hover:border-blue-100 transition-colors">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isApproved ? 'text-green-500' : 'text-gray-400'} group-hover:text-blue-500 transition-colors`} viewBox="0 0 20 20" fill="currentColor">
                                                             <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                                                         </svg>
                                                     </div>
@@ -179,18 +204,41 @@ export default function StaffHoursPage() {
                                                         <p className="font-bold text-gray-900 tracking-tight">
                                                             {formatDate(shift.date.toDate())}
                                                         </p>
-                                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                                            {shift.startTime} - {shift.endTime}
-                                                        </p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                                                {isApproved ? `${ts.workedStart} - ${ts.workedEnd}` : `${shift.startTime} - ${shift.endTime} (Rostered)`}
+                                                            </p>
+                                                            {ts && (
+                                                                <span className={`px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded border whitespace-nowrap ${ts.status === 'APPROVED' ? 'bg-green-50 text-green-700 border-green-100' :
+                                                                        ts.status === 'REJECTED' ? 'bg-red-50 text-red-700 border-red-100' :
+                                                                            'bg-blue-50 text-blue-700 border-blue-100'
+                                                                    }`}>
+                                                                    {ts.status}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-sm font-black text-gray-900 tabular-nums">
-                                                        {hours.toFixed(2)} hrs
-                                                    </p>
-                                                    <p className="text-xs font-bold text-green-600 uppercase tracking-widest tabular-nums">
-                                                        ${(hours * (userData?.hourlyRate || 0)).toFixed(2)}
-                                                    </p>
+                                                    {isApproved ? (
+                                                        <>
+                                                            <p className="text-sm font-black text-gray-900 tabular-nums">
+                                                                {hours.toFixed(2)} hrs
+                                                            </p>
+                                                            <p className="text-xs font-bold text-green-600 uppercase tracking-widest tabular-nums">
+                                                                ${(hours * (userData?.hourlyRate || 0)).toFixed(2)}
+                                                            </p>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <p className="text-sm font-bold text-gray-300 tabular-nums line-through">
+                                                                {rosteredHours.toFixed(2)} hrs
+                                                            </p>
+                                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                                                {ts ? 'Pending Approval' : 'No Timesheet'}
+                                                            </p>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         );

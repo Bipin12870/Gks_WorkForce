@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
 import { db, auth, firebaseConfig } from '@/lib/firebase';
 import { collection, setDoc, getDocs, updateDoc, doc, Timestamp, query, where, writeBatch, deleteDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
@@ -13,6 +14,7 @@ import Logo from '@/components/Logo';
 import { resetStaffPassword, deleteStaffAccount } from '@/app/actions/staff-actions';
 
 export default function AdminStaffPage() {
+    const { userData } = useAuth();
     const router = useRouter();
     const [staff, setStaff] = useState<User[]>([]);
     const [showCreateForm, setShowCreateForm] = useState(false);
@@ -34,20 +36,29 @@ export default function AdminStaffPage() {
     const { showNotification } = useNotification();
 
     useEffect(() => {
-        loadStaff();
-    }, []);
+        if (userData?.role === 'ADMIN') {
+            loadStaff();
+        }
+    }, [userData]);
 
     const loadStaff = async () => {
-        const snapshot = await getDocs(collection(db, 'users'));
-        const loadedStaff: User[] = [];
-        snapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.role === 'STAFF') {
-                loadedStaff.push({ id: doc.id, ...data } as User);
-            }
-        });
-        setStaff(loadedStaff);
-        setLoading(false);
+        if (!userData || userData.role !== 'ADMIN') return;
+        try {
+            const snapshot = await getDocs(collection(db, 'users'));
+            const loadedStaff: User[] = [];
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.role === 'STAFF') {
+                    loadedStaff.push({ id: doc.id, ...data } as User);
+                }
+            });
+            setStaff(loadedStaff);
+        } catch (error) {
+            console.error('Error loading staff:', error);
+            showNotification('Failed to load staff list.', 'error');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleCreateStaff = async (e: React.FormEvent) => {

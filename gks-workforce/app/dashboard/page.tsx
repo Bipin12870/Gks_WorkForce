@@ -27,9 +27,9 @@ export default function DashboardPage() {
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-6">
                                 <Logo width={110} height={36} />
-                                <div className="hidden sm:block border-l border-gray-200 pl-6">
-                                    <h1 className="text-lg font-bold text-gray-900 tracking-tight">Workforce</h1>
-                                    <p className="text-xs text-gray-500 font-medium">Signed in as {userData?.name}</p>
+                                <div className="border-l border-gray-200 pl-4 sm:pl-6">
+                                    <h1 className="hidden sm:block text-lg font-bold text-gray-900 tracking-tight">Workforce</h1>
+                                    <p className="text-[10px] sm:text-xs text-gray-500 font-medium whitespace-nowrap">Signed in as {userData?.name}</p>
                                 </div>
                             </div>
                             <button

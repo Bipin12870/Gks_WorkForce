@@ -1,10 +1,9 @@
-'use server';
-
-import { adminAuth } from '@/lib/firebase-admin';
+import { getAdminAuth } from '@/lib/firebase-admin';
 import { revalidatePath } from 'next/cache';
 
 export async function resetStaffPassword(userId: string, newPassword: string) {
     try {
+        const adminAuth = getAdminAuth();
         if (!userId || !newPassword) {
             throw new Error('User ID and new password are required');
         }
@@ -34,6 +33,7 @@ export async function deleteStaffAccount(userId: string) {
         }
 
         // Delete the user from Firebase Auth using Admin SDK
+        const adminAuth = getAdminAuth();
         await adminAuth.deleteUser(userId);
 
         return { success: true };

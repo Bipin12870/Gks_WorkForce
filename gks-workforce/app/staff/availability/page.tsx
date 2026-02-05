@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, query, where, getDocs, Timestamp, updateDoc, doc } from 'firebase/firestore';
 import { TimeRange, Availability } from '@/types';
-import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isTimeBefore } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
@@ -49,7 +49,7 @@ export default function StaffAvailabilityPage() {
     const addTimeRange = (dayOfWeek: number) => {
         setAvailability({
             ...availability,
-            [dayOfWeek]: [...(availability[dayOfWeek] || []), { start: '09:00', end: '17:00' }],
+            [dayOfWeek]: [...(availability[dayOfWeek] || []), { start: SHOP_OPEN_TIME, end: '17:00' }],
         });
     };
 
@@ -98,6 +98,20 @@ export default function StaffAvailabilityPage() {
 
     const handleSubmit = async () => {
         if (!userData) return;
+
+        // Validate operating hours
+        for (const [day, ranges] of Object.entries(availability)) {
+            for (const range of ranges) {
+                if (isTimeBefore(range.start, SHOP_OPEN_TIME) || isTimeBefore(SHOP_CLOSE_TIME, range.end)) {
+                    showNotification(`Availability must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
+                    return;
+                }
+                if (!isTimeBefore(range.start, range.end)) {
+                    showNotification('Start time must be before end time', 'error');
+                    return;
+                }
+            }
+        }
 
         setLoading(true);
 

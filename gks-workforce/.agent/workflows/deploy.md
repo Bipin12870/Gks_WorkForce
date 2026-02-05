@@ -13,7 +13,8 @@ You can deploy using the Vercel Dashboard or the CLI.
 **Using the Dashboard (Recommended):**
 1. Go to [vercel.com](https://vercel.com) and click **"Add New"** -> **"Project"**.
 2. Import your GitHub repository.
-3. In the **"Environment Variables"** section, add the following variables from your `.env.local`:
+3. **[CRITICAL]** In the **"Root Directory"** field (under Project Settings), click **"Edit"** and select the `gks-workforce` folder.
+4. In the **"Environment Variables"** section, add the following variables from your `.env.local`:
    - `NEXT_PUBLIC_FIREBASE_API_KEY`
    - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
    - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`

@@ -1,4 +1,10 @@
 /**
+ * Operating hours constants
+ */
+export const SHOP_OPEN_TIME = '09:00';
+export const SHOP_CLOSE_TIME = '21:00';
+
+/**
  * Get the Monday (00:00) of the week containing the given date
  */
 export function getWeekStart(date: Date): Date {

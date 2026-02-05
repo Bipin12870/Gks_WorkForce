@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { db, auth, firebaseConfig } from '@/lib/firebase';
-import { collection, setDoc, getDocs, updateDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, setDoc, getDocs, updateDoc, doc, Timestamp, query, where, writeBatch, deleteDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { useNotification } from '@/contexts/NotificationContext';
 import { User } from '@/types';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
-import { resetStaffPassword } from '@/app/actions/staff-actions';
+import { resetStaffPassword, deleteStaffAccount } from '@/app/actions/staff-actions';
 
 export default function AdminStaffPage() {
     const router = useRouter();
@@ -156,6 +156,66 @@ export default function AdminStaffPage() {
             hourlyRate: member.hourlyRate,
         });
         setShowEditModal(true);
+    };
+
+    const handleDeleteStaff = async (staffId: string, staffName: string) => {
+        const confirmed = window.confirm(
+            `CRITICAL WARNING: You are about to PERMANENTLY delete ${staffName} and ALL their associated data (shifts, availability, clock-in history).\n\nThis action is IRREVERSIBLE. Are you absolutely sure?`
+        );
+
+        if (!confirmed) return;
+
+        const secondConfirmation = window.confirm(
+            `FINAL WARNING: All historical payroll and roster data for ${staffName} will be purged. Type 'DELETE' in your mind and press OK to continue.`
+        );
+
+        if (!secondConfirmation) return;
+
+        try {
+            setLoading(true);
+            const batch = writeBatch(db);
+
+            // 1. Delete all shifts
+            const shiftsQuery = query(collection(db, 'shifts'), where('staffId', '==', staffId));
+            const shiftsSnapshot = await getDocs(shiftsQuery);
+            shiftsSnapshot.forEach((doc) => batch.delete(doc.ref));
+
+            // 2. Delete all availability
+            const availabilityQuery = query(collection(db, 'availability'), where('staffId', '==', staffId));
+            const availabilitySnapshot = await getDocs(availabilityQuery);
+            availabilitySnapshot.forEach((doc) => batch.delete(doc.ref));
+
+            // 3. Delete all time records
+            const timeRecordsQuery = query(collection(db, 'timeRecords'), where('staffId', '==', staffId));
+            const timeRecordsSnapshot = await getDocs(timeRecordsQuery);
+            timeRecordsSnapshot.forEach((doc) => batch.delete(doc.ref));
+
+            // 4. Delete all roster audit logs
+            const auditLogsQuery = query(collection(db, 'rosterAuditLogs'), where('staffId', '==', staffId));
+            const auditLogsSnapshot = await getDocs(auditLogsQuery);
+            auditLogsSnapshot.forEach((doc) => batch.delete(doc.ref));
+
+            // 5. Delete the user document in Firestore
+            batch.delete(doc(db, 'users', staffId));
+
+            // 6. Delete the Firebase Auth account using Server Action
+            const authDeleteResult = await deleteStaffAccount(staffId);
+            if (!authDeleteResult.success) {
+                console.warn('Auth account could not be deleted automatically:', authDeleteResult.error);
+                // We still proceed with the batch commit for data pruning
+            }
+
+            // Commit the batch
+            await batch.commit();
+
+            showNotification(`${staffName} and all associated data have been permanently deleted.`, 'success');
+            loadStaff();
+        } catch (error: any) {
+            console.error('Error deleting staff:', error);
+            showNotification(error.message || 'Failed to delete staff and data', 'error');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleResetPassword = async () => {
@@ -375,6 +435,15 @@ export default function AdminStaffPage() {
                                                             className={member.isActive ? "btn-ghost-danger" : "btn-ghost-primary"}
                                                         >
                                                             {member.isActive ? 'Deactivate' : 'Activate'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteStaff(member.id, member.name)}
+                                                            className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                            title="Permanently Delete Staff"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                            </svg>
                                                         </button>
                                                     </div>
                                                 </td>

@@ -27,3 +27,18 @@ export async function resetStaffPassword(userId: string, newPassword: string) {
         return { success: false, error: error.message || 'Failed to reset password' };
     }
 }
+export async function deleteStaffAccount(userId: string) {
+    try {
+        if (!userId) {
+            throw new Error('User ID is required');
+        }
+
+        // Delete the user from Firebase Auth using Admin SDK
+        await adminAuth.deleteUser(userId);
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error deleting staff account:', error);
+        return { success: false, error: error.message || 'Failed to delete auth account' };
+    }
+}

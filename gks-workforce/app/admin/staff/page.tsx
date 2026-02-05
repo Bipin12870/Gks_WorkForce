@@ -10,6 +10,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { User } from '@/types';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
+import { resetStaffPassword } from '@/app/actions/staff-actions';
 
 export default function AdminStaffPage() {
     const router = useRouter();
@@ -28,6 +29,8 @@ export default function AdminStaffPage() {
         name: '',
         hourlyRate: 0,
     });
+    const [newPassword, setNewPassword] = useState('');
+    const [resettingPassword, setResettingPassword] = useState(false);
     const { showNotification } = useNotification();
 
     useEffect(() => {
@@ -153,6 +156,31 @@ export default function AdminStaffPage() {
             hourlyRate: member.hourlyRate,
         });
         setShowEditModal(true);
+    };
+
+    const handleResetPassword = async () => {
+        if (!editingStaff || !newPassword) return;
+        if (newPassword.length < 6) {
+            showNotification('Password must be at least 6 characters', 'error');
+            return;
+        }
+
+        try {
+            setResettingPassword(true);
+            const result = await resetStaffPassword(editingStaff.id, newPassword);
+
+            if (result.success) {
+                showNotification('Password reset successfully!', 'success');
+                setNewPassword('');
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+            console.error('Error resetting password:', error);
+            showNotification(error.message || 'Failed to reset password', 'error');
+        } finally {
+            setResettingPassword(false);
+        }
     };
 
     return (
@@ -380,11 +408,32 @@ export default function AdminStaffPage() {
                                         className="input-base"
                                     />
                                 </div>
-                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                                    <p className="font-semibold mb-1">🔐 Password Editing</p>
-                                    <p>Passwords cannot be directly changed here for security. Please use the Firebase Console to reset passwords for staff accounts.</p>
+
+                                <div className="border-t pt-4 mt-6">
+                                    <h3 className="text-sm font-bold text-gray-900 mb-2">🔐 Reset Password</h3>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            placeholder="New password"
+                                            className="input-base flex-1"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleResetPassword}
+                                            disabled={resettingPassword || !newPassword}
+                                            className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm transition font-medium disabled:opacity-50"
+                                        >
+                                            {resettingPassword ? '...' : 'Reset'}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 mt-1 italic italic">
+                                        * No email required. Changes are immediate.
+                                    </p>
                                 </div>
-                                <div className="flex gap-3 pt-2">
+
+                                <div className="flex gap-3 pt-4 border-t mt-4">
                                     <button
                                         type="button"
                                         onClick={() => setShowEditModal(false)}

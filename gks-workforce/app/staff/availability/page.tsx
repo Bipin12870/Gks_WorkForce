@@ -290,7 +290,7 @@ export default function StaffAvailabilityPage() {
                                                 </div>
                                                 <button
                                                     onClick={() => removeTimeRange(dayOfWeek, index)}
-                                                    className="self-end sm:self-auto ml-auto p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                    className="self-end sm:self-auto ml-auto p-2 text-red-500 bg-red-50 sm:bg-transparent sm:text-gray-300 sm:hover:text-red-600 sm:hover:bg-red-50 rounded-lg transition-all"
                                                     title="Remove Range"
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

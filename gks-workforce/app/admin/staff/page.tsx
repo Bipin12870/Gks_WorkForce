@@ -210,10 +210,10 @@ export default function AdminStaffPage() {
             batch.delete(doc(db, 'users', staffId));
 
             // 6. Delete the Firebase Auth account using Server Action
+            // We do this BEFORE the Firestore batch commit to ensure we don't leave orphaned Auth accounts
             const authDeleteResult = await deleteStaffAccount(staffId);
             if (!authDeleteResult.success) {
-                console.warn('Auth account could not be deleted automatically:', authDeleteResult.error);
-                // We still proceed with the batch commit for data pruning
+                throw new Error(`Critical Error: Could not delete the login account (${authDeleteResult.error}). Staff data was not removed. Please try again.`);
             }
 
             // Commit the batch

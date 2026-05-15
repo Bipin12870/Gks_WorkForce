@@ -41,6 +41,10 @@ export async function deleteStaffAccount(userId: string) {
 
         return { success: true };
     } catch (error: any) {
+        // If the user is already gone from Auth, we consider it a success for the cleanup process
+        if (error.code === 'auth/user-not-found') {
+            return { success: true };
+        }
         console.error('Error deleting staff account:', error);
         return { success: false, error: error.message || 'Failed to delete auth account' };
     }

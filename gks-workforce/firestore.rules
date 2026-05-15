@@ -3,56 +3,121 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /*
-    GLOBAL DEV MODE
-    ----------------
-    - No Firebase Auth implemented yet
-    - Role logic handled at application level
-    - Internal / hobby project
-    */
+    // ─────────────────────────────────────────────────────────────
+    // HELPER FUNCTIONS
+    // ─────────────────────────────────────────────────────────────
 
-    /* USERS
-       - Created and managed by admin via UI
-       - Used for staff profiles and pay rates
-    */
+    // User must be signed in via Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // The requesting user's UID matches the staffId field on the document
+    function isOwner(staffId) {
+      return request.auth.uid == staffId;
+    }
+
+    // Look up the requesting user's role from Firestore
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+
+
+    // ─────────────────────────────────────────────────────────────
+    // USERS
+    // Staff:  read own profile only (AuthContext fetches it on login)
+    // Admin:  read all profiles (builds staffMap across pages)
+    //         write all profiles (create staff, update rate/status)
+    // ─────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated() &&
+                     (request.auth.uid == userId || isAdmin());
+
+      allow write: if isAdmin();
     }
 
-    /* AVAILABILITY
-       - Staff submits weekly availability
-       - Admin reviews and approves
-    */
+
+    // ─────────────────────────────────────────────────────────────
+    // AVAILABILITY
+    // Staff:  read/write/delete own availability
+    //         (deterministic IDs: staffId_weekStart_dayOfWeek)
+    // Admin:  read all (to view roster requests)
+    //         delete own staff availability if needed
+    // ─────────────────────────────────────────────────────────────
     match /availability/{availabilityId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated() &&
+                     (isOwner(resource.data.staffId) || isAdmin());
+
+      // Staff creates/updates their own days; staffId in payload must match auth UID
+      allow create, update: if isAuthenticated() &&
+                               isOwner(request.resource.data.staffId);
+
+      // Staff can delete their own (clearing a day); Admin can also delete
+      allow delete: if isAuthenticated() &&
+                       (isOwner(resource.data.staffId) || isAdmin());
     }
 
-    /* SHIFTS (APPROVED SHIFTS)
-       - Admin creates, edits, approves, deletes
-       - Source of truth for roster + weekly pay
-    */
+
+    // ─────────────────────────────────────────────────────────────
+    // SHIFTS (APPROVED ROSTER)
+    // Staff:  read own shifts only (staff roster view)
+    // Admin:  read and write all shifts (create, edit, delete)
+    // ─────────────────────────────────────────────────────────────
     match /shifts/{shiftId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated() &&
+                     (isOwner(resource.data.staffId) || isAdmin());
+
+      allow write: if isAdmin();
     }
 
-    /* TIME RECORDS (FUTURE USE)
-       - Clock-in / clock-out placeholder
-       - Not active yet
-    */
+
+    // ─────────────────────────────────────────────────────────────
+    // TIME RECORDS (Clock In / Clock Out)
+    // Staff:  read own records (check active clock-in)
+    //         create new record (clock in)
+    //         update own record (clock out)
+    // Admin:  read all (hours summary)
+    // ─────────────────────────────────────────────────────────────
     match /timeRecords/{recordId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated() &&
+                     (isOwner(resource.data.staffId) || isAdmin());
+
+      allow create: if isAuthenticated() &&
+                       isOwner(request.resource.data.staffId);
+
+      allow update: if isAuthenticated() &&
+                       isOwner(resource.data.staffId);
+
+      allow delete: if isAdmin();
     }
-    
-    /* TIMESHEETS
-       - Staff submits worked hours
-       - Admin reviews and approves
-    */
+
+
+    // ─────────────────────────────────────────────────────────────
+    // TIMESHEETS
+    // Staff:  read own timesheets
+    //         create timesheets for their own shifts
+    // Admin:  read all timesheets (approval view)
+    //         update timesheets (approve / reject / adjust hours)
+    // ─────────────────────────────────────────────────────────────
     match /timesheets/{timesheetId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated() &&
+                     (isOwner(resource.data.staffId) || isAdmin());
+
+      allow create: if isAuthenticated() &&
+                       isOwner(request.resource.data.staffId);
+
+      allow update, delete: if isAdmin();
     }
-    
+
+
+    // ─────────────────────────────────────────────────────────────
+    // ROSTER AUDIT LOGS
+    // Admin only — staff should never read or write audit data
+    // ─────────────────────────────────────────────────────────────
     match /rosterAuditLogs/{logId} {
-      allow read, write: if true;
+      allow read, write: if isAdmin();
     }
+
   }
 }

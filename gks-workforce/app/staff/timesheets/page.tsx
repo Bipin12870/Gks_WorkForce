@@ -101,7 +101,23 @@ export default function StaffTimesheetsPage() {
         return timesheets.find(ts => ts.shiftId === shiftId);
     };
 
+    const isFutureShift = (shift: Shift) => {
+        const shiftDate = shift.date.toDate();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const shiftDay = new Date(shiftDate);
+        shiftDay.setHours(0, 0, 0, 0);
+        
+        return shiftDay > today;
+    };
+
     const handleStartEdit = (shift: Shift) => {
+        if (isFutureShift(shift)) {
+            showNotification('You cannot submit timesheets for future shifts.', 'error');
+            return;
+        }
+
         const existingTs = getTimesheetForShift(shift.id!);
         if (existingTs) return; // Cannot edit if already exists
 
@@ -308,6 +324,11 @@ export default function StaffTimesheetsPage() {
                                                                         {isSubmitting ? 'Submitting...' : 'Submit Manual'}
                                                                     </button>
                                                                 </div>
+                                                            </div>
+                                                        ) : isFutureShift(shift) ? (
+                                                            <div className="flex flex-col items-end">
+                                                                <span className="px-2 py-1 bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-wider rounded border border-gray-100 italic">Future Shift</span>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">Available after shift date</p>
                                                             </div>
                                                         ) : (
                                                             <div className="flex flex-col items-end gap-2">

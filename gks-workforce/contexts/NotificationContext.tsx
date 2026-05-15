@@ -43,9 +43,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         <NotificationContext.Provider value={{ showNotification }}>
             {children}
             {notification && (
-                <div className="fixed bottom-4 right-4 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-[90%] md:max-w-md animate-in fade-in slide-in-from-top-4 duration-300">
                     <div
-                        className={`px-6 py-4 rounded-xl shadow-2xl border flex items-center gap-3 min-w-[300px] ${notification.type === 'success'
+                        className={`px-6 py-4 rounded-xl shadow-2xl border flex items-center gap-3 w-full ${notification.type === 'success'
                                 ? 'bg-green-50 border-green-200 text-green-800'
                                 : 'bg-red-50 border-red-200 text-red-800'
                             }`}

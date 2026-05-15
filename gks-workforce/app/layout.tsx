@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import BadgeManager from "@/components/BadgeManager";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -35,6 +36,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <NotificationProvider>
+            <BadgeManager />
             {children}
           </NotificationProvider>
         </AuthProvider>

@@ -68,7 +68,7 @@ export default function AdminStaffPage() {
 
         try {
             // Construct dummy email for staff username
-            const dummyEmail = `${formData.username.trim()}@gks.internal`;
+            const dummyEmail = `${formData.username.trim()}@internal.gks`;
 
             // Create a secondary Firebase app to create the user without signing out the admin
             const tempAppName = `temp-app-${Date.now()}`;

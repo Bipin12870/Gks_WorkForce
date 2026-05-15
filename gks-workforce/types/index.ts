@@ -61,28 +61,105 @@ export interface RosterAuditLog {
     timestamp: Timestamp;
 }
 
+// ─────────────────────────────────────────────────────────────
+// GEOFENCING — TIME RECORDS
+// ─────────────────────────────────────────────────────────────
+
+/** How a TimeRecord was closed */
+export type TimeRecordSource = 'GPS' | 'AUTO_CLOSED';
+
 export interface TimeRecord {
     id?: string;
     staffId: string;
-    clockInTime: Timestamp;
+
+    // Clock-in
+    clockInTime: Timestamp;           // exact timestamp
+    clockInRounded: string;           // HH:mm — rounded to nearest 5 min
+    clockInLat: number;
+    clockInLng: number;
+    clockInAccuracy: number;          // metres (browser GPS accuracy)
+
+    // Clock-out (null while active)
     clockOutTime: Timestamp | null;
-    hoursWorked: number | null;
+    clockOutRounded: string | null;   // HH:mm — rounded to nearest 5 min
+    clockOutLat: number | null;
+    clockOutLng: number | null;
+    clockOutAccuracy: number | null;
+    clockOutWithinGeofence: boolean | null; // was clock-out inside radius?
+
+    // Computed
+    hoursWorked: number | null;       // based on rounded times
+
+    // Links
+    shiftId: string | null;           // matched shift (set on clock-out)
+    timesheetId: string | null;       // generated timesheet
+
+    source: TimeRecordSource;
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
+
+// ─────────────────────────────────────────────────────────────
+// GEOFENCING — TIMESHEETS
+// ─────────────────────────────────────────────────────────────
+
 export type TimesheetStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+/**
+ * How the timesheet was generated:
+ * - MANUAL         → staff entered times manually (old path, fallback)
+ * - GPS_VERIFIED   → clocked in+out within 100m, within rostered hours
+ * - GPS_OVERTIME   → within 100m but actual time exceeded rostered end
+ * - GPS_OUTSIDE    → clocked out outside 100m — rostered end time applied
+ * - AUTO_CLOSED    → system auto-closed because staff forgot to clock out
+ * - GPS_UNMATCHED  → clocked in/out but no matching shift found
+ */
+export type TimesheetSource =
+    | 'MANUAL'
+    | 'GPS_VERIFIED'
+    | 'GPS_OVERTIME'
+    | 'GPS_OUTSIDE'
+    | 'AUTO_CLOSED'
+    | 'GPS_UNMATCHED';
 
 export interface Timesheet {
     id?: string;
     staffId: string;
-    shiftId: string; // Reference to approved shift
+    shiftId: string | null;           // null for GPS_UNMATCHED
     date: Timestamp;
-    weekStartDate: Timestamp; // Monday 00:00
-    approvedShiftStart: string; // HH:mm format
-    approvedShiftEnd: string;   // HH:mm format
-    workedStart: string; // HH:mm format
-    workedEnd: string;   // HH:mm format
+    weekStartDate: Timestamp;         // Monday 00:00
+    approvedShiftStart: string;       // HH:mm — from rostered shift
+    approvedShiftEnd: string;         // HH:mm — from rostered shift
+    workedStart: string;              // HH:mm — actual (rounded) or rostered
+    workedEnd: string;                // HH:mm — actual (rounded) or rostered
     status: TimesheetStatus;
+
+    // Geofence metadata (set when source !== 'MANUAL')
+    source: TimesheetSource;
+    timeRecordId?: string;            // linked TimeRecord
+    clockInLat?: number;
+    clockInLng?: number;
+    clockOutLat?: number;
+    clockOutLng?: number;
+    clockOutDistanceMetres?: number;  // distance from shop at clock-out
+
+    // Admin action on flagged records
+    requiresAdminNote: boolean;       // true for OUTSIDE / OVERTIME / AUTO_CLOSED
+    adminNote?: string;               // admin fills this when approving
+
     createdAt: Timestamp;
     updatedAt: Timestamp;
+}
+
+// ─────────────────────────────────────────────────────────────
+// SHOP LOCATION CONFIG
+// ─────────────────────────────────────────────────────────────
+
+export interface ShopLocation {
+    lat: number;
+    lng: number;
+    radiusMetres: number;   // geofence radius, default 100
+    name: string;           // e.g. "GKS Shop"
+    setAt: Timestamp;
+    setBy: string;          // admin uid
 }

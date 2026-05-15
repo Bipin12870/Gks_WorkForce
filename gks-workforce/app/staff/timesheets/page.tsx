@@ -21,7 +21,7 @@ export default function StaffTimesheetsPage() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState<string | null>(null);
 
-    // Form state for editing worked times before submission
+    // Form state for editing worked times manually (fallback)
     const [editMode, setEditMode] = useState<string | null>(null);
     const [workedStart, setWorkedStart] = useState('');
     const [workedEnd, setWorkedEnd] = useState('');
@@ -110,7 +110,7 @@ export default function StaffTimesheetsPage() {
         setWorkedEnd(shift.endTime);
     };
 
-    const handleSubmitTimesheet = async (shift: Shift) => {
+    const handleSubmitManualTimesheet = async (shift: Shift) => {
         if (!userData) return;
 
         setSubmitting(shift.id!);
@@ -125,12 +125,14 @@ export default function StaffTimesheetsPage() {
                 workedStart: workedStart,
                 workedEnd: workedEnd,
                 status: 'PENDING',
+                source: 'MANUAL', // explicit source
+                requiresAdminNote: false,
                 createdAt: serverTimestamp() as Timestamp,
                 updatedAt: serverTimestamp() as Timestamp
             };
 
             await addDoc(collection(db, 'timesheets'), timesheetData);
-            showNotification('Timesheet submitted successfully', 'success');
+            showNotification('Manual timesheet submitted successfully', 'success');
             setEditMode(null);
         } catch (error) {
             console.error('Error submitting timesheet:', error);
@@ -151,6 +153,19 @@ export default function StaffTimesheetsPage() {
             default:
                 return null;
         }
+    };
+
+    const getSourceBadge = (source: string) => {
+        if (source === 'MANUAL') {
+            return <span className="flex items-center gap-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest"><span className="text-sm">✏️</span> Manual Entry</span>;
+        }
+        if (source === 'AUTO_CLOSED') {
+            return <span className="flex items-center gap-1 text-[10px] font-bold text-orange-600 uppercase tracking-widest"><span className="text-sm">🕐</span> Auto-Closed</span>;
+        }
+        if (source === 'GPS_OUTSIDE') {
+            return <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 uppercase tracking-widest"><span className="text-sm">⚠️</span> Outside Geofence</span>;
+        }
+        return <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 uppercase tracking-widest"><span className="text-sm">📍</span> GPS Verified</span>;
     };
 
     return (
@@ -196,12 +211,6 @@ export default function StaffTimesheetsPage() {
                                 </svg>
                             </button>
                         </div>
-                        <div className="flex gap-4">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 self-center">Step:</span>
-                            <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-widest rounded border border-blue-100 flex items-center">
-                                Submit Worked Hours
-                            </span>
-                        </div>
                     </div>
 
                     {loading ? (
@@ -212,7 +221,7 @@ export default function StaffTimesheetsPage() {
                         <div className="space-y-6">
                             {shifts.length === 0 ? (
                                 <div className="card-base p-10 text-center border-2 border-dashed border-gray-100">
-                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No approved shifts to confirm for this week</p>
+                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No approved shifts for this week</p>
                                 </div>
                             ) : (
                                 shifts.map((shift) => {
@@ -221,80 +230,97 @@ export default function StaffTimesheetsPage() {
                                     const isSubmitting = submitting === shift.id;
 
                                     return (
-                                        <div key={shift.id} className="card-base p-6 hover:border-gray-200 transition-colors group">
-                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                                <div className="flex items-center gap-6">
-                                                    <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                                                        </svg>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-sm font-black text-gray-400 uppercase tracking-widest mb-1">{getDayName(shift.date.toDate().getDay())}</p>
-                                                        <p className="text-lg font-black text-gray-900 tracking-tight">
-                                                            {formatDate(shift.date.toDate())}
-                                                        </p>
-                                                        <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mt-0.5">
-                                                            Rostered: {shift.startTime} - {shift.endTime}
-                                                        </p>
-                                                    </div>
+                                        <div key={shift.id} className="card-base overflow-hidden hover:border-gray-300 transition-colors group">
+                                            
+                                            {/* Timesheet Banner for GPS generated */}
+                                            {timesheet && timesheet.source !== 'MANUAL' && (
+                                                <div className="bg-blue-50/50 border-b border-blue-100 px-6 py-3 flex items-center justify-between">
+                                                    {getSourceBadge(timesheet.source)}
+                                                    <span className="text-[10px] text-gray-500 font-medium">Auto-generated via Clock App</span>
                                                 </div>
+                                            )}
 
-                                                <div className="flex flex-col md:items-end gap-3">
-                                                    {timesheet ? (
-                                                        <div className="flex flex-col items-end gap-2">
-                                                            <div className="text-right">
-                                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Worked Hours</p>
-                                                                <p className="text-sm font-black text-gray-900">{timesheet.workedStart} - {timesheet.workedEnd}</p>
-                                                            </div>
-                                                            {getStatusBadge(timesheet.status)}
+                                            <div className="p-6">
+                                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                                    <div className="flex items-center gap-6">
+                                                        <div className={`bg-white p-3 rounded-lg border shadow-sm ${timesheet && timesheet.source !== 'MANUAL' ? 'border-blue-100' : 'border-gray-100'}`}>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${timesheet && timesheet.source !== 'MANUAL' ? 'text-blue-600' : 'text-gray-400'}`} viewBox="0 0 20 20" fill="currentColor">
+                                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                                            </svg>
                                                         </div>
-                                                    ) : isEditing ? (
-                                                        <div className="flex flex-col gap-4 w-full md:w-auto">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="flex flex-col gap-1">
-                                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Start</label>
-                                                                    <input
-                                                                        type="time"
-                                                                        value={workedStart}
-                                                                        onChange={(e) => setWorkedStart(e.target.value)}
-                                                                        className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-100 outline-none"
-                                                                    />
-                                                                </div>
-                                                                <div className="flex flex-col gap-1">
-                                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">End</label>
-                                                                    <input
-                                                                        type="time"
-                                                                        value={workedEnd}
-                                                                        onChange={(e) => setWorkedEnd(e.target.value)}
-                                                                        className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-100 outline-none"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <button
-                                                                    onClick={() => setEditMode(null)}
-                                                                    className="px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors capitalize"
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleSubmitTimesheet(shift)}
-                                                                    disabled={isSubmitting}
-                                                                    className="px-6 py-2 bg-blue-600 text-white text-xs font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                                                                >
-                                                                    {isSubmitting ? 'Submitting...' : 'Submit Confirm'}
-                                                                </button>
-                                                            </div>
+                                                        <div>
+                                                            <p className="text-sm font-black text-gray-400 uppercase tracking-widest mb-1">{getDayName(shift.date.toDate().getDay())}</p>
+                                                            <p className="text-lg font-black text-gray-900 tracking-tight">
+                                                                {formatDate(shift.date.toDate())}
+                                                            </p>
+                                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-0.5">
+                                                                Rostered: {shift.startTime} - {shift.endTime}
+                                                            </p>
                                                         </div>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handleStartEdit(shift)}
-                                                            className="px-6 py-2.5 bg-white border border-blue-600 text-blue-600 text-xs font-black uppercase tracking-widest rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
-                                                        >
-                                                            Create Timesheet
-                                                        </button>
-                                                    )}
+                                                    </div>
+
+                                                    <div className="flex flex-col md:items-end gap-3">
+                                                        {timesheet ? (
+                                                            <div className="flex flex-col items-end gap-2">
+                                                                <div className="text-right">
+                                                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Worked Hours</p>
+                                                                    <p className="text-lg font-black text-gray-900">{timesheet.workedStart} - {timesheet.workedEnd}</p>
+                                                                </div>
+                                                                <div className="flex gap-2 items-center mt-1">
+                                                                    {timesheet.source === 'MANUAL' && getSourceBadge('MANUAL')}
+                                                                    {getStatusBadge(timesheet.status)}
+                                                                </div>
+                                                            </div>
+                                                        ) : isEditing ? (
+                                                            <div className="flex flex-col gap-4 w-full md:w-auto">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Start</label>
+                                                                        <input
+                                                                            type="time"
+                                                                            value={workedStart}
+                                                                            onChange={(e) => setWorkedStart(e.target.value)}
+                                                                            className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-100 outline-none"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">End</label>
+                                                                        <input
+                                                                            type="time"
+                                                                            value={workedEnd}
+                                                                            onChange={(e) => setWorkedEnd(e.target.value)}
+                                                                            className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-100 outline-none"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <button
+                                                                        onClick={() => setEditMode(null)}
+                                                                        className="px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors capitalize"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleSubmitManualTimesheet(shift)}
+                                                                        disabled={isSubmitting}
+                                                                        className="px-6 py-2 bg-blue-600 text-white text-xs font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                                                    >
+                                                                        {isSubmitting ? 'Submitting...' : 'Submit Manual'}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex flex-col items-end gap-2">
+                                                                <p className="text-[10px] text-gray-400 font-bold italic uppercase">Waiting for Clock Out...</p>
+                                                                <button
+                                                                    onClick={() => handleStartEdit(shift)}
+                                                                    className="px-4 py-1.5 text-gray-400 hover:text-gray-700 text-[10px] font-black uppercase tracking-widest rounded hover:bg-gray-50 transition-colors underline-offset-2 hover:underline"
+                                                                >
+                                                                    Enter manually instead
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

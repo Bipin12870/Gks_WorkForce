@@ -21,12 +21,15 @@ export default function AdminTimesheetsPage() {
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [staffMap, setStaffMap] = useState<Record<string, User>>({});
     const [loading, setLoading] = useState(true);
+    const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('ALL');
+    const [activeMobileTab, setActiveMobileTab] = useState<'roster' | 'timesheets'>('roster');
 
     // Adjustment Modal State
     const [showAdjustModal, setShowAdjustModal] = useState(false);
     const [selectedTimesheet, setSelectedTimesheet] = useState<Timesheet | null>(null);
     const [adjustStart, setAdjustStart] = useState('');
     const [adjustEnd, setAdjustEnd] = useState('');
+    const [adminNote, setAdminNote] = useState('');
 
     useEffect(() => {
         if (userData?.role === 'ADMIN') {
@@ -38,20 +41,30 @@ export default function AdminTimesheetsPage() {
         if (!userData || userData.role !== 'ADMIN') return;
 
         setLoading(true);
-        const dayDate = new Date(selectedWeek);
-        // Correctly calculate the date for the selected day of current week start (Monday)
-        dayDate.setDate(dayDate.getDate() + (selectedDay === 0 ? 6 : selectedDay - 1));
-        dayDate.setHours(0, 0, 0, 0);
+        const weekStart = new Date(selectedWeek);
+        const weekEnd = new Date(selectedWeek);
+        weekEnd.setDate(weekEnd.getDate() + 7);
 
-        const nextDay = new Date(dayDate);
-        nextDay.setDate(nextDay.getDate() + 1);
+        let startDate = weekStart;
+        let endDate = weekEnd;
 
-        // Listen for approved shifts for the specific day
+        if (selectedDay !== -1) {
+            const dayDate = new Date(selectedWeek);
+            dayDate.setDate(dayDate.getDate() + (selectedDay === 0 ? 6 : selectedDay - 1));
+            dayDate.setHours(0, 0, 0, 0);
+            
+            const nextDay = new Date(dayDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+
+            startDate = dayDate;
+            endDate = nextDay;
+        }
+
         const shiftsQuery = query(
             collection(db, 'shifts'),
             where('status', '==', 'APPROVED'),
-            where('date', '>=', Timestamp.fromDate(dayDate)),
-            where('date', '<', Timestamp.fromDate(nextDay))
+            where('date', '>=', Timestamp.fromDate(startDate)),
+            where('date', '<', Timestamp.fromDate(endDate))
         );
 
         const unsubscribeShifts = onSnapshot(shiftsQuery,
@@ -60,7 +73,6 @@ export default function AdminTimesheetsPage() {
                 snapshot.forEach((doc) => {
                     loadedShifts.push({ id: doc.id, ...doc.data() } as Shift);
                 });
-                // Sort by start time
                 loadedShifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
                 setShifts(loadedShifts);
             },
@@ -70,11 +82,10 @@ export default function AdminTimesheetsPage() {
             }
         );
 
-        // Listen for all timesheets for the specific day
         const timesheetsQuery = query(
             collection(db, 'timesheets'),
-            where('date', '>=', Timestamp.fromDate(dayDate)),
-            where('date', '<', Timestamp.fromDate(nextDay))
+            where('date', '>=', Timestamp.fromDate(startDate)),
+            where('date', '<', Timestamp.fromDate(endDate))
         );
 
         const unsubscribeTimesheets = onSnapshot(timesheetsQuery,
@@ -115,11 +126,18 @@ export default function AdminTimesheetsPage() {
         setSelectedWeek(getWeekStart(newWeek));
     };
 
-    const handleUpdateStatus = async (timesheetId: string, status: TimesheetStatus, workedStart?: string, workedEnd?: string) => {
+    const handleUpdateStatus = async (
+        timesheetId: string, 
+        status: TimesheetStatus, 
+        workedStart?: string, 
+        workedEnd?: string,
+        note?: string
+    ) => {
         try {
             const updates: any = { status, updatedAt: Timestamp.now() };
             if (workedStart) updates.workedStart = workedStart;
             if (workedEnd) updates.workedEnd = workedEnd;
+            if (note !== undefined) updates.adminNote = note;
 
             await updateDoc(doc(db, 'timesheets', timesheetId), updates);
             showNotification(`Timesheet ${status.toLowerCase()} successfully`, 'success');
@@ -134,11 +152,29 @@ export default function AdminTimesheetsPage() {
         setSelectedTimesheet(ts);
         setAdjustStart(ts.workedStart);
         setAdjustEnd(ts.workedEnd);
+        setAdminNote(ts.adminNote || '');
         setShowAdjustModal(true);
     };
 
-    const getTimesheetForShift = (shiftId: string) => {
-        return timesheets.find(ts => ts.shiftId === shiftId);
+    const getSourceBadge = (ts: Timesheet) => {
+        if (!ts.source) return null;
+        
+        switch (ts.source) {
+            case 'MANUAL':
+                return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded border border-gray-200"><span className="text-sm">✏️</span> Manual</span>;
+            case 'GPS_VERIFIED':
+                return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-widest rounded border border-green-200"><span className="text-sm">📍</span> GPS Verified</span>;
+            case 'GPS_OVERTIME':
+                return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 text-[10px] font-black uppercase tracking-widest rounded border border-purple-200"><span className="text-sm">⏱️</span> Overtime</span>;
+            case 'GPS_OUTSIDE':
+                return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 text-[10px] font-black uppercase tracking-widest rounded border border-red-200"><span className="text-sm">⚠️</span> Off-Site ({ts.clockOutDistanceMetres}m)</span>;
+            case 'AUTO_CLOSED':
+                return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-orange-50 text-orange-700 text-[10px] font-black uppercase tracking-widest rounded border border-orange-200"><span className="text-sm">🕐</span> Auto-Closed</span>;
+            case 'GPS_UNMATCHED':
+                return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest rounded border border-amber-200"><span className="text-sm">❓</span> Unmatched Shift</span>;
+            default:
+                return null;
+        }
     };
 
     const getStatusBadge = (status: TimesheetStatus) => {
@@ -153,6 +189,175 @@ export default function AdminTimesheetsPage() {
                 return null;
         }
     };
+
+    const renderRosteredShifts = () => (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Rostered Shifts: {getDayName(selectedDay)}</h3>
+                <div className="text-[10px] font-bold text-gray-400 italic">Read-Only</div>
+            </div>
+            {loading ? (
+                <div className="flex justify-center py-10"><div className="animate-spin h-6 w-6 border-b-2 border-gray-400"></div></div>
+            ) : (() => {
+                const filteredShifts = selectedStaffFilter === 'ALL' ? shifts : shifts.filter(s => s.staffId === selectedStaffFilter);
+                return filteredShifts.length === 0 ? (
+                    <div className="card-base p-10 text-center border-dashed">
+                        <p className="text-sm font-medium text-gray-400 italic">No approved shifts for this criteria</p>
+                    </div>
+                ) : (
+                    filteredShifts.map((shift) => (
+                        <div key={shift.id} className="card-base p-5 bg-gray-50/30 border-gray-100">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="font-bold text-gray-900 mb-0.5">{staffMap[shift.staffId]?.name || 'Unknown Staff'}</p>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                                        {getDayName(shift.date.toDate().getDay())}, {formatDate(shift.date.toDate())}
+                                    </p>
+                                    <div className="inline-flex items-center gap-2 bg-white px-2 py-1 rounded border border-gray-100 text-xs font-bold text-gray-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                        </svg>
+                                        {shift.startTime} - {shift.endTime}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Duration</p>
+                                    <p className="text-sm font-black text-gray-900">{calculateHours(shift.startTime, shift.endTime).toFixed(2)} hrs</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                );
+            })()}
+        </div>
+    );
+
+    const renderSubmittedTimesheets = () => (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+                <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest">Submitted Timesheets</h3>
+                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Action Required</div>
+            </div>
+            {loading ? (
+                <div className="flex justify-center py-10"><div className="animate-spin h-6 w-6 border-b-2 border-blue-600"></div></div>
+            ) : (() => {
+                const filteredTimesheets = selectedStaffFilter === 'ALL' ? timesheets : timesheets.filter(t => t.staffId === selectedStaffFilter);
+                return filteredTimesheets.length === 0 ? (
+                    <div className="card-base p-10 text-center border-dashed border-blue-100 bg-blue-50/10">
+                        <p className="text-sm font-medium text-blue-400 italic">No timesheets submitted for this criteria</p>
+                    </div>
+                ) : (
+                    filteredTimesheets.map((ts) => {
+                    const approvedHours = calculateHours(ts.approvedShiftStart, ts.approvedShiftEnd);
+                    const workedHours = calculateHours(ts.workedStart, ts.workedEnd);
+                    const diff = workedHours - approvedHours;
+
+                    return (
+                        <div key={ts.id} className={`card-base p-0 overflow-hidden hover:border-blue-300 transition-colors shadow-sm bg-white border ${
+                            ts.requiresAdminNote ? 'border-red-200' : 'border-blue-100'
+                        }`}>
+                            {/* Top Banner for GPS Source */}
+                            <div className={`px-5 py-2.5 flex items-center justify-between border-b ${
+                                ts.requiresAdminNote ? 'bg-red-50/50 border-red-100' : 'bg-blue-50/30 border-blue-100'
+                            }`}>
+                                <div className="flex items-center gap-2">
+                                    {getSourceBadge(ts)}
+                                </div>
+                                {ts.requiresAdminNote && ts.status === 'PENDING' && (
+                                    <span className="text-[10px] font-black text-red-600 uppercase tracking-widest animate-pulse">
+                                        Review Required
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="p-5">
+                                <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div>
+                                        <p className="font-black text-gray-900 text-lg tracking-tight">{staffMap[ts.staffId]?.name || 'Staff Member'}</p>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                            Shift: {formatDate(ts.date.toDate())} ({ts.approvedShiftStart}-{ts.approvedShiftEnd})
+                                        </p>
+                                    </div>
+                                    {getStatusBadge(ts.status)}
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                    <div>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Approved</p>
+                                        <p className="text-sm font-bold text-gray-900">{approvedHours.toFixed(2)}h</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Worked</p>
+                                        <p className="text-sm font-black text-blue-600">{workedHours.toFixed(2)}h</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Diff</p>
+                                        <p className={`text-sm font-black ${diff > 0 ? 'text-orange-600' : diff < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                            {diff > 0 ? '+' : ''}{diff.toFixed(2)}h
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="mb-6 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Submitted Worked Hours</p>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold bg-white px-2 py-1 rounded border border-gray-100 shadow-sm">{ts.workedStart} - {ts.workedEnd}</span>
+                                        </div>
+                                    </div>
+                                    {ts.adminNote && (
+                                        <div className="text-right max-w-[50%]">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Admin Note</p>
+                                            <p className="text-[10px] text-gray-600 italic bg-gray-50 px-2 py-1 rounded line-clamp-2">"{ts.adminNote}"</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+                                    {ts.status === 'PENDING' && !ts.requiresAdminNote && (
+                                        <button
+                                            onClick={() => handleUpdateStatus(ts.id!, 'APPROVED')}
+                                            className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                                        >
+                                            Quick Approve
+                                        </button>
+                                    )}
+                                    
+                                    {ts.status === 'PENDING' && ts.requiresAdminNote && (
+                                        <button
+                                            onClick={() => openAdjustModal(ts)}
+                                            className="px-4 py-2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-600 transition-colors shadow-sm"
+                                        >
+                                            Review & Resolve
+                                        </button>
+                                    )}
+
+                                    {(!ts.requiresAdminNote || ts.status !== 'PENDING') && (
+                                        <button
+                                            onClick={() => openAdjustModal(ts)}
+                                            className="px-4 py-2 bg-white border border-gray-200 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-gray-50 transition-colors"
+                                        >
+                                            {ts.status === 'PENDING' ? 'Adjust & Approve' : 'Correct & Update'}
+                                        </button>
+                                    )}
+                                    
+                                    {ts.status !== 'REJECTED' && (
+                                        <button
+                                            onClick={() => handleUpdateStatus(ts.id!, 'REJECTED')}
+                                            className="px-4 py-2 bg-white border border-red-100 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-red-50 transition-colors"
+                                        >
+                                            Reject
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })
+                );
+            })()}
+        </div>
+    );
 
     return (
         <ProtectedRoute requiredRole="ADMIN">
@@ -179,184 +384,114 @@ export default function AdminTimesheetsPage() {
                     <div className="card-base p-6 mb-8">
                         <div className="flex flex-col gap-6">
                             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                                <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100">
-                                    <button
-                                        onClick={() => changeWeek('prev')}
-                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
-                                    <div className="px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap min-w-[200px] text-center uppercase tracking-widest">
-                                        Week of {formatDate(selectedWeek)}
+                                <div className="flex flex-wrap items-center gap-4 w-full">
+                                    <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100">
+                                        <button
+                                            onClick={() => changeWeek('prev')}
+                                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                        <div className="px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap min-w-[200px] text-center uppercase tracking-widest">
+                                            Week of {formatDate(selectedWeek)}
+                                        </div>
+                                        <button
+                                            onClick={() => changeWeek('next')}
+                                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={() => changeWeek('next')}
-                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
-                                </div>
 
-                                <div className="flex gap-4">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 self-center">View Type:</span>
-                                    <span className="px-3 py-1 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-widest rounded border border-green-100 flex items-center">
-                                        Shift vs Timesheet Sync
-                                    </span>
-                                </div>
-                            </div>
+                                    <div className="flex flex-wrap items-center gap-4">
+                                        {/* Day Filter Dropdown */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Filter Day:</label>
+                                            <select
+                                                value={selectedDay}
+                                                onChange={(e) => setSelectedDay(Number(e.target.value))}
+                                                className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer min-w-[140px]"
+                                            >
+                                                <option value={-1}>All Week</option>
+                                                {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+                                                    <option key={day} value={day}>{getDayName(day)}</option>
+                                                ))}
+                                            </select>
+                                        </div>
 
-                            <div className="flex gap-1.5 bg-gray-50 p-1 rounded-xl border border-gray-100 overflow-x-auto">
-                                {[1, 2, 3, 4, 5, 6, 0].map((day) => (
-                                    <button
-                                        key={day}
-                                        onClick={() => setSelectedDay(day)}
-                                        className={`px-4 py-2 text-xs font-bold uppercase tracking-tight rounded-lg transition-all whitespace-nowrap ${selectedDay === day
-                                            ? 'bg-white text-blue-600 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
-                                            }`}
-                                    >
-                                        {getDayName(day)}
-                                    </button>
-                                ))}
+                                        {/* Staff Filter Dropdown */}
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Filter Staff:</label>
+                                            <select
+                                                value={selectedStaffFilter}
+                                                onChange={(e) => setSelectedStaffFilter(e.target.value)}
+                                                className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer min-w-[180px]"
+                                            >
+                                                <option value="ALL">All Staff</option>
+                                                {Object.values(staffMap).map((staff) => (
+                                                    <option key={staff.id} value={staff.id}>{staff.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                        {/* LEFT VIEW - Approved Roster (Read-Only) */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between px-2">
-                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Rostered Shifts: {getDayName(selectedDay)}</h3>
-                                <div className="text-[10px] font-bold text-gray-400 italic">Read-Only</div>
+                    {/* Desktop/Tablet Layout - Grid */}
+                    <div className="hidden lg:grid lg:grid-cols-2 gap-10">
+                        {renderRosteredShifts()}
+                        {renderSubmittedTimesheets()}
+                    </div>
+
+                    {/* Mobile/Tablet Layout - Tabbed */}
+                    <div className="lg:hidden">
+                        <div className="card-base">
+                            <div className="flex border-b border-gray-100">
+                                <button
+                                    onClick={() => setActiveMobileTab('roster')}
+                                    className={`flex-1 px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all ${activeMobileTab === 'roster'
+                                        ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-gray-400 hover:text-gray-600'
+                                        }`}
+                                >
+                                    Rostered Shifts
+                                </button>
+                                <button
+                                    onClick={() => setActiveMobileTab('timesheets')}
+                                    className={`flex-1 px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all ${activeMobileTab === 'timesheets'
+                                        ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-gray-400 hover:text-gray-600'
+                                        }`}
+                                >
+                                    Timesheets
+                                </button>
                             </div>
-                            {loading ? (
-                                <div className="flex justify-center py-10"><div className="animate-spin h-6 w-6 border-b-2 border-gray-400"></div></div>
-                            ) : shifts.length === 0 ? (
-                                <div className="card-base p-10 text-center border-dashed">
-                                    <p className="text-sm font-medium text-gray-400 italic">No approved shifts for this day</p>
-                                </div>
-                            ) : (
-                                shifts.map((shift) => (
-                                    <div key={shift.id} className="card-base p-5 bg-gray-50/30 border-gray-100">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="font-bold text-gray-900 mb-0.5">{staffMap[shift.staffId]?.name || 'Unknown Staff'}</p>
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                                                    {getDayName(shift.date.toDate().getDay())}, {formatDate(shift.date.toDate())}
-                                                </p>
-                                                <div className="inline-flex items-center gap-2 bg-white px-2 py-1 rounded border border-gray-100 text-xs font-bold text-gray-600">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                                                    </svg>
-                                                    {shift.startTime} - {shift.endTime}
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Duration</p>
-                                                <p className="text-sm font-black text-gray-900">{calculateHours(shift.startTime, shift.endTime).toFixed(2)} hrs</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-
-                        {/* RIGHT VIEW - Timesheets (Actionable) */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between px-2">
-                                <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest">Submitted Timesheets</h3>
-                                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Action Required</div>
+                            <div className="p-4 min-h-[400px]">
+                                {activeMobileTab === 'roster' ? renderRosteredShifts() : renderSubmittedTimesheets()}
                             </div>
-                            {loading ? (
-                                <div className="flex justify-center py-10"><div className="animate-spin h-6 w-6 border-b-2 border-blue-600"></div></div>
-                            ) : timesheets.length === 0 ? (
-                                <div className="card-base p-10 text-center border-dashed border-blue-100 bg-blue-50/10">
-                                    <p className="text-sm font-medium text-blue-400 italic">No timesheets submitted for this day</p>
-                                </div>
-                            ) : (
-                                timesheets.map((ts) => {
-                                    const approvedHours = calculateHours(ts.approvedShiftStart, ts.approvedShiftEnd);
-                                    const workedHours = calculateHours(ts.workedStart, ts.workedEnd);
-                                    const diff = workedHours - approvedHours;
-
-                                    return (
-                                        <div key={ts.id} className="card-base p-5 border-blue-100 hover:border-blue-300 transition-colors shadow-sm bg-white">
-                                            <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                                <div>
-                                                    <p className="font-black text-gray-900 text-lg tracking-tight">{staffMap[ts.staffId]?.name || 'Staff Member'}</p>
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                                        Shift: {formatDate(ts.date.toDate())} ({ts.approvedShiftStart}-{ts.approvedShiftEnd})
-                                                    </p>
-                                                </div>
-                                                {getStatusBadge(ts.status)}
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-2 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                                                <div>
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Approved</p>
-                                                    <p className="text-sm font-bold text-gray-900">{approvedHours.toFixed(2)}h</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Worked</p>
-                                                    <p className="text-sm font-black text-blue-600">{workedHours.toFixed(2)}h</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Diff</p>
-                                                    <p className={`text-sm font-black ${diff > 0 ? 'text-orange-600' : diff < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                                                        {diff > 0 ? '+' : ''}{diff.toFixed(2)}h
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="mb-6">
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Submitted Worked Hours</p>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-bold bg-white px-2 py-1 rounded border border-gray-100 shadow-sm">{ts.workedStart} - {ts.workedEnd}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                                                {ts.status === 'PENDING' && (
-                                                    <button
-                                                        onClick={() => handleUpdateStatus(ts.id!, 'APPROVED')}
-                                                        className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                                                    >
-                                                        Quick Approve
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => openAdjustModal(ts)}
-                                                    className="px-4 py-2 bg-white border border-gray-200 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-gray-50 transition-colors"
-                                                >
-                                                    {ts.status === 'PENDING' ? 'Adjust & Approve' : 'Correct & Update'}
-                                                </button>
-                                                {ts.status !== 'REJECTED' && (
-                                                    <button
-                                                        onClick={() => handleUpdateStatus(ts.id!, 'REJECTED')}
-                                                        className="px-4 py-2 bg-white border border-red-100 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-red-50 transition-colors"
-                                                    >
-                                                        Reject
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
                         </div>
                     </div>
                 </main>
 
-                {/* Adjustment Modal */}
+                {/* Adjustment / Resolution Modal */}
                 {showAdjustModal && selectedTimesheet && (
                     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-                        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden">
-                            <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                                <h3 className="text-lg font-black text-gray-900 tracking-tight">Adjust Worked Time</h3>
+                        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]">
+                            <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
+                                <div>
+                                    <h3 className="text-lg font-black text-gray-900 tracking-tight">
+                                        {selectedTimesheet.requiresAdminNote && selectedTimesheet.status === 'PENDING' ? 'Resolve Timesheet Issue' : 'Adjust Worked Time'}
+                                    </h3>
+                                    {selectedTimesheet.requiresAdminNote && (
+                                        <p className="text-xs text-amber-600 font-bold mt-1">This record requires admin review.</p>
+                                    )}
+                                </div>
                                 <button onClick={() => setShowAdjustModal(false)} className="text-gray-400 hover:text-gray-600">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                         <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -364,13 +499,19 @@ export default function AdminTimesheetsPage() {
                                 </button>
                             </div>
 
-                            <div className="p-6">
-                                <div className="mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
-                                    <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-1">Approved Roster</p>
-                                    <p className="text-sm font-bold text-gray-900">{selectedTimesheet.approvedShiftStart} - {selectedTimesheet.approvedShiftEnd}</p>
+                            <div className="p-6 overflow-y-auto">
+                                <div className="mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-1">Approved Roster</p>
+                                        <p className="text-sm font-bold text-gray-900">{selectedTimesheet.approvedShiftStart} - {selectedTimesheet.approvedShiftEnd}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Submitted</p>
+                                        <p className="text-sm font-bold text-gray-600">{selectedTimesheet.workedStart} - {selectedTimesheet.workedEnd}</p>
+                                    </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4 mb-8">
+                                <div className="grid grid-cols-2 gap-4 mb-6">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Adjusted Start</label>
                                         <input
@@ -391,6 +532,21 @@ export default function AdminTimesheetsPage() {
                                     </div>
                                 </div>
 
+                                {(selectedTimesheet.requiresAdminNote || adminNote) && (
+                                    <div className="mb-8">
+                                        <label className="block text-[10px] font-black text-gray-600 uppercase tracking-widest mb-2">
+                                            Admin Note <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={adminNote}
+                                            onChange={(e) => setAdminNote(e.target.value)}
+                                            placeholder="Explain why this overtime/off-site record was approved..."
+                                            className="input-base min-h-[80px] resize-none"
+                                            required={selectedTimesheet.requiresAdminNote}
+                                        />
+                                    </div>
+                                )}
+
                                 <div className="flex gap-3">
                                     <button
                                         onClick={() => setShowAdjustModal(false)}
@@ -399,10 +555,16 @@ export default function AdminTimesheetsPage() {
                                         Cancel
                                     </button>
                                     <button
-                                        onClick={() => handleUpdateStatus(selectedTimesheet.id!, 'APPROVED', adjustStart, adjustEnd)}
-                                        className="btn-primary flex-1"
+                                        onClick={() => {
+                                            if (selectedTimesheet.requiresAdminNote && !adminNote.trim()) {
+                                                showNotification('Admin note is required to resolve this record', 'error');
+                                                return;
+                                            }
+                                            handleUpdateStatus(selectedTimesheet.id!, 'APPROVED', adjustStart, adjustEnd, adminNote);
+                                        }}
+                                        className="btn-primary flex-1 bg-amber-500 hover:bg-amber-600"
                                     >
-                                        Approve Adjusted
+                                        {selectedTimesheet.requiresAdminNote && selectedTimesheet.status === 'PENDING' ? 'Resolve & Approve' : 'Approve Adjusted'}
                                     </button>
                                 </div>
                             </div>

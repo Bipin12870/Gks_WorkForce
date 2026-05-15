@@ -49,6 +49,12 @@ export default function DashboardPage() {
                         {userData?.role === 'STAFF' && (
                             <>
                                 <DashboardCard
+                                    title="Time Clock"
+                                    description="Clock in and out of your shift (GPS Required)"
+                                    icon="📍"
+                                    onClick={() => handleNavigation('/clock')}
+                                />
+                                <DashboardCard
                                     title="My Availability"
                                     description="Set your weekly working hours"
                                     icon="📅"
@@ -101,6 +107,18 @@ export default function DashboardPage() {
                                     description="View payroll and hours overview"
                                     icon="📈"
                                     onClick={() => handleNavigation('/admin/hours')}
+                                />
+                                <DashboardCard
+                                    title="Settings"
+                                    description="Configure shop location and geofence for GPS clock-in"
+                                    icon="⚙️"
+                                    onClick={() => handleNavigation('/admin/settings')}
+                                />
+                                <DashboardCard
+                                    title="Analytics"
+                                    description="Labor costs, hours summary, and performance metrics"
+                                    icon="📊"
+                                    onClick={() => handleNavigation('/admin/analytics')}
                                 />
                             </>
                         )}

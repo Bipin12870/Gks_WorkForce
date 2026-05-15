@@ -18,6 +18,7 @@ export default function StaffAvailabilityPage() {
     const [availability, setAvailability] = useState<Record<number, TimeRange[]>>({});
     const [isRecurring, setIsRecurring] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [isRostered, setIsRostered] = useState(false);
     const { showNotification } = useNotification();
 
     // Load existing availability for the week
@@ -27,23 +28,47 @@ export default function StaffAvailabilityPage() {
 
     const loadAvailability = async () => {
         if (!userData) return;
+        setLoading(true);
 
-        const weekStart = Timestamp.fromDate(selectedWeek);
-        const q = query(
-            collection(db, 'availability'),
-            where('staffId', '==', userData.id),
-            where('weekStartDate', '==', weekStart)
-        );
+        try {
+            const weekStart = Timestamp.fromDate(selectedWeek);
+            const nextWeek = new Date(selectedWeek);
+            nextWeek.setDate(nextWeek.getDate() + 7);
+            const nextWeekStart = Timestamp.fromDate(nextWeek);
 
-        const snapshot = await getDocs(q);
-        const loadedAvailability: Record<number, TimeRange[]> = {};
+            const availQuery = query(
+                collection(db, 'availability'),
+                where('staffId', '==', userData.id),
+                where('weekStartDate', '==', weekStart)
+            );
 
-        snapshot.forEach((doc) => {
-            const data = doc.data() as Availability;
-            loadedAvailability[data.dayOfWeek] = data.timeRanges;
-        });
+            const shiftsQuery = query(
+                collection(db, 'shifts'),
+                where('staffId', '==', userData.id),
+                where('date', '>=', weekStart),
+                where('date', '<', nextWeekStart),
+                where('status', '==', 'APPROVED')
+            );
 
-        setAvailability(loadedAvailability);
+            const [availSnapshot, shiftsSnapshot] = await Promise.all([
+                getDocs(availQuery),
+                getDocs(shiftsQuery)
+            ]);
+
+            const loadedAvailability: Record<number, TimeRange[]> = {};
+            availSnapshot.forEach((doc) => {
+                const data = doc.data() as Availability;
+                loadedAvailability[data.dayOfWeek] = data.timeRanges;
+            });
+
+            setAvailability(loadedAvailability);
+            setIsRostered(!shiftsSnapshot.empty);
+        } catch (error) {
+            console.error('Error loading data:', error);
+            showNotification('Failed to load availability', 'error');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const addTimeRange = (dayOfWeek: number) => {
@@ -219,30 +244,50 @@ export default function StaffAvailabilityPage() {
                             <div className="flex items-center gap-4 w-full md:w-auto">
                                 <button
                                     onClick={copyFromLastWeek}
-                                    className="flex-1 md:flex-none px-4 py-2 text-xs font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 rounded-lg border-2 border-blue-100 transition-all active:scale-[0.98]"
+                                    disabled={isRostered}
+                                    className={`flex-1 md:flex-none px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg border-2 transition-all active:scale-[0.98] ${
+                                        isRostered ? 'text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed' : 'text-blue-600 hover:bg-blue-50 border-blue-100'
+                                    }`}
                                 >
                                     Copy Past Week
                                 </button>
-                                <label className="flex items-center gap-3 cursor-pointer bg-gray-50/50 px-4 py-2 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+                                <label className={`flex items-center gap-3 px-4 py-2 rounded-lg border transition-colors ${
+                                    isRostered ? 'bg-gray-100 border-gray-200 cursor-not-allowed' : 'bg-gray-50/50 border-gray-100 hover:bg-gray-50 cursor-pointer'
+                                }`}>
                                     <input
                                         type="checkbox"
                                         checked={isRecurring}
                                         onChange={(e) => setIsRecurring(e.target.checked)}
-                                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 transition-all cursor-pointer"
+                                        disabled={isRostered}
+                                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 transition-all cursor-pointer disabled:opacity-50"
                                     />
                                     <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Recurring</span>
                                 </label>
                             </div>
                         </div>
 
-                        <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl flex gap-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-orange-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                            </svg>
-                            <p className="text-xs font-medium text-orange-800 leading-relaxed">
-                                Please submit your availability for the selected week. Your availability must fall within operating hours ({SHOP_OPEN_TIME} - {SHOP_CLOSE_TIME}).
-                            </p>
-                        </div>
+                        {isRostered ? (
+                            <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex gap-3 shadow-sm animate-in fade-in">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                <div>
+                                    <h4 className="text-sm font-bold text-red-900 mb-1">Roster Published</h4>
+                                    <p className="text-xs font-medium text-red-800 leading-relaxed">
+                                        Your shifts for this week have already been scheduled. You cannot edit your availability for a rostered week. Please contact management if you need to request a change.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl flex gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-orange-400 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                                <p className="text-xs font-medium text-orange-800 leading-relaxed">
+                                    Please submit your availability for the selected week. Your availability must fall within operating hours ({SHOP_OPEN_TIME} - {SHOP_CLOSE_TIME}).
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Days Mapping */}
@@ -254,12 +299,14 @@ export default function StaffAvailabilityPage() {
                                         <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
                                         {getDayName(dayOfWeek)}
                                     </h3>
-                                    <button
-                                        onClick={() => addTimeRange(dayOfWeek)}
-                                        className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 bg-white border border-blue-100 rounded-lg transition-all"
-                                    >
-                                        + Add Range
-                                    </button>
+                                    {!isRostered && (
+                                        <button
+                                            onClick={() => addTimeRange(dayOfWeek)}
+                                            className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 bg-white border border-blue-100 rounded-lg transition-all"
+                                        >
+                                            + Add Range
+                                        </button>
+                                    )}
                                 </div>
 
                                 <div className="space-y-4">
@@ -276,7 +323,8 @@ export default function StaffAvailabilityPage() {
                                                         type="time"
                                                         value={range.start}
                                                         onChange={(e) => updateTimeRange(dayOfWeek, index, 'start', e.target.value)}
-                                                        className="flex-1 sm:w-32 px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm font-semibold text-gray-900"
+                                                        disabled={isRostered}
+                                                        className="flex-1 sm:w-32 px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm font-semibold text-gray-900 disabled:opacity-60 disabled:bg-gray-100"
                                                     />
                                                 </div>
                                                 <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -285,18 +333,21 @@ export default function StaffAvailabilityPage() {
                                                         type="time"
                                                         value={range.end}
                                                         onChange={(e) => updateTimeRange(dayOfWeek, index, 'end', e.target.value)}
-                                                        className="flex-1 sm:w-32 px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm font-semibold text-gray-900"
+                                                        disabled={isRostered}
+                                                        className="flex-1 sm:w-32 px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm font-semibold text-gray-900 disabled:opacity-60 disabled:bg-gray-100"
                                                     />
                                                 </div>
-                                                <button
-                                                    onClick={() => removeTimeRange(dayOfWeek, index)}
-                                                    className="self-end sm:self-auto ml-auto p-2 text-red-500 bg-red-50 sm:bg-transparent sm:text-gray-300 sm:hover:text-red-600 sm:hover:bg-red-50 rounded-lg transition-all"
-                                                    title="Remove Range"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                                    </svg>
-                                                </button>
+                                                {!isRostered && (
+                                                    <button
+                                                        onClick={() => removeTimeRange(dayOfWeek, index)}
+                                                        className="self-end sm:self-auto ml-auto p-2 text-red-500 bg-red-50 sm:bg-transparent sm:text-gray-300 sm:hover:text-red-600 sm:hover:bg-red-50 rounded-lg transition-all"
+                                                        title="Remove Range"
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </button>
+                                                )}
                                             </div>
                                         ))
                                     )}
@@ -306,29 +357,31 @@ export default function StaffAvailabilityPage() {
                     </div>
 
                     {/* Submit Button */}
-                    <div className="mt-12 sticky bottom-8 flex justify-center">
-                        <button
-                            onClick={handleSubmit}
-                            disabled={loading}
-                            className={`
-                                group relative flex items-center justify-center gap-3 px-10 py-4 
-                                rounded-2xl font-black uppercase tracking-[0.2em] text-sm
-                                transition-all duration-300 shadow-xl overflow-hidden
-                                ${loading
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/25 hover:-translate-y-1 active:translate-y-0'
-                                }
-                            `}
-                        >
-                            <span className="relative z-10">{loading ? 'Submitting...' : 'Confirm Availability'}</span>
-                            {!loading && (
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 relative z-10 transition-transform group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                        </button>
-                    </div>
+                    {!isRostered && (
+                        <div className="mt-12 sticky bottom-8 flex justify-center">
+                            <button
+                                onClick={handleSubmit}
+                                disabled={loading}
+                                className={`
+                                    group relative flex items-center justify-center gap-3 px-10 py-4 
+                                    rounded-2xl font-black uppercase tracking-[0.2em] text-sm
+                                    transition-all duration-300 shadow-xl overflow-hidden
+                                    ${loading
+                                        ? 'bg-gray-400 cursor-not-allowed'
+                                        : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-500/25 hover:-translate-y-1 active:translate-y-0'
+                                    }
+                                `}
+                            >
+                                <span className="relative z-10">{loading ? 'Submitting...' : 'Confirm Availability'}</span>
+                                {!loading && (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 relative z-10 transition-transform group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                            </button>
+                        </div>
+                    )}
                 </main>
             </div>
         </ProtectedRoute>

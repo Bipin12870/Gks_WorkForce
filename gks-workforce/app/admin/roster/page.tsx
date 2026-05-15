@@ -71,17 +71,29 @@ export default function AdminRosterPage() {
     useEffect(() => {
         if (!userData || userData.role !== 'ADMIN') return;
 
-        const dayDate = new Date(selectedWeek);
-        dayDate.setDate(dayDate.getDate() + (selectedDay === 0 ? 6 : selectedDay - 1));
-        dayDate.setHours(0, 0, 0, 0);
+        const weekStart = new Date(selectedWeek);
+        const weekEnd = new Date(selectedWeek);
+        weekEnd.setDate(weekEnd.getDate() + 7);
 
-        const nextDay = new Date(dayDate);
-        nextDay.setDate(nextDay.getDate() + 1);
+        let startDate = weekStart;
+        let endDate = weekEnd;
+
+        if (selectedDay !== -1) {
+            const dayDate = new Date(selectedWeek);
+            dayDate.setDate(dayDate.getDate() + (selectedDay === 0 ? 6 : selectedDay - 1));
+            dayDate.setHours(0, 0, 0, 0);
+
+            const nextDay = new Date(dayDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+
+            startDate = dayDate;
+            endDate = nextDay;
+        }
 
         const q = query(
             collection(db, 'shifts'),
-            where('date', '>=', Timestamp.fromDate(dayDate)),
-            where('date', '<', Timestamp.fromDate(nextDay)),
+            where('date', '>=', Timestamp.fromDate(startDate)),
+            where('date', '<', Timestamp.fromDate(endDate)),
             where('status', '==', 'APPROVED')
         );
 
@@ -113,6 +125,9 @@ export default function AdminRosterPage() {
     };
 
     const getAvailabilityForDay = () => {
+        if (selectedDay === -1) {
+            return availability;
+        }
         return availability.filter((a) => a.dayOfWeek === selectedDay);
     };
 
@@ -304,19 +319,21 @@ export default function AdminRosterPage() {
                                 </button>
                             </div>
 
-                            <div className="flex gap-1.5 bg-gray-50 p-1 rounded-xl border border-gray-100 overflow-x-auto">
-                                {[1, 2, 3, 4, 5, 6, 0].map((day) => (
-                                    <button
-                                        key={day}
-                                        onClick={() => setSelectedDay(day)}
-                                        className={`px-4 py-2 text-xs font-bold uppercase tracking-tight rounded-lg transition-all whitespace-nowrap ${selectedDay === day
-                                            ? 'bg-white text-blue-600 shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
-                                            }`}
+                            <div className="flex flex-wrap items-center gap-4">
+                                {/* Day Filter Dropdown */}
+                                <div className="flex items-center gap-3">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Filter Day:</label>
+                                    <select
+                                        value={selectedDay}
+                                        onChange={(e) => setSelectedDay(Number(e.target.value))}
+                                        className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer min-w-[140px]"
                                     >
-                                        {getDayName(day)}
-                                    </button>
-                                ))}
+                                        <option value={-1}>All Week</option>
+                                        {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+                                            <option key={day} value={day}>{getDayName(day)}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -327,7 +344,7 @@ export default function AdminRosterPage() {
                         <div>
                             <div className="flex items-center justify-between mb-4 px-2">
                                 <h3 className="text-sm font-bold text-gray-700 uppercase tracking-widest">
-                                    Roster: {getDayName(selectedDay)}
+                                    Roster: {selectedDay === -1 ? 'All Week' : getDayName(selectedDay)}
                                 </h3>
                                 <span className="px-2 py-0.5 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-tighter rounded border border-green-100">
                                     Approved
@@ -348,6 +365,7 @@ export default function AdminRosterPage() {
                                                 <div>
                                                     <p className="font-bold text-gray-900 mb-1">
                                                         {staffMap[shift.staffId]?.name || 'Unknown Staff'}
+                                                        {selectedDay === -1 && <span className="ml-2 text-[10px] text-gray-500 font-black uppercase">({getDayName(shift.date.toDate().getDay())})</span>}
                                                     </p>
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded tabular-nums">
@@ -386,7 +404,7 @@ export default function AdminRosterPage() {
                         <div>
                             <div className="flex items-center justify-between mb-4 px-2">
                                 <h3 className="text-sm font-bold text-gray-700 uppercase tracking-widest">
-                                    Availability: {getDayName(selectedDay)}
+                                    Availability: {selectedDay === -1 ? 'All Week' : getDayName(selectedDay)}
                                 </h3>
                                 <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-tighter rounded border border-blue-100">
                                     Requests
@@ -406,6 +424,7 @@ export default function AdminRosterPage() {
                                             <div className="flex justify-between items-center mb-4">
                                                 <p className="font-bold text-gray-900">
                                                     {staffMap[avail.staffId]?.name || 'Unknown Staff'}
+                                                    {selectedDay === -1 && <span className="ml-2 text-[10px] text-gray-500 font-black uppercase">({getDayName(avail.dayOfWeek)})</span>}
                                                 </p>
                                                 {avail.timeRanges.map((range, idx) => (
                                                     <span key={idx} className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded tabular-nums">

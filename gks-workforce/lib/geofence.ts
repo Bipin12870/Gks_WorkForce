@@ -1,0 +1,120 @@
+/**
+ * lib/geofence.ts
+ * ─────────────────────────────────────────────────────────────
+ * Pure geofence utilities — no React, no side-effects.
+ * All functions are safe to call from client components.
+ */
+
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { ShopLocation } from '@/types';
+
+// ─────────────────────────────────────────────────────────────
+// TIME ROUNDING
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Round a Date object to the nearest 5-minute mark.
+ * Returns an HH:mm string.
+ *
+ * Examples:
+ *   09:02 → "09:00"
+ *   09:03 → "09:05"
+ *   17:28 → "17:30"
+ *   23:58 → "00:00" (wraps midnight)
+ */
+export function roundToNearest5(date: Date): string {
+    const totalMinutes = date.getHours() * 60 + date.getMinutes();
+    const rounded = Math.round(totalMinutes / 5) * 5;
+    const h = Math.floor(rounded / 60) % 24;
+    const m = rounded % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// DISTANCE CALCULATION (HAVERSINE)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Calculate the distance in metres between two GPS coordinates
+ * using the Haversine formula. Accurate to within ~0.5% for
+ * distances under 1 km, which is more than sufficient for a 100m geofence.
+ */
+export function getDistanceMetres(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number
+): number {
+    const R = 6_371_000; // Earth radius in metres
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+
+    const a =
+        Math.sin(Δφ / 2) ** 2 +
+        Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ─────────────────────────────────────────────────────────────
+// OVERTIME CHECK
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the clockOutRounded time is strictly after shiftEndTime.
+ * Both arguments must be HH:mm strings.
+ */
+export function isOvertime(clockOutRounded: string, shiftEndTime: string): boolean {
+    const [oh, om] = clockOutRounded.split(':').map(Number);
+    const [sh, sm] = shiftEndTime.split(':').map(Number);
+    return oh * 60 + om > sh * 60 + sm;
+}
+
+// ─────────────────────────────────────────────────────────────
+// SHOP LOCATION (FIRESTORE)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetch the shop location config from Firestore.
+ * Returns null if no location has been configured yet.
+ */
+export async function getShopLocation(): Promise<ShopLocation | null> {
+    const ref = doc(db, 'config', 'shopLocation');
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return snap.data() as ShopLocation;
+}
+
+// ─────────────────────────────────────────────────────────────
+// GEOFENCE CHECK
+// ─────────────────────────────────────────────────────────────
+
+export interface GeofenceResult {
+    withinRange: boolean;
+    distanceMetres: number;
+    radiusMetres: number;
+}
+
+/**
+ * Check whether a GPS coordinate is within the configured shop radius.
+ * Fetches the shop location from Firestore.
+ * Returns null if no shop location has been set yet.
+ */
+export async function checkGeofence(
+    userLat: number,
+    userLng: number
+): Promise<GeofenceResult | null> {
+    const shop = await getShopLocation();
+    if (!shop) return null;
+
+    const distanceMetres = getDistanceMetres(userLat, userLng, shop.lat, shop.lng);
+
+    return {
+        withinRange: distanceMetres <= shop.radiusMetres,
+        distanceMetres: Math.round(distanceMetres),
+        radiusMetres: shop.radiusMetres,
+    };
+}

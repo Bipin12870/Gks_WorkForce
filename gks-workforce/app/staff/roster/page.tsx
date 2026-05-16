@@ -62,18 +62,20 @@ export default function StaffRosterPage() {
         <ProtectedRoute requiredRole="STAFF">
             <div className="min-h-screen bg-background text-gray-900">
                 {/* Header */}
-                <header className="bg-white border-b border-gray-200">
+                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div className="flex items-center gap-6">
-                            <Logo width={100} height={35} />
-                            <div className="border-l border-gray-200 pl-6">
-                                <button
-                                    onClick={() => router.push('/dashboard')}
-                                    className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
-                                >
-                                    ← Dashboard
-                                </button>
-                                <h1 className="text-xl font-bold text-gray-900 tracking-tight">My Weekly Roster</h1>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-6">
+                                <Logo width={100} height={35} />
+                                <div className="border-l border-gray-200 pl-6">
+                                    <button
+                                        onClick={() => router.push('/dashboard')}
+                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
+                                    >
+                                        ← Dashboard
+                                    </button>
+                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">My Weekly Roster</h1>
+                                </div>
                             </div>
                         </div>
                     </div>

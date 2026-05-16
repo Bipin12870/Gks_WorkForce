@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
@@ -104,13 +104,18 @@ export default function StaffTimesheetsPage() {
 
     const isFutureShift = (shift: Shift) => {
         const shiftDate = shift.date.toDate();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const [endHours, endMinutes] = shift.endTime.split(':').map(Number);
         
-        const shiftDay = new Date(shiftDate);
-        shiftDay.setHours(0, 0, 0, 0);
-        
-        return shiftDay > today;
+        const shiftEnd = new Date(shiftDate);
+        shiftEnd.setHours(endHours, endMinutes, 0, 0);
+
+        // Handle overnight shifts (e.g. 22:00 to 06:00)
+        const [startHours, startMinutes] = shift.startTime.split(':').map(Number);
+        if (endHours < startHours || (endHours === startHours && endMinutes < startMinutes)) {
+            shiftEnd.setDate(shiftEnd.getDate() + 1);
+        }
+
+        return new Date() < shiftEnd;
     };
 
     const handleStartEdit = (shift: Shift) => {
@@ -187,21 +192,56 @@ export default function StaffTimesheetsPage() {
         return <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 uppercase tracking-widest"><span className="text-sm">📍</span> GPS Verified</span>;
     };
 
+
+    // Unified list for display
+    const unifiedDisplayList = useMemo(() => {
+        // 1. Start with all shifts
+        const list = shifts.map(shift => {
+            const ts = timesheets.find(t => t.shiftId === shift.id);
+            return {
+                id: shift.id || `shift-${Math.random()}`,
+                date: shift.date,
+                shift,
+                timesheet: ts,
+                type: 'ROSTERED'
+            };
+        });
+
+        // 2. Add unrostered timesheets
+        timesheets.forEach(ts => {
+            const hasShiftInCurrentList = shifts.some(s => s.id === ts.shiftId);
+            if (!ts.shiftId || !hasShiftInCurrentList) {
+                list.push({
+                    id: ts.id || `ts-${Math.random()}`,
+                    date: ts.date,
+                    shift: null,
+                    timesheet: ts,
+                    type: 'UNROSTERED'
+                });
+            }
+        });
+
+        // 3. Sort by date (descending)
+        return list.sort((a, b) => b.date.toMillis() - a.date.toMillis());
+    }, [shifts, timesheets]);
+
     return (
         <ProtectedRoute requiredRole="STAFF">
             <div className="min-h-screen bg-background text-gray-900">
-                <header className="bg-white border-b border-gray-200">
+                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div className="flex items-center gap-6">
-                            <Logo width={100} height={35} />
-                            <div className="border-l border-gray-200 pl-6">
-                                <button
-                                    onClick={() => router.push('/dashboard')}
-                                    className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
-                                >
-                                    ← Dashboard
-                                </button>
-                                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Shift Timesheets</h1>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-6">
+                                <Logo width={100} height={35} />
+                                <div className="border-l border-gray-200 pl-6">
+                                    <button
+                                        onClick={() => router.push('/dashboard')}
+                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
+                                    >
+                                        ← Dashboard
+                                    </button>
+                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Shift Timesheets</h1>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -238,19 +278,20 @@ export default function StaffTimesheetsPage() {
                         </div>
                     ) : (
                         <div className="space-y-6">
-                            {shifts.length === 0 ? (
+                            {unifiedDisplayList.length === 0 ? (
                                 <div className="card-base p-10 text-center border-2 border-dashed border-gray-100">
-                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No approved shifts for this week</p>
+                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No shifts or activity for this week</p>
                                 </div>
                             ) : (
-                                shifts.map((shift) => {
-                                    const timesheet = getTimesheetForShift(shift.id!);
-                                    const isEditing = editMode === shift.id;
-                                    const isSubmitting = submitting === shift.id;
+                                unifiedDisplayList.map((item: any) => {
+                                    const shift = item.shift;
+                                    const timesheet = item.timesheet;
+                                    const isEditing = editMode === item.id;
+                                    const isSubmitting = submitting === item.id;
 
                                     return (
-                                        <div key={shift.id} className="card-base overflow-hidden hover:border-gray-300 transition-colors group">
-                                            
+                                        <div key={item.id} className="card-base overflow-hidden hover:border-gray-300 transition-colors group">
+
                                             {/* Timesheet Banner for GPS generated */}
                                             {timesheet && timesheet.source !== 'MANUAL' && (
                                                 <div className="bg-blue-50/50 border-b border-blue-100 px-6 py-3 flex items-center justify-between">
@@ -268,12 +309,21 @@ export default function StaffTimesheetsPage() {
                                                             </svg>
                                                         </div>
                                                         <div>
-                                                            <p className="text-sm font-black text-gray-400 uppercase tracking-widest mb-1">{getDayName(shift.date.toDate().getDay())}</p>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <p className="text-sm font-black text-gray-400 uppercase tracking-widest">{getDayName(item.date.toDate().getDay())}</p>
+                                                                {item.type === 'UNROSTERED' && (
+                                                                    <span className="px-2 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 text-[8px] font-black uppercase tracking-wider rounded">
+                                                                        Unrostered
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <p className="text-lg font-black text-gray-900 tracking-tight">
-                                                                {formatDate(shift.date.toDate())}
+                                                                {formatDate(item.date.toDate())}
                                                             </p>
                                                             <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-0.5">
-                                                                Rostered: {shift.startTime} - {shift.endTime}
+                                                                {shift
+                                                                    ? `Rostered: ${shift.startTime} - ${shift.endTime}`
+                                                                    : 'Emergency/Extra Work'}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -314,35 +364,37 @@ export default function StaffTimesheetsPage() {
                                                                 </div>
                                                                 <div className="flex gap-2">
                                                                     <button
+                                                                        onClick={() => handleSubmitManualTimesheet(shift!)}
+                                                                        disabled={isSubmitting}
+                                                                        className="flex-grow py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                                                                    >
+                                                                        {isSubmitting ? 'Saving...' : 'Submit'}
+                                                                    </button>
+                                                                    <button
                                                                         onClick={() => setEditMode(null)}
-                                                                        className="px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors capitalize"
+                                                                        className="px-4 py-2 bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-gray-200 transition-colors"
                                                                     >
                                                                         Cancel
                                                                     </button>
-                                                                    <button
-                                                                        onClick={() => handleSubmitManualTimesheet(shift)}
-                                                                        disabled={isSubmitting}
-                                                                        className="px-6 py-2 bg-blue-600 text-white text-xs font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                                                                    >
-                                                                        {isSubmitting ? 'Submitting...' : 'Submit Manual'}
-                                                                    </button>
                                                                 </div>
                                                             </div>
-                                                        ) : isFutureShift(shift) ? (
+                                                        ) : shift && isFutureShift(shift) ? (
                                                             <div className="flex flex-col items-end">
                                                                 <span className="px-2 py-1 bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-wider rounded border border-gray-100 italic">Future Shift</span>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">Available after shift date</p>
+                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">Available after shift ends</p>
                                                             </div>
                                                         ) : (
-                                                            <div className="flex flex-col items-end gap-2">
-                                                                <p className="text-[10px] text-gray-400 font-bold italic uppercase">Waiting for Clock Out...</p>
+                                                            shift && (
                                                                 <button
                                                                     onClick={() => handleStartEdit(shift)}
-                                                                    className="px-4 py-1.5 text-gray-400 hover:text-gray-700 text-[10px] font-black uppercase tracking-widest rounded hover:bg-gray-50 transition-colors underline-offset-2 hover:underline"
+                                                                    className="px-6 py-2.5 bg-white border border-gray-200 text-gray-900 text-[10px] font-black uppercase tracking-widest rounded-xl hover:border-blue-600 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2 group/btn"
                                                                 >
-                                                                    Enter manually instead
+                                                                    Submit Manual Timesheet
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 transform group-hover/btn:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
+                                                                        <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                    </svg>
                                                                 </button>
-                                                            </div>
+                                                            )
                                                         )}
                                                     </div>
                                                 </div>

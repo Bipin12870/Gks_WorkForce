@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
@@ -17,6 +17,20 @@ export default function StaffHoursPage() {
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showPayInfo, setShowPayInfo] = useState(true);
+
+    // Load preference from localStorage on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('gks_show_pay_info');
+        if (saved !== null) {
+            setShowPayInfo(saved === 'true');
+        }
+    }, []);
+
+    // Save preference when it changes
+    useEffect(() => {
+        localStorage.setItem('gks_show_pay_info', String(showPayInfo));
+    }, [showPayInfo]);
 
     useEffect(() => {
         loadData();
@@ -85,52 +99,104 @@ export default function StaffHoursPage() {
 
     const grossPay = totalHours * (userData?.hourlyRate || 0);
 
+    // Unified display list for the Shift Log
+    const unifiedLog = useMemo(() => {
+        // 1. Start with all shifts
+        const log = shifts.map(shift => {
+            const ts = timesheets.find(t => t.shiftId === shift.id);
+            return {
+                id: shift.id || `shift-${Math.random()}`,
+                date: shift.date,
+                shift,
+                timesheet: ts,
+                type: 'ROSTERED'
+            };
+        });
+
+        // 2. Add unrostered timesheets
+        timesheets.forEach(ts => {
+            const hasShiftInCurrentList = shifts.some(s => s.id === ts.shiftId);
+            if (!ts.shiftId || !hasShiftInCurrentList) {
+                log.push({
+                    id: ts.id || `ts-${Math.random()}`,
+                    date: ts.date,
+                    shift: null,
+                    timesheet: ts,
+                    type: 'UNROSTERED'
+                });
+            }
+        });
+
+        // 3. Sort by date (descending)
+        return log.sort((a, b) => b.date.toMillis() - a.date.toMillis());
+    }, [shifts, timesheets]);
+
     return (
         <ProtectedRoute requiredRole="STAFF">
             <div className="min-h-screen bg-background text-gray-900">
                 {/* Header */}
-                <header className="bg-white border-b border-gray-200">
+                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div className="flex items-center gap-6">
-                            <Logo width={100} height={35} />
-                            <div className="border-l border-gray-200 pl-6">
-                                <button
-                                    onClick={() => router.push('/dashboard')}
-                                    className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
-                                >
-                                    ← Dashboard
-                                </button>
-                                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Hours & Pay Summary</h1>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-6">
+                                <Logo width={100} height={35} />
+                                <div className="border-l border-gray-200 pl-6">
+                                    <button
+                                        onClick={() => router.push('/dashboard')}
+                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
+                                    >
+                                        ← Dashboard
+                                    </button>
+                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Hours & Pay Summary</h1>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </header>
 
-                {/* Main Content */}
                 <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     {/* Week Selector */}
                     <div className="card-base p-6 mb-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 w-full md:w-auto">
-                            <button
-                                onClick={() => changeWeek('prev')}
-                                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                                title="Previous Week"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                            </button>
-                            <div className="px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap flex-grow text-center min-w-[180px]">
-                                Week of {formatDate(selectedWeek)}
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 flex-grow md:flex-grow-0">
+                                <button
+                                    onClick={() => changeWeek('prev')}
+                                    className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                    title="Previous Week"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                                <div className="px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap text-center min-w-[180px]">
+                                    Week of {formatDate(selectedWeek)}
+                                </div>
+                                <button
+                                    onClick={() => changeWeek('next')}
+                                    className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                    title="Next Week"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
                             </div>
+
                             <button
-                                onClick={() => changeWeek('next')}
-                                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                                title="Next Week"
+                                onClick={() => setShowPayInfo(!showPayInfo)}
+                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl border border-gray-100 transition-all shadow-sm bg-white"
+                                title={showPayInfo ? "Hide Pay Info" : "Show Pay Info"}
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                </svg>
+                                {showPayInfo ? (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                                    </svg>
+                                )}
                             </button>
                         </div>
 
@@ -155,45 +221,46 @@ export default function StaffHoursPage() {
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Hourly Rate</p>
                             <div className="flex items-baseline gap-1">
                                 <p className="text-sm font-bold text-gray-400">$</p>
-                                <p className="text-3xl font-black text-gray-900 tracking-tighter tabular-nums">{userData?.hourlyRate.toFixed(2)}</p>
+                                <p className="text-3xl font-black text-gray-900 tracking-tighter tabular-nums">
+                                    {showPayInfo ? userData?.hourlyRate.toFixed(2) : '•••••'}
+                                </p>
                             </div>
                         </div>
                         <div className="card-base p-6 border-l-4 border-l-green-600">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Estimated Gross</p>
                             <div className="flex items-baseline gap-1">
                                 <p className="text-sm font-bold text-green-600/50">$</p>
-                                <p className="text-3xl font-black text-green-600 tracking-tighter tabular-nums">{grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                <p className="text-3xl font-black text-green-600 tracking-tighter tabular-nums">
+                                    {showPayInfo ? grossPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '•••••'}
+                                </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Loading State */}
-                    {loading && (
+                    {loading ? (
                         <div className="flex justify-center py-20">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         </div>
-                    )}
-
-                    {/* Shift Records */}
-                    {!loading && (
-                        <div className="card-base overflow-hidden">
-                            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Approved Shift Log</h3>
+                    ) : (
+                        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm mb-12">
+                            <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+                                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Shift Log</h3>
                             </div>
                             <div className="divide-y divide-gray-100">
-                                {shifts.length === 0 ? (
+                                {unifiedLog.length === 0 ? (
                                     <div className="p-10 text-center">
-                                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No approved shifts found for this period</p>
+                                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No activity found for this period</p>
                                     </div>
                                 ) : (
-                                    shifts.map((shift) => {
-                                        const ts = timesheets.find((t) => t.shiftId === shift.id);
+                                    unifiedLog.map((item: any) => {
+                                        const ts = item.timesheet;
+                                        const shift = item.shift;
                                         const isApproved = ts?.status === 'APPROVED';
                                         const hours = isApproved ? calculateHours(ts.workedStart, ts.workedEnd) : 0;
-                                        const rosteredHours = calculateHours(shift.startTime, shift.endTime);
+                                        const rosteredHours = shift ? calculateHours(shift.startTime, shift.endTime) : 0;
 
                                         return (
-                                            <div key={shift.id} className="p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors group">
+                                            <div key={item.id} className="p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors group">
                                                 <div className="flex items-center gap-4">
                                                     <div className="bg-white p-2 rounded-lg border border-gray-100 shadow-sm group-hover:border-blue-100 transition-colors">
                                                         <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isApproved ? 'text-green-500' : 'text-gray-400'} group-hover:text-blue-500 transition-colors`} viewBox="0 0 20 20" fill="currentColor">
@@ -201,17 +268,28 @@ export default function StaffHoursPage() {
                                                         </svg>
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-gray-900 tracking-tight">
-                                                            {formatDate(shift.date.toDate())}
-                                                        </p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-bold text-gray-900 tracking-tight">
+                                                                {formatDate(item.date.toDate())}
+                                                            </p>
+                                                            {item.type === 'UNROSTERED' && (
+                                                                <span className="px-2 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 text-[9px] font-black uppercase tracking-wider rounded">
+                                                                    Unrostered
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <div className="flex items-center gap-2">
                                                             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                                                {isApproved ? `${ts.workedStart} - ${ts.workedEnd}` : `${shift.startTime} - ${shift.endTime} (Rostered)`}
+                                                                {isApproved
+                                                                    ? `${ts.workedStart} - ${ts.workedEnd}`
+                                                                    : shift
+                                                                        ? `${shift.startTime} - ${shift.endTime} (Rostered)`
+                                                                        : 'Worked outside roster'}
                                                             </p>
                                                             {ts && (
                                                                 <span className={`px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded border whitespace-nowrap ${ts.status === 'APPROVED' ? 'bg-green-50 text-green-700 border-green-100' :
-                                                                        ts.status === 'REJECTED' ? 'bg-red-50 text-red-700 border-red-100' :
-                                                                            'bg-blue-50 text-blue-700 border-blue-100'
+                                                                    ts.status === 'REJECTED' ? 'bg-red-50 text-red-700 border-red-100' :
+                                                                        'bg-blue-50 text-blue-700 border-blue-100'
                                                                     }`}>
                                                                     {ts.status}
                                                                 </span>
@@ -226,13 +304,13 @@ export default function StaffHoursPage() {
                                                                 {hours.toFixed(2)} hrs
                                                             </p>
                                                             <p className="text-xs font-bold text-green-600 uppercase tracking-widest tabular-nums">
-                                                                ${(hours * (userData?.hourlyRate || 0)).toFixed(2)}
+                                                                {showPayInfo ? `$${(hours * (userData?.hourlyRate || 0)).toFixed(2)}` : '$•••••'}
                                                             </p>
                                                         </>
                                                     ) : (
                                                         <>
                                                             <p className="text-sm font-bold text-gray-300 tabular-nums line-through">
-                                                                {rosteredHours.toFixed(2)} hrs
+                                                                {rosteredHours > 0 ? `${rosteredHours.toFixed(2)} hrs` : '---'}
                                                             </p>
                                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                                                 {ts ? 'Pending Approval' : 'No Timesheet'}

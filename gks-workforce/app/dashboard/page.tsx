@@ -18,7 +18,7 @@ export default function DashboardPage() {
     useEffect(() => {
         if (!user || !userData) return;
 
-        let unsubscribe = () => {};
+        let unsubscribe = () => { };
 
         if (userData.role === 'ADMIN') {
             // All pending timesheets
@@ -26,7 +26,7 @@ export default function DashboardPage() {
                 collection(db, 'timesheets'),
                 where('status', '==', 'PENDING')
             );
-            
+
             // Specifically flagged timesheets
             const qFlagged = query(
                 collection(db, 'timesheets'),
@@ -79,19 +79,19 @@ export default function DashboardPage() {
         <ProtectedRoute>
             <div className="min-h-screen bg-background">
                 {/* Header */}
-                <header className="bg-white border-b border-gray-200">
+                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-6">
                                 <Logo width={110} height={36} />
                                 <div className="border-l border-gray-200 pl-4 sm:pl-6">
-                                    <h1 className="hidden sm:block text-lg font-bold text-gray-900 tracking-tight">Workforce</h1>
-                                    <p className="text-[10px] sm:text-xs text-gray-500 font-medium whitespace-nowrap">Hi {userData?.name}</p>
+                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Workforce</h1>
+                                    <p className="text-[10px] sm:text-xs text-gray-400 font-black uppercase tracking-widest">Hi {userData?.name}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={handleLogout}
-                                className="px-3 py-1.5 text-sm font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200"
+                                className="px-4 py-2 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all border border-gray-100 shadow-sm"
                             >
                                 Sign Out
                             </button>
@@ -211,32 +211,27 @@ function DashboardCard({ title, description, icon, onClick, badgeCount, isWarnin
     return (
         <button
             onClick={onClick}
-            className={`relative flex flex-col p-6 text-left transition-all duration-200 border rounded-xl hover:shadow-sm group focus:ring-2 outline-none overflow-hidden ${
-                isWarning 
-                ? 'bg-amber-50/30 border-amber-200 hover:border-amber-500 focus:ring-amber-100' 
-                : 'bg-white border-gray-200 hover:border-blue-500 focus:ring-blue-100'
-            }`}
+            className={`relative flex flex-col p-6 text-left transition-all duration-200 border rounded-xl hover:shadow-sm group focus:ring-2 outline-none overflow-hidden ${isWarning
+                    ? 'bg-amber-50/30 border-amber-200 hover:border-amber-500 focus:ring-amber-100'
+                    : 'bg-white border-gray-200 hover:border-blue-500 focus:ring-blue-100'
+                }`}
         >
             {badgeCount && badgeCount > 0 ? (
-                <div className={`absolute top-4 right-4 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 text-white text-[10px] font-black rounded-full shadow-sm ring-2 ring-white animate-in zoom-in duration-300 ${
-                    isWarning ? 'bg-amber-600' : 'bg-red-600'
-                }`}>
+                <div className={`absolute top-4 right-4 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 text-white text-[10px] font-black rounded-full shadow-sm ring-2 ring-white animate-in zoom-in duration-300 ${isWarning ? 'bg-amber-600' : 'bg-red-600'
+                    }`}>
                     {badgeCount}
                 </div>
             ) : null}
-            <div className={`flex items-center justify-center w-12 h-12 mb-5 text-2xl rounded-lg transition-colors ${
-                isWarning ? 'bg-amber-100 group-hover:bg-amber-200' : 'bg-gray-50 group-hover:bg-blue-50'
-            }`}>
+            <div className={`flex items-center justify-center w-12 h-12 mb-5 text-2xl rounded-lg transition-colors ${isWarning ? 'bg-amber-100 group-hover:bg-amber-200' : 'bg-gray-50 group-hover:bg-blue-50'
+                }`}>
                 {icon}
             </div>
-            <h3 className={`text-base font-bold mb-1.5 transition-colors ${
-                isWarning ? 'text-amber-900 group-hover:text-amber-700' : 'text-gray-900 group-hover:text-blue-600'
-            }`}>
+            <h3 className={`text-base font-bold mb-1.5 transition-colors ${isWarning ? 'text-amber-900 group-hover:text-amber-700' : 'text-gray-900 group-hover:text-blue-600'
+                }`}>
                 {title}
             </h3>
-            <p className={`text-sm leading-relaxed ${
-                isWarning ? 'text-amber-700/70' : 'text-gray-500'
-            }`}>{description}</p>
+            <p className={`text-sm leading-relaxed ${isWarning ? 'text-amber-700/70' : 'text-gray-500'
+                }`}>{description}</p>
         </button>
     );
 }

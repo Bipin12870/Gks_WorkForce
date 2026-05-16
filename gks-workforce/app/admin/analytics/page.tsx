@@ -29,7 +29,7 @@ export default function AnalyticsPage() {
     const [staffList, setStaffList] = useState<User[]>([]);
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [shifts, setShifts] = useState<Shift[]>([]);
-    
+
     // Default to current week
     const [weekStart, setWeekStart] = useState<Date>(() => {
         const now = new Date();
@@ -58,10 +58,10 @@ export default function AnalyticsPage() {
                 // 2. Fetch Timesheets for selected week
                 const startOfSelectedWeek = new Date(weekStart);
                 startOfSelectedWeek.setHours(0, 0, 0, 0);
-                
+
                 const endOfSelectedWeek = new Date(startOfSelectedWeek);
                 endOfSelectedWeek.setDate(endOfSelectedWeek.getDate() + 7);
-                
+
                 const tsQ = query(
                     collection(db, 'timesheets'),
                     where('date', '>=', Timestamp.fromDate(startOfSelectedWeek)),
@@ -114,7 +114,7 @@ export default function AnalyticsPage() {
 
         // Group by staff for Bar Chart
         const staffCostMap: Record<string, { name: string; cost: number; rosterCost: number; actualHours: number; scheduledHours: number }> = {};
-        
+
         staffList.forEach(staff => {
             staffCostMap[staff.id] = {
                 name: staff.name.split(' ')[0],
@@ -138,7 +138,7 @@ export default function AnalyticsPage() {
         shifts.forEach(shift => {
             const hours = calculateHours(shift.startTime, shift.endTime);
             totalScheduledHours += hours;
-            
+
             const staff = staffList.find(s => s.id === shift.staffId);
             const rate = staff?.hourlyRate || 0;
             const shiftRosterCost = hours * rate;
@@ -254,7 +254,7 @@ export default function AnalyticsPage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
                                 </button>
-                                
+
                                 <div className="px-4 py-1 text-center min-w-[160px]">
                                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                                         Week Starting
@@ -292,7 +292,7 @@ export default function AnalyticsPage() {
                         </div>
                     ) : (
                         <div className="space-y-8 animate-in fade-in duration-500">
-                            
+
                             {/* KPI Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="card-base p-6 bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-md">
@@ -329,8 +329,8 @@ export default function AnalyticsPage() {
                                         {analyticsData.laborVariance > 0 ? '+' : ''}{analyticsData.laborVariance.toFixed(1)}<span className="text-xl font-medium ml-1">hrs</span>
                                     </p>
                                     <p className="text-gray-500 text-xs mt-2 font-medium">
-                                        {analyticsData.laborVariance > 0 
-                                            ? "Staff worked more hours than rostered" 
+                                        {analyticsData.laborVariance > 0
+                                            ? "Staff worked more hours than rostered"
                                             : "Staff worked fewer hours than rostered"}
                                     </p>
                                 </div>
@@ -338,7 +338,7 @@ export default function AnalyticsPage() {
 
                             {/* Charts Row */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                
+
                                 {/* Employee Cost Breakdown */}
                                 <div className="card-base p-6 flex flex-col">
                                     <div className="mb-6">
@@ -353,25 +353,25 @@ export default function AnalyticsPage() {
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart data={analyticsData.staffChartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                                <XAxis 
-                                                    dataKey="name" 
+                                                <XAxis
+                                                    dataKey="name"
                                                     axisLine={false}
                                                     tickLine={false}
                                                     tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
                                                     dy={10}
                                                 />
-                                                <YAxis 
+                                                <YAxis
                                                     axisLine={false}
                                                     tickLine={false}
                                                     tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
                                                     tickFormatter={(value) => `$${value}`}
                                                 />
-                                                <Tooltip 
+                                                <Tooltip
                                                     cursor={{ fill: '#f3f4f6' }}
                                                     contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                                     formatter={(value: any, name: any) => [formatCurrency(Number(value)), String(name)]}
                                                 />
-                                                <Legend verticalAlign="top" height={36}/>
+                                                <Legend verticalAlign="top" height={36} />
                                                 <Bar dataKey="rosterCost" name="Rostered" fill="#bfdbfe" radius={[4, 4, 0, 0]} maxBarSize={40} />
                                                 <Bar dataKey="cost" name="Approved" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
                                             </BarChart>
@@ -393,43 +393,43 @@ export default function AnalyticsPage() {
                                         <ResponsiveContainer width="100%" height="100%">
                                             <LineChart data={analyticsData.dayChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                                <XAxis 
-                                                    dataKey="name" 
+                                                <XAxis
+                                                    dataKey="name"
                                                     axisLine={false}
                                                     tickLine={false}
                                                     tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
                                                     dy={10}
                                                 />
-                                                <YAxis 
+                                                <YAxis
                                                     axisLine={false}
                                                     tickLine={false}
                                                     tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 500 }}
                                                 />
-                                                <Tooltip 
+                                                <Tooltip
                                                     contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                                     formatter={(value: any) => [`${Number(value).toFixed(1)} hrs`, '']}
                                                 />
-                                                <Legend 
-                                                    verticalAlign="top" 
+                                                <Legend
+                                                    verticalAlign="top"
                                                     height={36}
                                                     iconType="circle"
                                                     wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#4b5563' }}
                                                 />
-                                                <Line 
-                                                    type="monotone" 
-                                                    dataKey="Scheduled" 
-                                                    stroke="#94a3b8" 
-                                                    strokeWidth={3} 
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="Scheduled"
+                                                    stroke="#94a3b8"
+                                                    strokeWidth={3}
                                                     dot={{ r: 4, strokeWidth: 2 }}
-                                                    activeDot={{ r: 6 }} 
+                                                    activeDot={{ r: 6 }}
                                                 />
-                                                <Line 
-                                                    type="monotone" 
-                                                    dataKey="Actual" 
-                                                    stroke="#10b981" 
-                                                    strokeWidth={3} 
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="Actual"
+                                                    stroke="#10b981"
+                                                    strokeWidth={3}
                                                     dot={{ r: 4, strokeWidth: 2 }}
-                                                    activeDot={{ r: 6 }} 
+                                                    activeDot={{ r: 6 }}
                                                 />
                                             </LineChart>
                                         </ResponsiveContainer>

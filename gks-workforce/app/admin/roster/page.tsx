@@ -17,7 +17,7 @@ import {
     doc,
 } from 'firebase/firestore';
 import { Availability, Shift, User, RosterAuditLog } from '@/types';
-import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
@@ -32,11 +32,13 @@ export default function AdminRosterPage() {
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [staffMap, setStaffMap] = useState<Record<string, User>>({});
     const [showApprovalModal, setShowApprovalModal] = useState(false);
-    const [selectedStaff, setSelectedStaff] = useState<{ id: string; name: string; ranges: any[] } | null>(null);
+    const [selectedStaff, setSelectedStaff] = useState<{ id: string; name: string; ranges: any[]; dayOfWeek?: number } | null>(null);
     const [shiftForm, setShiftForm] = useState({ startTime: '09:00', endTime: '17:00' });
     const [isEditingShift, setIsEditingShift] = useState(false);
     const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
     const [activeMobileTab, setActiveMobileTab] = useState<'roster' | 'availability'>('roster');
+    const [staffFilter, setStaffFilter] = useState<string | null>(null);
+    const [filterMode, setFilterMode] = useState<'HARD' | 'HIGHLIGHT'>('HARD');
 
     // Load staff data
     useEffect(() => {
@@ -125,17 +127,21 @@ export default function AdminRosterPage() {
     };
 
     const getAvailabilityForDay = () => {
-        if (selectedDay === -1) {
-            return availability;
+        let filtered = availability;
+        if (selectedDay !== -1) {
+            filtered = filtered.filter((a) => a.dayOfWeek === selectedDay);
         }
-        return availability.filter((a) => a.dayOfWeek === selectedDay);
+        if (staffFilter) {
+            filtered = filtered.filter((a) => a.staffId === staffFilter);
+        }
+        return filtered;
     };
 
-    const openApprovalModal = (staffId: string, ranges: any[]) => {
+    const openApprovalModal = (staffId: string, ranges: any[], dayOfWeek?: number) => {
         const staff = staffMap[staffId];
         if (!staff) return;
 
-        setSelectedStaff({ id: staffId, name: staff.name, ranges });
+        setSelectedStaff({ id: staffId, name: staff.name, ranges, dayOfWeek });
         setShiftForm({ startTime: ranges[0]?.start || '09:00', endTime: ranges[0]?.end || '17:00' });
         setIsEditingShift(false);
         setEditingShiftId(null);
@@ -150,7 +156,7 @@ export default function AdminRosterPage() {
         const staffAvail = availability.find(a => a.staffId === shift.staffId);
         const ranges = staffAvail?.timeRanges || [{ start: '00:00', end: '23:59' }];
 
-        setSelectedStaff({ id: shift.staffId, name: staff.name, ranges });
+        setSelectedStaff({ id: shift.staffId, name: staff.name, ranges, dayOfWeek: shift.date.toDate().getDay() });
         setShiftForm({ startTime: shift.startTime, endTime: shift.endTime });
         setIsEditingShift(true);
         setEditingShiftId(shift.id!);
@@ -204,7 +210,8 @@ export default function AdminRosterPage() {
                 showNotification('Shift updated successfully!', 'success');
             } else {
                 const dayDate = new Date(selectedWeek);
-                dayDate.setDate(dayDate.getDate() + (selectedDay === 0 ? 6 : selectedDay - 1));
+                const shiftDay = selectedStaff.dayOfWeek ?? selectedDay;
+                dayDate.setDate(dayDate.getDate() + (shiftDay === 0 ? 6 : shiftDay - 1));
                 dayDate.setHours(0, 0, 0, 0);
 
                 const newShift = {
@@ -271,9 +278,9 @@ export default function AdminRosterPage() {
         <ProtectedRoute requiredRole="ADMIN">
             <div className="min-h-screen bg-background text-gray-900">
                 {/* Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-6">
                                 <Logo width={100} height={35} />
                                 <div className="border-l border-gray-200 pl-6">
@@ -293,45 +300,67 @@ export default function AdminRosterPage() {
                 {/* Main Content */}
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     {/* Controls Card */}
-                    <div className="card-base p-6 mb-8">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-                            <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100">
-                                <button
-                                    onClick={() => changeWeek('prev')}
-                                    className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                                    title="Previous Week"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                </button>
-                                <div className="px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap min-w-[180px] text-center">
-                                    Week of {formatDate(selectedWeek)}
+                    <div className="card-base p-4 sm:p-6 mb-8 border-blue-100 bg-white shadow-sm">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                            <div className="flex flex-col sm:flex-row items-center gap-4">
+                                <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 w-full sm:w-auto justify-between sm:justify-start">
+                                    <button
+                                        onClick={() => changeWeek('prev')}
+                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                        title="Previous Week"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                    <div className="px-4 sm:px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap min-w-[140px] sm:min-w-[180px] text-center">
+                                        Week of {formatDate(selectedWeek)}
+                                    </div>
+                                    <button
+                                        onClick={() => changeWeek('next')}
+                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                        title="Next Week"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => changeWeek('next')}
-                                    className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                                    title="Next Week"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                </button>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-4">
-                                {/* Day Filter Dropdown */}
-                                <div className="flex items-center gap-3">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Filter Day:</label>
+                            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                                <div className="flex items-center gap-3 flex-1 sm:flex-none min-w-[160px]">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 hidden sm:block">Filter Staff:</label>
+                                    <select
+                                        value={staffFilter || 'ALL'}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setStaffFilter(val === 'ALL' ? null : val);
+                                            setFilterMode('HARD');
+                                        }}
+                                        className="flex-1 sm:flex-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer"
+                                    >
+                                        <option value="ALL">All Staff</option>
+                                        {Object.values(staffMap).map((staff) => (
+                                            <option key={staff.id} value={staff.id}>{staff.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-3 flex-1 sm:flex-none min-w-[160px]">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 hidden sm:block">View Day:</label>
                                     <select
                                         value={selectedDay}
                                         onChange={(e) => setSelectedDay(Number(e.target.value))}
-                                        className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer min-w-[140px]"
+                                        className="flex-1 sm:flex-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer"
                                     >
                                         <option value={-1}>All Week</option>
-                                        {[1, 2, 3, 4, 5, 6, 0].map((day) => (
-                                            <option key={day} value={day}>{getDayName(day)}</option>
-                                        ))}
+                                        <option value={1}>Monday</option>
+                                        <option value={2}>Tuesday</option>
+                                        <option value={3}>Wednesday</option>
+                                        <option value={4}>Thursday</option>
+                                        <option value={5}>Friday</option>
+                                        <option value={6}>Saturday</option>
+                                        <option value={0}>Sunday</option>
                                     </select>
                                 </div>
                             </div>
@@ -343,101 +372,178 @@ export default function AdminRosterPage() {
                         {/* LEFT SECTION - Roster View */}
                         <div>
                             <div className="flex items-center justify-between mb-4 px-2">
-                                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-widest">
-                                    Roster: {selectedDay === -1 ? 'All Week' : getDayName(selectedDay)}
+                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                                    Roster: {selectedDay === -1 ? 'Full Week' : getDayName(selectedDay)}
                                 </h3>
                                 <span className="px-2 py-0.5 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-tighter rounded border border-green-100">
-                                    Approved
+                                    Active Roster
                                 </span>
                             </div>
                             <div className="space-y-4">
-                                {shifts.length === 0 ? (
-                                    <div className="card-base p-10 text-center bg-gray-50/50 border-dashed">
-                                        <p className="text-sm text-gray-400 font-medium">No approved shifts for this day</p>
-                                    </div>
-                                ) : (
-                                    shifts.map((shift) => (
-                                        <div
-                                            key={shift.id}
-                                            className="card-base p-5 group hover:border-blue-200 transition-colors"
-                                        >
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="font-bold text-gray-900 mb-1">
-                                                        {staffMap[shift.staffId]?.name || 'Unknown Staff'}
-                                                        {selectedDay === -1 && <span className="ml-2 text-[10px] text-gray-500 font-black uppercase">({getDayName(shift.date.toDate().getDay())})</span>}
-                                                    </p>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded tabular-nums">
+                                {(() => {
+                                    // Force hard filter for All Week view
+                                    const shouldHardFilter = filterMode === 'HARD' || selectedDay === -1;
+                                    const rosterShifts = shouldHardFilter && staffFilter
+                                        ? shifts.filter(s => s.staffId === staffFilter)
+                                        : shifts;
+
+                                    return rosterShifts.length === 0 ? (
+                                        <div className="card-base p-10 text-center bg-gray-50/30 border-dashed">
+                                            <p className="text-sm text-gray-400 font-medium italic">No approved shifts for this criteria</p>
+                                        </div>
+                                    ) : (
+                                        rosterShifts.map((shift) => (
+                                            <div
+                                                key={shift.id}
+                                                onClick={() => {
+                                                    // Container filtering only triggers when viewing ALL week and no master filter is active
+                                                    if (selectedDay === -1) {
+                                                        if (!staffFilter) {
+                                                            setStaffFilter(shift.staffId);
+                                                            setFilterMode('HIGHLIGHT');
+                                                        } else if (filterMode === 'HIGHLIGHT' && staffFilter === shift.staffId) {
+                                                            setStaffFilter(null);
+                                                        }
+                                                    }
+                                                }}
+                                                className={`card-base p-5 group hover:border-blue-200 transition-all cursor-pointer ${staffFilter === shift.staffId ? 'bg-blue-50/50 border-blue-500 ring-2 ring-blue-100' : 'bg-white border-gray-100 shadow-sm'
+                                                    }`}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <p className="font-bold text-gray-900 text-base">
+                                                                {staffMap[shift.staffId]?.name || 'Unknown Staff'}
+                                                            </p>
+                                                            {selectedDay === -1 && (
+                                                                <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded">
+                                                                    {getDayName(shift.date.toDate().getDay()).substring(0, 3)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
+                                                            {formatDate(shift.date.toDate())}
+                                                        </p>
+                                                        <div className="inline-flex items-center gap-2 bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100 text-xs font-bold text-blue-700 tabular-nums">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                                            </svg>
                                                             {shift.startTime} - {shift.endTime}
-                                                        </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-6">
+                                                        <div className="text-right hidden sm:block">
+                                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Duration</p>
+                                                            <p className="text-sm font-black text-gray-900">{calculateHours(shift.startTime, shift.endTime).toFixed(2)}h</p>
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            <button
+                                                                onClick={() => openEditModal(shift)}
+                                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                                title="Modify Shift"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                                                </svg>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleRemoveShift(shift)}
+                                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                                title="Remove from Roster"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => openEditModal(shift)}
-                                                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                        title="Modify Shift"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                                        </svg>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleRemoveShift(shift)}
-                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                        title="Remove from Roster"
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
                                             </div>
-                                        </div>
-                                    ))
-                                )}
+                                        ))
+                                    );
+                                })()}
                             </div>
                         </div>
 
                         {/* RIGHT SECTION - Availability */}
                         <div>
                             <div className="flex items-center justify-between mb-4 px-2">
-                                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-widest">
-                                    Availability: {selectedDay === -1 ? 'All Week' : getDayName(selectedDay)}
+                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                                    Availability: {selectedDay === -1 ? 'Full Week' : getDayName(selectedDay)}
                                 </h3>
                                 <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-tighter rounded border border-blue-100">
-                                    Requests
+                                    Staff Submissions
                                 </span>
                             </div>
                             <div className="space-y-4">
                                 {dayAvailability.length === 0 ? (
-                                    <div className="card-base p-10 text-center bg-gray-50/50 border-dashed">
-                                        <p className="text-sm text-gray-400 font-medium">No availability submitted for this day</p>
+                                    <div className="card-base p-10 text-center bg-gray-50/30 border-dashed">
+                                        <p className="text-sm text-gray-400 font-medium italic">
+                                            {staffFilter
+                                                ? `No availability submitted for ${staffMap[staffFilter]?.name}`
+                                                : 'No availability submitted for this period'}
+                                        </p>
                                     </div>
                                 ) : (
                                     dayAvailability.map((avail) => (
                                         <div
                                             key={avail.id}
-                                            className="card-base p-5 border-l-4 border-l-blue-500"
+                                            className={`card-base p-5 border-l-4 transition-all ${staffFilter === avail.staffId
+                                                ? 'bg-blue-50/50 border-blue-500 ring-2 ring-blue-100 border-l-blue-600'
+                                                : 'bg-white shadow-sm border-gray-100 border-l-blue-400'
+                                                }`}
                                         >
-                                            <div className="flex justify-between items-center mb-4">
-                                                <p className="font-bold text-gray-900">
-                                                    {staffMap[avail.staffId]?.name || 'Unknown Staff'}
-                                                    {selectedDay === -1 && <span className="ml-2 text-[10px] text-gray-500 font-black uppercase">({getDayName(avail.dayOfWeek)})</span>}
-                                                </p>
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div>
+                                                    <p className="font-bold text-gray-900 text-base">
+                                                        {staffMap[avail.staffId]?.name || 'Unknown Staff'}
+                                                    </p>
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                                        Employee Availability
+                                                    </p>
+                                                </div>
+                                                {selectedDay === -1 ? (
+                                                    <span className="px-2 py-1 bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-widest rounded border border-blue-100">
+                                                        {getDayName(avail.dayOfWeek)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+                                                        Requested
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div className="flex flex-wrap gap-2 mb-6">
                                                 {avail.timeRanges.map((range, idx) => (
-                                                    <span key={idx} className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded tabular-nums">
+                                                    <span key={idx} className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-100 tabular-nums">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
                                                         {range.start} - {range.end}
                                                     </span>
                                                 ))}
                                             </div>
-                                            <button
-                                                onClick={() => openApprovalModal(avail.staffId, avail.timeRanges)}
-                                                className="btn-primary w-full py-2 text-xs uppercase tracking-widest font-black"
-                                            >
-                                                Approve Draft Shift
-                                            </button>
+
+                                            {(() => {
+                                                const rosteredForDay = shifts.some(s => {
+                                                    const shiftDay = s.date.toDate().getDay();
+                                                    return s.staffId === avail.staffId && shiftDay === avail.dayOfWeek;
+                                                });
+
+                                                return (
+                                                    <button
+                                                        onClick={() => openApprovalModal(avail.staffId, avail.timeRanges, avail.dayOfWeek)}
+                                                        className={`w-full py-2.5 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${rosteredForDay
+                                                            ? 'bg-green-600 hover:bg-green-700 border-b-2 border-green-800'
+                                                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'
+                                                            }`}
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                        </svg>
+                                                        {rosteredForDay ? 'Shift Rostered' : 'Approve Draft Shift'}
+                                                    </button>
+                                                );
+                                            })()}
                                         </div>
                                     ))
                                 )}
@@ -447,68 +553,140 @@ export default function AdminRosterPage() {
 
                     {/* Mobile/Tablet Layout - Tabbed */}
                     <div className="lg:hidden">
-                        <div className="card-base">
-                            <div className="flex border-b border-gray-100">
+                        <div className="card-base border-blue-100 shadow-sm overflow-hidden">
+                            <div className="flex bg-gray-50/50 border-b border-gray-100">
                                 <button
                                     onClick={() => setActiveMobileTab('roster')}
-                                    className={`flex-1 px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all ${activeMobileTab === 'roster'
+                                    className={`flex-1 px-4 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeMobileTab === 'roster'
                                         ? 'bg-white text-blue-600 border-b-2 border-blue-600'
                                         : 'text-gray-400 hover:text-gray-600'
                                         }`}
                                 >
-                                    Roster View
+                                    Roster ({shifts.length})
                                 </button>
                                 <button
                                     onClick={() => setActiveMobileTab('availability')}
-                                    className={`flex-1 px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all ${activeMobileTab === 'availability'
+                                    className={`flex-1 px-4 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeMobileTab === 'availability'
                                         ? 'bg-white text-blue-600 border-b-2 border-blue-600'
                                         : 'text-gray-400 hover:text-gray-600'
                                         }`}
                                 >
-                                    Availability
+                                    Availability ({dayAvailability.length})
                                 </button>
                             </div>
-                            <div className="p-4 space-y-4 min-h-[400px]">
+                            <div className="p-4 space-y-4 min-h-[400px] bg-white">
                                 {activeMobileTab === 'roster' ? (
                                     shifts.length === 0 ? (
-                                        <p className="text-gray-400 text-sm font-medium text-center py-10 italic">No approved shifts</p>
+                                        <div className="py-20 text-center">
+                                            <p className="text-gray-400 text-sm font-medium italic">No approved shifts</p>
+                                        </div>
                                     ) : (
                                         shifts.map((shift) => (
-                                            <div key={shift.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
-                                                <div>
-                                                    <p className="font-bold text-gray-900">{staffMap[shift.staffId]?.name || 'Staff'}</p>
-                                                    <p className="text-xs font-bold text-blue-600 mt-1 tabular-nums">{shift.startTime} - {shift.endTime}</p>
+                                            <div
+                                                key={shift.id}
+                                                onClick={() => {
+                                                    if (selectedDay === -1 && (!staffFilter || staffFilter === shift.staffId)) {
+                                                        setStaffFilter(prev => prev === shift.staffId ? null : shift.staffId);
+                                                        setFilterMode('HIGHLIGHT');
+                                                    }
+                                                }}
+                                                className={`p-4 rounded-xl border transition-all cursor-pointer ${staffFilter === shift.staffId ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-100' : 'bg-gray-50 border-gray-100'
+                                                    }`}
+                                            >
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <p className="font-bold text-gray-900">{staffMap[shift.staffId]?.name || 'Staff'}</p>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                                            {getDayName(shift.date.toDate().getDay())}, {formatDate(shift.date.toDate())}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex gap-1">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openEditModal(shift);
+                                                            }}
+                                                            className="p-2 bg-white text-gray-400 rounded-lg shadow-sm border border-gray-100"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                                            </svg>
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleRemoveShift(shift);
+                                                            }}
+                                                            className="p-2 bg-white text-red-400 rounded-lg shadow-sm border border-gray-100"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="flex gap-2">
-                                                    <button onClick={() => openEditModal(shift)} className="p-2 bg-white text-gray-400 rounded-lg shadow-sm">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                                        </svg>
-                                                    </button>
-                                                    <button onClick={() => handleRemoveShift(shift)} className="p-2 bg-white text-red-400 rounded-lg shadow-sm">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                                        </svg>
-                                                    </button>
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`text-xs font-bold px-2 py-1 rounded border tabular-nums ${staffFilter === shift.staffId ? 'text-blue-700 bg-blue-100 border-blue-200' : 'text-blue-600 bg-white border-blue-100'}`}>
+                                                        {shift.startTime} - {shift.endTime}
+                                                    </span>
+                                                    <span className="text-xs font-black text-gray-900">
+                                                        {calculateHours(shift.startTime, shift.endTime).toFixed(2)}h
+                                                    </span>
                                                 </div>
                                             </div>
                                         ))
                                     )
                                 ) : (
-                                    dayAvailability.map((avail) => (
-                                        <div key={avail.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                            <div className="flex justify-between items-center mb-3">
-                                                <p className="font-bold text-gray-900">{staffMap[avail.staffId]?.name || 'Staff'}</p>
-                                                <span className="text-[10px] font-bold text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-100">AVAIL</span>
-                                            </div>
-                                            <button
-                                                onClick={() => openApprovalModal(avail.staffId, avail.timeRanges)}
-                                                className="btn-primary w-full text-xs py-2"
-                                            >
-                                                Approve Shift
-                                            </button>
+                                    dayAvailability.length === 0 ? (
+                                        <div className="py-20 text-center">
+                                            <p className="text-gray-400 text-sm font-medium italic">
+                                                {staffFilter
+                                                    ? `No availability for ${staffMap[staffFilter]?.name}`
+                                                    : 'No submissions'}
+                                            </p>
                                         </div>
-                                    ))
+                                    ) : (
+                                        dayAvailability.map((avail) => (
+                                            <div
+                                                key={avail.id}
+                                                className={`p-4 rounded-xl border-l-4 transition-all ${staffFilter === avail.staffId
+                                                    ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-100 border-l-blue-600'
+                                                    : 'bg-white border-gray-100 shadow-sm border-l-blue-400'
+                                                    }`}
+                                            >
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <p className="font-bold text-gray-900">{staffMap[avail.staffId]?.name || 'Staff'}</p>
+                                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                                                            {getDayName(avail.dayOfWeek)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2 mb-4">
+                                                    {avail.timeRanges.map((range, idx) => (
+                                                        <span key={idx} className="text-[10px] font-bold text-gray-600 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                                                            {range.start} - {range.end}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                                {(() => {
+                                                    const rosteredForDay = shifts.some(s => {
+                                                        const shiftDay = s.date.toDate().getDay();
+                                                        return s.staffId === avail.staffId && shiftDay === avail.dayOfWeek;
+                                                    });
+
+                                                    return (
+                                                        <button
+                                                            onClick={() => openApprovalModal(avail.staffId, avail.timeRanges, avail.dayOfWeek)}
+                                                            className={`w-full text-white text-[10px] font-black uppercase tracking-widest py-2.5 rounded-lg shadow-sm transition-all ${rosteredForDay ? 'bg-green-600' : 'bg-blue-600'}`}
+                                                        >
+                                                            {rosteredForDay ? 'Shift Rostered' : 'Approve Shift'}
+                                                        </button>
+                                                    );
+                                                })()}
+                                            </div>
+                                        ))
+                                    )
                                 )}
                             </div>
                         </div>
@@ -533,7 +711,9 @@ export default function AdminRosterPage() {
                             <div className="p-6">
                                 <div className="mb-6 flex flex-wrap gap-2">
                                     <div className="px-3 py-1 bg-gray-100 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-600">{selectedStaff.name}</div>
-                                    <div className="px-3 py-1 bg-gray-100 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-600">{getDayName(selectedDay)}</div>
+                                    <div className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100">
+                                        {getDayName(selectedStaff.dayOfWeek ?? selectedDay)}
+                                    </div>
                                 </div>
 
                                 <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 mb-8">

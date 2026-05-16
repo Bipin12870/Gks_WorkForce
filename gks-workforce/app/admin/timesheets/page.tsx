@@ -32,6 +32,7 @@ function AdminTimesheetsContent() {
     const [loading, setLoading] = useState(true);
     const searchParams = useSearchParams();
     const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('ALL');
+    const [filterMode, setFilterMode] = useState<'HARD' | 'HIGHLIGHT'>('HARD');
     const [activeMobileTab, setActiveMobileTab] = useState<'roster' | 'timesheets'>('roster');
     const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
 
@@ -70,7 +71,7 @@ function AdminTimesheetsContent() {
             const dayDate = new Date(selectedWeek);
             dayDate.setDate(dayDate.getDate() + (selectedDay === 0 ? 6 : selectedDay - 1));
             dayDate.setHours(0, 0, 0, 0);
-            
+
             const nextDay = new Date(dayDate);
             nextDay.setDate(nextDay.getDate() + 1);
 
@@ -145,9 +146,9 @@ function AdminTimesheetsContent() {
     };
 
     const handleUpdateStatus = async (
-        timesheetId: string, 
-        status: TimesheetStatus, 
-        workedStart?: string, 
+        timesheetId: string,
+        status: TimesheetStatus,
+        workedStart?: string,
         workedEnd?: string,
         note?: string
     ) => {
@@ -176,7 +177,7 @@ function AdminTimesheetsContent() {
 
     const getSourceBadge = (ts: Timesheet) => {
         if (!ts.source) return null;
-        
+
         switch (ts.source) {
             case 'MANUAL':
                 return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded border border-gray-200"><span className="text-sm">✏️</span> Manual</span>;
@@ -211,27 +212,51 @@ function AdminTimesheetsContent() {
     const renderRosteredShifts = () => (
         <div className="space-y-4">
             <div className="flex items-center justify-between px-2">
-                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Rostered Shifts: {getDayName(selectedDay)}</h3>
+                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                    Rostered Shifts: {selectedDay === -1 ? 'Full Week' : getDayName(selectedDay)}
+                </h3>
                 <div className="text-[10px] font-bold text-gray-400 italic">Read-Only</div>
             </div>
             {loading ? (
                 <div className="flex justify-center py-10"><div className="animate-spin h-6 w-6 border-b-2 border-gray-400"></div></div>
             ) : (() => {
-                const filteredShifts = selectedStaffFilter === 'ALL' ? shifts : shifts.filter(s => s.staffId === selectedStaffFilter);
-                return filteredShifts.length === 0 ? (
+                // If All Week is selected (-1), we force hard filter for clarity
+                const shouldHardFilter = filterMode === 'HARD' || selectedDay === -1;
+                const rosterShifts = shouldHardFilter && selectedStaffFilter !== 'ALL'
+                    ? shifts.filter(s => s.staffId === selectedStaffFilter)
+                    : shifts;
+
+                return rosterShifts.length === 0 ? (
                     <div className="card-base p-10 text-center border-dashed">
                         <p className="text-sm font-medium text-gray-400 italic">No approved shifts for this criteria</p>
                     </div>
                 ) : (
-                    filteredShifts.map((shift) => (
-                        <div key={shift.id} className="card-base p-5 bg-gray-50/30 border-gray-100">
+                    rosterShifts.map((shift) => (
+                        <div
+                            key={shift.id}
+                            onClick={() => {
+                                // Container filtering only triggers when viewing ALL week and no master filter is active
+                                if (selectedDay === -1) {
+                                    if (selectedStaffFilter === 'ALL') {
+                                        setSelectedStaffFilter(shift.staffId);
+                                        setFilterMode('HIGHLIGHT');
+                                    } else if (filterMode === 'HIGHLIGHT' && selectedStaffFilter === shift.staffId) {
+                                        setSelectedStaffFilter('ALL');
+                                    }
+                                }
+                            }}
+                            className={`card-base p-5 transition-all cursor-pointer ${selectedStaffFilter === shift.staffId
+                                ? 'bg-blue-50/50 border-blue-500 ring-2 ring-blue-100'
+                                : 'bg-gray-50/30 border-gray-100 hover:border-blue-200'
+                                }`}
+                        >
                             <div className="flex justify-between items-center">
                                 <div>
                                     <p className="font-bold text-gray-900 mb-0.5">{staffMap[shift.staffId]?.name || 'Unknown Staff'}</p>
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
                                         {getDayName(shift.date.toDate().getDay())}, {formatDate(shift.date.toDate())}
                                     </p>
-                                    <div className="inline-flex items-center gap-2 bg-white px-2 py-1 rounded border border-gray-100 text-xs font-bold text-gray-600">
+                                    <div className="inline-flex items-center gap-2 bg-white px-2 py-1 rounded border border-gray-100 text-xs font-bold text-gray-600 tabular-nums">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                                         </svg>
@@ -265,116 +290,118 @@ function AdminTimesheetsContent() {
                 }
                 return filteredTimesheets.length === 0 ? (
                     <div className="card-base p-10 text-center border-dashed border-blue-100 bg-blue-50/10">
-                        <p className="text-sm font-medium text-blue-400 italic">No timesheets submitted for this criteria</p>
+                        <p className="text-sm font-medium text-blue-400 italic">
+                            {selectedStaffFilter !== 'ALL'
+                                ? `No timesheets submitted for ${staffMap[selectedStaffFilter]?.name}`
+                                : 'No timesheets submitted for this criteria'}
+                        </p>
                     </div>
                 ) : (
                     filteredTimesheets.map((ts) => {
-                    const approvedHours = calculateHours(ts.approvedShiftStart, ts.approvedShiftEnd);
-                    const workedHours = calculateHours(ts.workedStart, ts.workedEnd);
-                    const diff = workedHours - approvedHours;
+                        const approvedHours = calculateHours(ts.approvedShiftStart, ts.approvedShiftEnd);
+                        const workedHours = calculateHours(ts.workedStart, ts.workedEnd);
+                        const diff = workedHours - approvedHours;
 
-                    return (
-                        <div key={ts.id} className={`card-base p-0 overflow-hidden hover:border-blue-300 transition-colors shadow-sm bg-white border ${
-                            ts.requiresAdminNote ? 'border-red-200' : 'border-blue-100'
-                        }`}>
-                            {/* Top Banner for GPS Source */}
-                            <div className={`px-5 py-2.5 flex items-center justify-between border-b ${
-                                ts.requiresAdminNote ? 'bg-red-50/50 border-red-100' : 'bg-blue-50/30 border-blue-100'
-                            }`}>
-                                <div className="flex items-center gap-2">
-                                    {getSourceBadge(ts)}
-                                </div>
-                                {ts.requiresAdminNote && ts.status === 'PENDING' && (
-                                    <span className="text-[10px] font-black text-red-600 uppercase tracking-widest animate-pulse">
-                                        Review Required
-                                    </span>
-                                )}
-                            </div>
-
-                            <div className="p-5">
-                                <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div>
-                                        <p className="font-black text-gray-900 text-lg tracking-tight">{staffMap[ts.staffId]?.name || 'Staff Member'}</p>
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                            Shift: {formatDate(ts.date.toDate())} ({ts.approvedShiftStart}-{ts.approvedShiftEnd})
-                                        </p>
+                        return (
+                            <div key={ts.id} className={`card-base p-0 overflow-hidden hover:border-blue-300 transition-colors shadow-sm bg-white border ${ts.requiresAdminNote ? 'border-red-200' : 'border-blue-100'
+                                }`}>
+                                {/* Top Banner for GPS Source */}
+                                <div className={`px-5 py-2.5 flex items-center justify-between border-b ${ts.requiresAdminNote ? 'bg-red-50/50 border-red-100' : 'bg-blue-50/30 border-blue-100'
+                                    }`}>
+                                    <div className="flex items-center gap-2">
+                                        {getSourceBadge(ts)}
                                     </div>
-                                    {getStatusBadge(ts.status)}
+                                    {ts.requiresAdminNote && ts.status === 'PENDING' && (
+                                        <span className="text-[10px] font-black text-red-600 uppercase tracking-widest animate-pulse">
+                                            Review Required
+                                        </span>
+                                    )}
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-2 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                                    <div>
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Approved</p>
-                                        <p className="text-sm font-bold text-gray-900">{approvedHours.toFixed(2)}h</p>
+                                <div className="p-5">
+                                    <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <p className="font-black text-gray-900 text-lg tracking-tight">{staffMap[ts.staffId]?.name || 'Staff Member'}</p>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                                Shift: {formatDate(ts.date.toDate())} ({ts.approvedShiftStart}-{ts.approvedShiftEnd})
+                                            </p>
+                                        </div>
+                                        {getStatusBadge(ts.status)}
                                     </div>
-                                    <div>
-                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Worked</p>
-                                        <p className="text-sm font-black text-blue-600">{workedHours.toFixed(2)}h</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Diff</p>
-                                        <p className={`text-sm font-black ${diff > 0 ? 'text-orange-600' : diff < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                                            {diff > 0 ? '+' : ''}{diff.toFixed(2)}h
-                                        </p>
-                                    </div>
-                                </div>
 
-                                <div className="mb-6 flex items-center justify-between">
-                                    <div>
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Submitted Worked Hours</p>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-bold bg-white px-2 py-1 rounded border border-gray-100 shadow-sm">{ts.workedStart} - {ts.workedEnd}</span>
+                                    <div className="grid grid-cols-3 gap-2 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Approved</p>
+                                            <p className="text-sm font-bold text-gray-900">{approvedHours.toFixed(2)}h</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Worked</p>
+                                            <p className="text-sm font-black text-blue-600">{workedHours.toFixed(2)}h</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Diff</p>
+                                            <p className={`text-sm font-black ${diff > 0 ? 'text-orange-600' : diff < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                                {diff > 0 ? '+' : ''}{diff.toFixed(2)}h
+                                            </p>
                                         </div>
                                     </div>
-                                    {ts.adminNote && (
-                                        <div className="text-right max-w-[50%]">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Admin Note</p>
-                                            <p className="text-[10px] text-gray-600 italic bg-gray-50 px-2 py-1 rounded line-clamp-2">"{ts.adminNote}"</p>
+
+                                    <div className="mb-6 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Submitted Worked Hours</p>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold bg-white px-2 py-1 rounded border border-gray-100 shadow-sm">{ts.workedStart} - {ts.workedEnd}</span>
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
+                                        {ts.adminNote && (
+                                            <div className="text-right max-w-[50%]">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Admin Note</p>
+                                                <p className="text-[10px] text-gray-600 italic bg-gray-50 px-2 py-1 rounded line-clamp-2">"{ts.adminNote}"</p>
+                                            </div>
+                                        )}
+                                    </div>
 
-                                <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
-                                    {ts.status === 'PENDING' && !ts.requiresAdminNote && (
-                                        <button
-                                            onClick={() => handleUpdateStatus(ts.id!, 'APPROVED')}
-                                            className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                                        >
-                                            Quick Approve
-                                        </button>
-                                    )}
-                                    
-                                    {ts.status === 'PENDING' && ts.requiresAdminNote && (
-                                        <button
-                                            onClick={() => openAdjustModal(ts)}
-                                            className="px-4 py-2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-600 transition-colors shadow-sm"
-                                        >
-                                            Review & Resolve
-                                        </button>
-                                    )}
+                                    <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+                                        {ts.status === 'PENDING' && !ts.requiresAdminNote && (
+                                            <button
+                                                onClick={() => handleUpdateStatus(ts.id!, 'APPROVED')}
+                                                className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                                            >
+                                                Quick Approve
+                                            </button>
+                                        )}
 
-                                    {(!ts.requiresAdminNote || ts.status !== 'PENDING') && (
-                                        <button
-                                            onClick={() => openAdjustModal(ts)}
-                                            className="px-4 py-2 bg-white border border-gray-200 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-gray-50 transition-colors"
-                                        >
-                                            {ts.status === 'PENDING' ? 'Adjust & Approve' : 'Correct & Update'}
-                                        </button>
-                                    )}
-                                    
-                                    {ts.status !== 'REJECTED' && (
-                                        <button
-                                            onClick={() => handleUpdateStatus(ts.id!, 'REJECTED')}
-                                            className="px-4 py-2 bg-white border border-red-100 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-red-50 transition-colors"
-                                        >
-                                            Reject
-                                        </button>
-                                    )}
+                                        {ts.status === 'PENDING' && ts.requiresAdminNote && (
+                                            <button
+                                                onClick={() => openAdjustModal(ts)}
+                                                className="px-4 py-2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-600 transition-colors shadow-sm"
+                                            >
+                                                Review & Resolve
+                                            </button>
+                                        )}
+
+                                        {(!ts.requiresAdminNote || ts.status !== 'PENDING') && (
+                                            <button
+                                                onClick={() => openAdjustModal(ts)}
+                                                className="px-4 py-2 bg-white border border-gray-200 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-gray-50 transition-colors"
+                                            >
+                                                {ts.status === 'PENDING' ? 'Adjust & Approve' : 'Correct & Update'}
+                                            </button>
+                                        )}
+
+                                        {ts.status !== 'REJECTED' && (
+                                            <button
+                                                onClick={() => handleUpdateStatus(ts.id!, 'REJECTED')}
+                                                className="px-4 py-2 bg-white border border-red-100 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-red-50 transition-colors"
+                                            >
+                                                Reject
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    );
-                })
+                        );
+                    })
                 );
             })()}
         </div>
@@ -383,18 +410,20 @@ function AdminTimesheetsContent() {
     return (
         <ProtectedRoute requiredRole="ADMIN">
             <div className="min-h-screen bg-background text-gray-900">
-                <header className="bg-white border-b border-gray-200">
+                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div className="flex items-center gap-6">
-                            <Logo width={100} height={35} />
-                            <div className="border-l border-gray-200 pl-6">
-                                <button
-                                    onClick={() => router.push('/dashboard')}
-                                    className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
-                                >
-                                    ← Dashboard
-                                </button>
-                                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Timesheet Approval</h1>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-6">
+                                <Logo width={100} height={35} />
+                                <div className="border-l border-gray-200 pl-6">
+                                    <button
+                                        onClick={() => router.push('/dashboard')}
+                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
+                                    >
+                                        ← Dashboard
+                                    </button>
+                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Timesheet Approval</h1>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -424,62 +453,59 @@ function AdminTimesheetsContent() {
                     )}
 
                     {/* Selectors Section */}
-                    <div className="card-base p-6 mb-8">
-                        <div className="flex flex-col gap-6">
-                            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                                <div className="flex flex-wrap items-center gap-4 w-full">
-                                    <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100">
-                                        <button
-                                            onClick={() => changeWeek('prev')}
-                                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                                            </svg>
-                                        </button>
-                                        <div className="px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap min-w-[200px] text-center uppercase tracking-widest">
-                                            Week of {formatDate(selectedWeek)}
-                                        </div>
-                                        <button
-                                            onClick={() => changeWeek('next')}
-                                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                            </svg>
-                                        </button>
+                    <div className="card-base p-4 sm:p-6 mb-8 border-blue-100 bg-white shadow-sm">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                            <div className="flex flex-col sm:flex-row items-center gap-4">
+                                <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 w-full sm:w-auto justify-between sm:justify-start">
+                                    <button
+                                        onClick={() => changeWeek('prev')}
+                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                    <div className="px-4 sm:px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap min-w-[140px] sm:min-w-[180px] text-center uppercase tracking-widest">
+                                        Week of {formatDate(selectedWeek)}
                                     </div>
-
-                                    <div className="flex flex-wrap items-center gap-4">
-                                        {/* Day Filter Dropdown */}
-                                        <div className="flex items-center gap-3">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Filter Day:</label>
-                                            <select
-                                                value={selectedDay}
-                                                onChange={(e) => setSelectedDay(Number(e.target.value))}
-                                                className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer min-w-[140px]"
-                                            >
-                                                <option value={-1}>All Week</option>
-                                                {[1, 2, 3, 4, 5, 6, 0].map((day) => (
-                                                    <option key={day} value={day}>{getDayName(day)}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        {/* Staff Filter Dropdown */}
-                                        <div className="flex items-center gap-3">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Filter Staff:</label>
-                                            <select
-                                                value={selectedStaffFilter}
-                                                onChange={(e) => setSelectedStaffFilter(e.target.value)}
-                                                className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer min-w-[180px]"
-                                            >
-                                                <option value="ALL">All Staff</option>
-                                                {Object.values(staffMap).map((staff) => (
-                                                    <option key={staff.id} value={staff.id}>{staff.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                    <button
+                                        onClick={() => changeWeek('next')}
+                                        className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                                    <div className="flex items-center gap-3 flex-1 sm:flex-none min-w-[160px]">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 hidden sm:block">Filter Day:</label>
+                                        <select
+                                            value={selectedDay}
+                                            onChange={(e) => setSelectedDay(Number(e.target.value))}
+                                            className="flex-1 sm:flex-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer"
+                                        >
+                                            <option value={-1}>All Week</option>
+                                            {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+                                                <option key={day} value={day}>{getDayName(day)}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-3 flex-1 sm:flex-none min-w-[160px]">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 hidden sm:block">Filter Staff:</label>
+                                        <select
+                                            value={selectedStaffFilter}
+                                            onChange={(e) => {
+                                                setSelectedStaffFilter(e.target.value);
+                                                setFilterMode('HARD');
+                                            }}
+                                            className="flex-1 sm:flex-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-blue-100 outline-none shadow-sm cursor-pointer"
+                                        >
+                                            <option value="ALL">All Staff</option>
+                                            {Object.values(staffMap).map((staff) => (
+                                                <option key={staff.id} value={staff.id}>{staff.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
                             </div>

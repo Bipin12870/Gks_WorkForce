@@ -182,14 +182,35 @@ export default function AdminRosterPage() {
             showNotification('Shift must be within staff availability', 'error');
             return;
         }
+        // Determine the target date of the shift we are trying to save
+        const targetDate = (() => {
+            if (isEditingShift && editingShiftId) {
+                const prevShift = shifts.find(s => s.id === editingShiftId);
+                return prevShift ? prevShift.date.toDate() : null;
+            } else {
+                const dayDate = new Date(selectedWeek);
+                const shiftDay = selectedStaff.dayOfWeek ?? selectedDay;
+                const finalDay = shiftDay === -1 ? new Date().getDay() : shiftDay;
+                dayDate.setDate(dayDate.getDate() + (finalDay === 0 ? 6 : finalDay - 1));
+                dayDate.setHours(0, 0, 0, 0);
+                return dayDate;
+            }
+        })();
 
-        // Check for overlapping shifts
-        const existingShifts = shifts.filter((s) => s.staffId === selectedStaff.id && s.id !== editingShiftId);
+        if (!targetDate) return;
+        const targetDateString = targetDate.toDateString();
+
+        // Check for overlapping shifts ONLY on the same day
+        const existingShifts = shifts.filter((s) => 
+            s.staffId === selectedStaff.id && 
+            s.id !== editingShiftId &&
+            s.date.toDate().toDateString() === targetDateString
+        );
         for (const shift of existingShifts) {
             const shiftStartsBefore = isTimeBefore(shiftForm.startTime, shift.endTime);
             const shiftEndsAfter = isTimeBefore(shift.startTime, shiftForm.endTime);
             if (shiftStartsBefore && shiftEndsAfter) {
-                showNotification('Shift overlaps with existing shift for this staff', 'error');
+                showNotification('Shift overlaps with existing shift for this staff on this day', 'error');
                 return;
             }
         }
@@ -209,14 +230,9 @@ export default function AdminRosterPage() {
                 await logRosterAction(editingShiftId, selectedStaff.id, 'EDIT', prevShift, shiftData);
                 showNotification('Shift updated successfully!', 'success');
             } else {
-                const dayDate = new Date(selectedWeek);
-                const shiftDay = selectedStaff.dayOfWeek ?? selectedDay;
-                dayDate.setDate(dayDate.getDate() + (shiftDay === 0 ? 6 : shiftDay - 1));
-                dayDate.setHours(0, 0, 0, 0);
-
                 const newShift = {
                     ...shiftData,
-                    date: Timestamp.fromDate(dayDate),
+                    date: Timestamp.fromDate(targetDate),
                     status: 'APPROVED' as const,
                     approvedBy: userData.id,
                     approvedAt: Timestamp.now(),

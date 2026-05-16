@@ -12,6 +12,7 @@ export default function DashboardPage() {
     const { userData, user, logout } = useAuth();
     const router = useRouter();
     const [pendingTimesheets, setPendingTimesheets] = useState(0);
+    const [flaggedCount, setFlaggedCount] = useState(0);
     const [todayShifts, setTodayShifts] = useState(0);
 
     useEffect(() => {
@@ -20,13 +21,31 @@ export default function DashboardPage() {
         let unsubscribe = () => {};
 
         if (userData.role === 'ADMIN') {
-            const q = query(
+            // All pending timesheets
+            const qAll = query(
                 collection(db, 'timesheets'),
                 where('status', '==', 'PENDING')
             );
-            unsubscribe = onSnapshot(q, (snapshot) => {
+            
+            // Specifically flagged timesheets
+            const qFlagged = query(
+                collection(db, 'timesheets'),
+                where('status', '==', 'PENDING'),
+                where('requiresAdminNote', '==', true)
+            );
+
+            const unsubAll = onSnapshot(qAll, (snapshot) => {
                 setPendingTimesheets(snapshot.size);
             });
+
+            const unsubFlagged = onSnapshot(qFlagged, (snapshot) => {
+                setFlaggedCount(snapshot.size);
+            });
+
+            unsubscribe = () => {
+                unsubAll();
+                unsubFlagged();
+            };
         } else {
             const startOfToday = new Date();
             startOfToday.setHours(0, 0, 0, 0);
@@ -142,6 +161,16 @@ export default function DashboardPage() {
                                     badgeCount={pendingTimesheets}
                                     onClick={() => handleNavigation('/admin/timesheets')}
                                 />
+                                {flaggedCount > 0 && (
+                                    <DashboardCard
+                                        title="Flagged Issues"
+                                        description="Review geofence violations or overtime alerts"
+                                        icon="⚠️"
+                                        badgeCount={flaggedCount}
+                                        isWarning
+                                        onClick={() => handleNavigation('/admin/timesheets?filter=flagged')}
+                                    />
+                                )}
                                 <DashboardCard
                                     title="Hours Summary"
                                     description="View payroll and hours overview"
@@ -175,26 +204,39 @@ interface DashboardCardProps {
     icon: string;
     onClick: () => void;
     badgeCount?: number;
+    isWarning?: boolean;
 }
 
-function DashboardCard({ title, description, icon, onClick, badgeCount }: DashboardCardProps) {
+function DashboardCard({ title, description, icon, onClick, badgeCount, isWarning }: DashboardCardProps) {
     return (
         <button
             onClick={onClick}
-            className="relative flex flex-col p-6 text-left transition-all duration-200 bg-white border border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-sm group focus:ring-2 focus:ring-blue-100 outline-none overflow-hidden"
+            className={`relative flex flex-col p-6 text-left transition-all duration-200 border rounded-xl hover:shadow-sm group focus:ring-2 outline-none overflow-hidden ${
+                isWarning 
+                ? 'bg-amber-50/30 border-amber-200 hover:border-amber-500 focus:ring-amber-100' 
+                : 'bg-white border-gray-200 hover:border-blue-500 focus:ring-blue-100'
+            }`}
         >
             {badgeCount && badgeCount > 0 ? (
-                <div className="absolute top-4 right-4 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 bg-red-600 text-white text-[10px] font-black rounded-full shadow-sm ring-2 ring-white animate-in zoom-in duration-300">
+                <div className={`absolute top-4 right-4 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 text-white text-[10px] font-black rounded-full shadow-sm ring-2 ring-white animate-in zoom-in duration-300 ${
+                    isWarning ? 'bg-amber-600' : 'bg-red-600'
+                }`}>
                     {badgeCount}
                 </div>
             ) : null}
-            <div className="flex items-center justify-center w-12 h-12 mb-5 text-2xl bg-gray-50 rounded-lg group-hover:bg-blue-50 transition-colors">
+            <div className={`flex items-center justify-center w-12 h-12 mb-5 text-2xl rounded-lg transition-colors ${
+                isWarning ? 'bg-amber-100 group-hover:bg-amber-200' : 'bg-gray-50 group-hover:bg-blue-50'
+            }`}>
                 {icon}
             </div>
-            <h3 className="text-base font-bold text-gray-900 mb-1.5 group-hover:text-blue-600 transition-colors">
+            <h3 className={`text-base font-bold mb-1.5 transition-colors ${
+                isWarning ? 'text-amber-900 group-hover:text-amber-700' : 'text-gray-900 group-hover:text-blue-600'
+            }`}>
                 {title}
             </h3>
-            <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
+            <p className={`text-sm leading-relaxed ${
+                isWarning ? 'text-amber-700/70' : 'text-gray-500'
+            }`}>{description}</p>
         </button>
     );
 }

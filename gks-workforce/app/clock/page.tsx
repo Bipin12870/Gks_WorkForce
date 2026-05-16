@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import { collection, addDoc, query, where, getDocs, updateDoc, doc, Timestamp, getDoc } from 'firebase/firestore';
 import { TimeRecord, Timesheet, Shift, ShopLocation, TimesheetSource } from '@/types';
 import { useRouter } from 'next/navigation';
-import { getShopLocation, checkGeofence, roundToNearest5, getDistanceMetres, isOvertime } from '@/lib/geofence';
+import { getShopLocation, checkGeofence, roundToNearest5, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
 import { getWeekStart } from '@/lib/utils';
 import Logo from '@/components/Logo';
 
@@ -193,7 +193,7 @@ export default function ClockInOutPage() {
             if (geo && shop && geo.distanceMetres !== null && geo.distanceMetres > shop.radiusMetres) {
                 source = 'GPS_OUTSIDE';
                 requiresNote = true;
-            } else if (isOvertime(clockOutRounded, shift.endTime)) {
+            } else if (isSignificantOvertime(clockOutRounded, shift.endTime)) {
                 source = 'GPS_OVERTIME';
                 requiresNote = true;
             } else {

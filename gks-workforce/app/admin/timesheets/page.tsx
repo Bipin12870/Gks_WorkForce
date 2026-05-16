@@ -7,11 +7,20 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, updateDoc, doc, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, User } from '@/types';
 import { getWeekStart, formatDate, calculateHours, getDayName } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
+import { Suspense } from 'react';
 
 export default function AdminTimesheetsPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <AdminTimesheetsContent />
+        </Suspense>
+    );
+}
+
+function AdminTimesheetsContent() {
     const { userData } = useAuth();
     const router = useRouter();
     const { showNotification } = useNotification();
@@ -21,8 +30,17 @@ export default function AdminTimesheetsPage() {
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [staffMap, setStaffMap] = useState<Record<string, User>>({});
     const [loading, setLoading] = useState(true);
+    const searchParams = useSearchParams();
     const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('ALL');
     const [activeMobileTab, setActiveMobileTab] = useState<'roster' | 'timesheets'>('roster');
+    const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+
+    useEffect(() => {
+        if (searchParams.get('filter') === 'flagged') {
+            setShowFlaggedOnly(true);
+            setSelectedDay(-1); // Show all days for the week
+        }
+    }, [searchParams]);
 
     // Adjustment Modal State
     const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -241,7 +259,10 @@ export default function AdminTimesheetsPage() {
             {loading ? (
                 <div className="flex justify-center py-10"><div className="animate-spin h-6 w-6 border-b-2 border-blue-600"></div></div>
             ) : (() => {
-                const filteredTimesheets = selectedStaffFilter === 'ALL' ? timesheets : timesheets.filter(t => t.staffId === selectedStaffFilter);
+                let filteredTimesheets = selectedStaffFilter === 'ALL' ? timesheets : timesheets.filter(t => t.staffId === selectedStaffFilter);
+                if (showFlaggedOnly) {
+                    filteredTimesheets = filteredTimesheets.filter(t => t.requiresAdminNote && t.status === 'PENDING');
+                }
                 return filteredTimesheets.length === 0 ? (
                     <div className="card-base p-10 text-center border-dashed border-blue-100 bg-blue-50/10">
                         <p className="text-sm font-medium text-blue-400 italic">No timesheets submitted for this criteria</p>
@@ -380,6 +401,28 @@ export default function AdminTimesheetsPage() {
                 </header>
 
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    {showFlaggedOnly && (
+                        <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between animate-in slide-in-from-top-4 duration-500">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xl">⚠️</span>
+                                <div>
+                                    <p className="text-sm font-bold text-amber-900">Viewing Flagged Issues Only</p>
+                                    <p className="text-xs text-amber-700">Showing all pending timesheets with geofence or overtime violations for this week.</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowFlaggedOnly(false);
+                                    setSelectedDay(new Date().getDay()); // Reset to today
+                                    router.replace('/admin/timesheets'); // Clean URL
+                                }}
+                                className="px-4 py-2 bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-black uppercase tracking-widest rounded-lg transition-colors"
+                            >
+                                Clear Filter
+                            </button>
+                        </div>
+                    )}
+
                     {/* Selectors Section */}
                     <div className="card-base p-6 mb-8">
                         <div className="flex flex-col gap-6">

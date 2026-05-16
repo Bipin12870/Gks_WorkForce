@@ -10,6 +10,7 @@ import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
+import { isSignificantOvertime } from '@/lib/geofence';
 
 export default function StaffTimesheetsPage() {
     const { userData } = useAuth();
@@ -131,6 +132,8 @@ export default function StaffTimesheetsPage() {
 
         setSubmitting(shift.id!);
         try {
+            const requiresNote = isSignificantOvertime(workedEnd, shift.endTime);
+
             const timesheetData: Omit<Timesheet, 'id'> = {
                 staffId: userData.id,
                 shiftId: shift.id!,
@@ -141,8 +144,8 @@ export default function StaffTimesheetsPage() {
                 workedStart: workedStart,
                 workedEnd: workedEnd,
                 status: 'PENDING',
-                source: 'MANUAL', // explicit source
-                requiresAdminNote: false,
+                source: 'MANUAL',
+                requiresAdminNote: requiresNote,
                 createdAt: serverTimestamp() as Timestamp,
                 updatedAt: serverTimestamp() as Timestamp
             };

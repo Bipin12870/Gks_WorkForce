@@ -5,10 +5,10 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 // --- CONFIGURATION ---
-// You can either fill these in or the script will try to read .env.local
-const ADMIN_EMAIL = 'gksyerros@gmail.com'; // CHANGE THIS
-const ADMIN_PASSWORD = 'gksyerros123#';    // CHANGE THIS
-const ADMIN_NAME = 'Tony';         // CHANGE THIS
+// The script will try to read these from .env.local first
+let ADMIN_EMAIL = ''; 
+let ADMIN_PASSWORD = '';
+let ADMIN_NAME = '';
 // ---------------------
 
 async function bootstrap() {
@@ -37,6 +37,16 @@ async function bootstrap() {
         messagingSenderId: getEnv('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
         appId: getEnv('NEXT_PUBLIC_FIREBASE_APP_ID')
     };
+
+    // 2. Load Credentials
+    ADMIN_EMAIL = getEnv('BOOTSTRAP_ADMIN_EMAIL') || '';
+    ADMIN_PASSWORD = getEnv('BOOTSTRAP_ADMIN_PASSWORD') || '';
+    ADMIN_NAME = getEnv('BOOTSTRAP_ADMIN_NAME') || '';
+
+    if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+        console.error('❌ Missing Admin Credentials in .env.local (BOOTSTRAP_ADMIN_EMAIL/PASSWORD)');
+        process.exit(1);
+    }
 
     if (!firebaseConfig.apiKey) {
         console.error('❌ Missing Firebase configuration in .env.local');

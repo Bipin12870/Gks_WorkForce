@@ -59,18 +59,22 @@ export function getDistanceMetres(
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ─────────────────────────────────────────────────────────────
-// OVERTIME CHECK
-// ─────────────────────────────────────────────────────────────
-
 /**
- * Returns true if the clockOutRounded time is strictly after shiftEndTime.
+ * Returns true if the clockOutRounded time is at least 30 minutes after shiftEndTime.
  * Both arguments must be HH:mm strings.
  */
-export function isOvertime(clockOutRounded: string, shiftEndTime: string): boolean {
+export function isSignificantOvertime(clockOutRounded: string, shiftEndTime: string, thresholdMinutes = 30): boolean {
     const [oh, om] = clockOutRounded.split(':').map(Number);
     const [sh, sm] = shiftEndTime.split(':').map(Number);
-    return oh * 60 + om > sh * 60 + sm;
+    
+    let diff = (oh * 60 + om) - (sh * 60 + sm);
+    
+    // Handle cross-midnight: If shift ended at 23:00 and they clocked out at 01:00
+    if (diff < -1000) { // e.g. -1300 minutes difference
+        diff += 24 * 60;
+    }
+    
+    return diff >= thresholdMinutes;
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -102,7 +102,13 @@ export default function StaffHoursPage() {
     // Unified display list for the Shift Log
     const unifiedLog = useMemo(() => {
         // 1. Start with all shifts
-        const log = shifts.map(shift => {
+        const log: Array<{
+            id: string;
+            date: Timestamp;
+            shift: Shift | null;
+            timesheet: Timesheet | undefined;
+            type: string;
+        }> = shifts.map(shift => {
             const ts = timesheets.find(t => t.shiftId === shift.id);
             return {
                 id: shift.id || `shift-${Math.random()}`,

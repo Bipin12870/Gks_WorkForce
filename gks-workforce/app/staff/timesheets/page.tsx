@@ -196,7 +196,13 @@ export default function StaffTimesheetsPage() {
     // Unified list for display
     const unifiedDisplayList = useMemo(() => {
         // 1. Start with all shifts
-        const list = shifts.map(shift => {
+        const list: Array<{
+            id: string;
+            date: Timestamp;
+            shift: Shift | null;
+            timesheet: Timesheet | undefined;
+            type: string;
+        }> = shifts.map(shift => {
             const ts = timesheets.find(t => t.shiftId === shift.id);
             return {
                 id: shift.id || `shift-${Math.random()}`,

@@ -4,10 +4,48 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
+import { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 
 export default function DashboardPage() {
-    const { userData, logout } = useAuth();
+    const { userData, user, logout } = useAuth();
     const router = useRouter();
+    const [pendingTimesheets, setPendingTimesheets] = useState(0);
+    const [todayShifts, setTodayShifts] = useState(0);
+
+    useEffect(() => {
+        if (!user || !userData) return;
+
+        let unsubscribe = () => {};
+
+        if (userData.role === 'ADMIN') {
+            const q = query(
+                collection(db, 'timesheets'),
+                where('status', '==', 'PENDING')
+            );
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                setPendingTimesheets(snapshot.size);
+            });
+        } else {
+            const startOfToday = new Date();
+            startOfToday.setHours(0, 0, 0, 0);
+            const endOfToday = new Date();
+            endOfToday.setHours(23, 59, 59, 999);
+
+            const q = query(
+                collection(db, 'shifts'),
+                where('staffId', '==', user.uid),
+                where('date', '>=', Timestamp.fromDate(startOfToday)),
+                where('date', '<=', Timestamp.fromDate(endOfToday))
+            );
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                setTodayShifts(snapshot.size);
+            });
+        }
+
+        return () => unsubscribe();
+    }, [user, userData]);
 
     const handleLogout = async () => {
         await logout();
@@ -52,6 +90,7 @@ export default function DashboardPage() {
                                     title="Time Clock"
                                     description="Clock in and out of your shift (GPS Required)"
                                     icon="📍"
+                                    badgeCount={todayShifts}
                                     onClick={() => handleNavigation('/clock')}
                                 />
                                 <DashboardCard
@@ -100,6 +139,7 @@ export default function DashboardPage() {
                                     title="Timesheet Approval"
                                     description="Verify and approve staff timesheets"
                                     icon="✅"
+                                    badgeCount={pendingTimesheets}
                                     onClick={() => handleNavigation('/admin/timesheets')}
                                 />
                                 <DashboardCard
@@ -134,14 +174,20 @@ interface DashboardCardProps {
     description: string;
     icon: string;
     onClick: () => void;
+    badgeCount?: number;
 }
 
-function DashboardCard({ title, description, icon, onClick }: DashboardCardProps) {
+function DashboardCard({ title, description, icon, onClick, badgeCount }: DashboardCardProps) {
     return (
         <button
             onClick={onClick}
-            className="flex flex-col p-6 text-left transition-all duration-200 bg-white border border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-sm group focus:ring-2 focus:ring-blue-100 outline-none"
+            className="relative flex flex-col p-6 text-left transition-all duration-200 bg-white border border-gray-200 rounded-xl hover:border-blue-500 hover:shadow-sm group focus:ring-2 focus:ring-blue-100 outline-none overflow-hidden"
         >
+            {badgeCount && badgeCount > 0 ? (
+                <div className="absolute top-4 right-4 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 bg-red-600 text-white text-[10px] font-black rounded-full shadow-sm ring-2 ring-white animate-in zoom-in duration-300">
+                    {badgeCount}
+                </div>
+            ) : null}
             <div className="flex items-center justify-center w-12 h-12 mb-5 text-2xl bg-gray-50 rounded-lg group-hover:bg-blue-50 transition-colors">
                 {icon}
             </div>

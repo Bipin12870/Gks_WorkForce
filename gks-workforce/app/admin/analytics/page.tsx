@@ -107,17 +107,19 @@ export default function AnalyticsPage() {
     };
 
     const analyticsData = useMemo(() => {
-        let totalWages = 0;
-        let totalActualHours = 0;
+        let totalWages = 0; // Only approved
+        let projectedWages = 0; // Based on roster
+        let totalActualHours = 0; // Only approved
         let totalScheduledHours = 0;
 
         // Group by staff for Bar Chart
-        const staffCostMap: Record<string, { name: string; cost: number; actualHours: number; scheduledHours: number }> = {};
+        const staffCostMap: Record<string, { name: string; cost: number; rosterCost: number; actualHours: number; scheduledHours: number }> = {};
         
         staffList.forEach(staff => {
             staffCostMap[staff.id] = {
-                name: staff.name.split(' ')[0], // First name only for cleaner chart
+                name: staff.name.split(' ')[0],
                 cost: 0,
+                rosterCost: 0,
                 actualHours: 0,
                 scheduledHours: 0
             };
@@ -125,7 +127,6 @@ export default function AnalyticsPage() {
 
         // Group by Day for Line Chart
         const dayMap: Record<string, { name: string; Scheduled: number; Actual: number; date: Date }> = {};
-        // Initialize the 7 days of the selected week
         for (let i = 0; i < 7; i++) {
             const d = new Date(weekStart);
             d.setDate(d.getDate() + i);
@@ -133,13 +134,19 @@ export default function AnalyticsPage() {
             dayMap[dayName] = { name: dayName, Scheduled: 0, Actual: 0, date: d };
         }
 
-        // Process Shifts (Scheduled)
+        // Process Shifts (Scheduled & Projected Cost)
         shifts.forEach(shift => {
             const hours = calculateHours(shift.startTime, shift.endTime);
             totalScheduledHours += hours;
             
+            const staff = staffList.find(s => s.id === shift.staffId);
+            const rate = staff?.hourlyRate || 0;
+            const shiftRosterCost = hours * rate;
+            projectedWages += shiftRosterCost;
+
             if (staffCostMap[shift.staffId]) {
                 staffCostMap[shift.staffId].scheduledHours += hours;
+                staffCostMap[shift.staffId].rosterCost += shiftRosterCost;
             }
 
             const shiftDate = shift.date.toDate();
@@ -149,9 +156,10 @@ export default function AnalyticsPage() {
             }
         });
 
-        // Process Timesheets (Actual & Costs)
+        // Process Timesheets (Actual & Costs - ONLY APPROVED)
         timesheets.forEach(ts => {
-            // Include both APPROVED and PENDING as "Actual", but maybe note it. Let's just use all submitted timesheets.
+            if (ts.status !== 'APPROVED') return;
+
             const hours = calculateHours(ts.workedStart, ts.workedEnd);
             totalActualHours += hours;
 
@@ -173,13 +181,14 @@ export default function AnalyticsPage() {
             }
         });
 
-        const staffChartData = Object.values(staffCostMap).sort((a, b) => b.cost - a.cost);
+        const staffChartData = Object.values(staffCostMap).sort((a, b) => b.rosterCost - a.rosterCost);
         const dayChartData = Object.values(dayMap).sort((a, b) => a.date.getTime() - b.date.getTime());
 
         const laborVariance = totalActualHours - totalScheduledHours;
 
         return {
             totalWages,
+            projectedWages,
             totalActualHours,
             totalScheduledHours,
             laborVariance,
@@ -288,13 +297,13 @@ export default function AnalyticsPage() {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="card-base p-6 bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-md">
                                     <p className="text-blue-100 text-xs font-black uppercase tracking-widest mb-1">
-                                        Total Estimated Wages
+                                        Actual Wages (Approved)
                                     </p>
                                     <p className="text-4xl font-bold tracking-tight">
                                         {formatCurrency(analyticsData.totalWages)}
                                     </p>
                                     <p className="text-blue-100 text-xs mt-2 font-medium">
-                                        Based on actual hours × staff hourly rates
+                                        Budgeted: {formatCurrency(analyticsData.projectedWages)} (from roster)
                                     </p>
                                 </div>
 
@@ -334,10 +343,10 @@ export default function AnalyticsPage() {
                                 <div className="card-base p-6 flex flex-col">
                                     <div className="mb-6">
                                         <h2 className="text-base font-black text-gray-900 uppercase tracking-widest">
-                                            Employee Cost Breakdown
+                                            Cost: Budget vs Actual
                                         </h2>
                                         <p className="text-sm text-gray-500 mt-1">
-                                            Total wages distributed by staff member
+                                            Comparison of rostered costs vs approved pay
                                         </p>
                                     </div>
                                     <div className="h-[300px] w-full">
@@ -360,9 +369,11 @@ export default function AnalyticsPage() {
                                                 <Tooltip 
                                                     cursor={{ fill: '#f3f4f6' }}
                                                     contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                                    formatter={(value: any) => [formatCurrency(Number(value)), 'Cost']}
+                                                    formatter={(value: any, name: string) => [formatCurrency(Number(value)), name]}
                                                 />
-                                                <Bar dataKey="cost" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                                                <Legend verticalAlign="top" height={36}/>
+                                                <Bar dataKey="rosterCost" name="Rostered" fill="#bfdbfe" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                                <Bar dataKey="cost" name="Approved" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -372,10 +383,10 @@ export default function AnalyticsPage() {
                                 <div className="card-base p-6 flex flex-col">
                                     <div className="mb-6">
                                         <h2 className="text-base font-black text-gray-900 uppercase tracking-widest">
-                                            Scheduled vs Actual Hours
+                                            Rostered vs Worked Hours
                                         </h2>
                                         <p className="text-sm text-gray-500 mt-1">
-                                            Daily breakdown of planned vs worked hours
+                                            Daily breakdown of planned hours vs actual worked time
                                         </p>
                                     </div>
                                     <div className="h-[300px] w-full">

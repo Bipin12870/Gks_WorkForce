@@ -159,7 +159,7 @@ export default function DashboardPage() {
                                     description="Verify and approve staff timesheets"
                                     icon="✅"
                                     badgeCount={pendingTimesheets}
-                                    onClick={() => handleNavigation('/admin/timesheets')}
+                                    onClick={() => handleNavigation('/admin/timesheets?filter=pending')}
                                 />
                                 {flaggedCount > 0 && (
                                     <DashboardCard
@@ -212,8 +212,8 @@ function DashboardCard({ title, description, icon, onClick, badgeCount, isWarnin
         <button
             onClick={onClick}
             className={`relative flex flex-col p-6 text-left transition-all duration-200 border rounded-xl hover:shadow-sm group focus:ring-2 outline-none overflow-hidden ${isWarning
-                    ? 'bg-amber-50/30 border-amber-200 hover:border-amber-500 focus:ring-amber-100'
-                    : 'bg-white border-gray-200 hover:border-blue-500 focus:ring-blue-100'
+                ? 'bg-amber-50/30 border-amber-200 hover:border-amber-500 focus:ring-amber-100'
+                : 'bg-white border-gray-200 hover:border-blue-500 focus:ring-blue-100'
                 }`}
         >
             {badgeCount && badgeCount > 0 ? (

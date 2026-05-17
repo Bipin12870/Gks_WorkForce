@@ -35,11 +35,19 @@ function AdminTimesheetsContent() {
     const [filterMode, setFilterMode] = useState<'HARD' | 'HIGHLIGHT'>('HARD');
     const [activeMobileTab, setActiveMobileTab] = useState<'roster' | 'timesheets'>('roster');
     const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
 
     useEffect(() => {
-        if (searchParams.get('filter') === 'flagged') {
+        const filter = searchParams.get('filter');
+        if (filter === 'flagged') {
             setShowFlaggedOnly(true);
+            setStatusFilter('PENDING');
             setSelectedDay(-1); // Show all days for the week
+            setActiveMobileTab('timesheets');
+        } else if (filter === 'pending') {
+            setStatusFilter('PENDING');
+            setSelectedDay(-1); // Show all days for the week
+            setActiveMobileTab('timesheets');
         }
     }, [searchParams]);
 
@@ -277,14 +285,38 @@ function AdminTimesheetsContent() {
 
     const renderSubmittedTimesheets = () => (
         <div className="space-y-4">
-            <div className="flex items-center justify-between px-2">
-                <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest">Submitted Timesheets</h3>
-                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Action Required</div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-2 pb-2 border-b border-gray-100">
+                <div className="flex flex-col">
+                    <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest">
+                        {statusFilter === 'ALL' ? 'Submitted Timesheets' : `${statusFilter} Timesheets`}
+                    </h3>
+                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wide">
+                        {statusFilter === 'PENDING' ? 'Action Required' : 'Historical Archive'}
+                    </span>
+                </div>
+                <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Status:</span>
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value as any)}
+                        className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-[11px] font-black text-blue-600 outline-none shadow-sm cursor-pointer hover:border-blue-200 transition-colors uppercase tracking-wider"
+                    >
+                        <option value="ALL">All Statuses</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="APPROVED">Approved</option>
+                        <option value="REJECTED">Rejected</option>
+                    </select>
+                </div>
             </div>
             {loading ? (
                 <div className="flex justify-center py-10"><div className="animate-spin h-6 w-6 border-b-2 border-blue-600"></div></div>
             ) : (() => {
                 let filteredTimesheets = selectedStaffFilter === 'ALL' ? timesheets : timesheets.filter(t => t.staffId === selectedStaffFilter);
+                
+                if (statusFilter !== 'ALL') {
+                    filteredTimesheets = filteredTimesheets.filter(t => t.status === statusFilter);
+                }
+                
                 if (showFlaggedOnly) {
                     filteredTimesheets = filteredTimesheets.filter(t => t.requiresAdminNote && t.status === 'PENDING');
                 }
@@ -478,7 +510,7 @@ function AdminTimesheetsContent() {
                                     </button>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                                    <div className="flex items-center gap-3 flex-1 sm:flex-none min-w-[160px]">
+                                    <div className="flex items-center gap-3 flex-1 sm:flex-none min-w-[140px]">
                                         <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 hidden sm:block">Filter Day:</label>
                                         <select
                                             value={selectedDay}
@@ -491,7 +523,7 @@ function AdminTimesheetsContent() {
                                             ))}
                                         </select>
                                     </div>
-                                    <div className="flex items-center gap-3 flex-1 sm:flex-none min-w-[160px]">
+                                    <div className="flex items-center gap-3 flex-1 sm:flex-none min-w-[140px]">
                                         <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 hidden sm:block">Filter Staff:</label>
                                         <select
                                             value={selectedStaffFilter}

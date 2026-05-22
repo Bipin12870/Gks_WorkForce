@@ -139,9 +139,9 @@ export interface Timesheet {
     timeRecordId?: string;            // linked TimeRecord
     clockInLat?: number;
     clockInLng?: number;
-    clockOutLat?: number;
-    clockOutLng?: number;
-    clockOutDistanceMetres?: number;  // distance from shop at clock-out
+    clockOutLat?: number | null;
+    clockOutLng?: number | null;
+    clockOutDistanceMetres?: number | null;  // distance from shop at clock-out
 
     // Admin action on flagged records
     requiresAdminNote: boolean;       // true for OUTSIDE / OVERTIME / AUTO_CLOSED

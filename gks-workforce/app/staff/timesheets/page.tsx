@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, Timestamp, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Shift, Timesheet, TimesheetStatus } from '@/types';
+import { collection, query, where, onSnapshot, Timestamp, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { Shift, Timesheet, TimesheetStatus, TimeRecord } from '@/types';
 import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
@@ -19,6 +19,7 @@ export default function StaffTimesheetsPage() {
     const [selectedWeek, setSelectedWeek] = useState<Date>(getWeekStart(new Date()));
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
+    const [activeRecord, setActiveRecord] = useState<TimeRecord | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState<string | null>(null);
 
@@ -86,9 +87,31 @@ export default function StaffTimesheetsPage() {
             }
         );
 
+        // Listen for active clock sessions
+        const activeRecordQuery = query(
+            collection(db, 'timeRecords'),
+            where('staffId', '==', userData.id),
+            where('clockOutTime', '==', null)
+        );
+
+        const unsubscribeActiveRecord = onSnapshot(activeRecordQuery,
+            (snapshot) => {
+                if (!snapshot.empty) {
+                    const docSnap = snapshot.docs[0];
+                    setActiveRecord({ id: docSnap.id, ...docSnap.data() } as TimeRecord);
+                } else {
+                    setActiveRecord(null);
+                }
+            },
+            (error) => {
+                console.error('Error fetching active record:', error);
+            }
+        );
+
         return () => {
             unsubscribeShifts();
             unsubscribeTimesheets();
+            unsubscribeActiveRecord();
         };
     }, [selectedWeek, userData]);
 
@@ -119,6 +142,11 @@ export default function StaffTimesheetsPage() {
     };
 
     const handleStartEdit = (shift: Shift) => {
+        if (activeRecord) {
+            showNotification('You have an active clock session. Please clock out first.', 'error');
+            return;
+        }
+
         if (isFutureShift(shift)) {
             showNotification('You cannot submit timesheets for future shifts.', 'error');
             return;
@@ -137,6 +165,19 @@ export default function StaffTimesheetsPage() {
 
         setSubmitting(shift.id!);
         try {
+            // Check if timesheet already exists to prevent duplicate submissions
+            const q = query(
+                collection(db, 'timesheets'),
+                where('staffId', '==', userData.id),
+                where('shiftId', '==', shift.id!)
+            );
+            const existingSnap = await getDocs(q);
+            if (!existingSnap.empty) {
+                showNotification('A timesheet for this shift has already been submitted.', 'error');
+                setEditMode(null);
+                return;
+            }
+
             const requiresNote = isSignificantOvertime(workedEnd, shift.endTime);
 
             const timesheetData: Omit<Timesheet, 'id'> = {
@@ -289,7 +330,7 @@ export default function StaffTimesheetsPage() {
                                     <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No shifts or activity for this week</p>
                                 </div>
                             ) : (
-                                unifiedDisplayList.map((item: any) => {
+                                unifiedDisplayList.map((item) => {
                                     const shift = item.shift;
                                     const timesheet = item.timesheet;
                                     const isEditing = editMode === item.id;
@@ -391,15 +432,22 @@ export default function StaffTimesheetsPage() {
                                                             </div>
                                                         ) : (
                                                             shift && (
-                                                                <button
-                                                                    onClick={() => handleStartEdit(shift)}
-                                                                    className="px-6 py-2.5 bg-white border border-gray-200 text-gray-900 text-[10px] font-black uppercase tracking-widest rounded-xl hover:border-blue-600 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2 group/btn"
-                                                                >
-                                                                    Submit Manual Timesheet
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 transform group-hover/btn:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
-                                                                        <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                                    </svg>
-                                                                </button>
+                                                                activeRecord ? (
+                                                                    <div className="flex flex-col items-end">
+                                                                        <span className="px-2 py-1 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-wider rounded border border-amber-100 italic">Clock Active</span>
+                                                                        <p className="text-[10px] text-gray-400 font-medium mt-1">Clock out to edit</p>
+                                                                    </div>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => handleStartEdit(shift)}
+                                                                        className="px-6 py-2.5 bg-white border border-gray-200 text-gray-900 text-[10px] font-black uppercase tracking-widest rounded-xl hover:border-blue-600 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2 group/btn"
+                                                                    >
+                                                                        Submit Manual Timesheet
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 transform group-hover/btn:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
+                                                                            <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                                        </svg>
+                                                                    </button>
+                                                                )
                                                             )
                                                         )}
                                                     </div>

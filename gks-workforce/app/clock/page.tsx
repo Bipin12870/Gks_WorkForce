@@ -36,6 +36,12 @@ export default function ClockInOutPage() {
     const [clockInCoolingRemaining, setClockInCoolingRemaining] = useState<number>(0);
     const [clockOutCoolingRemaining, setClockOutCoolingRemaining] = useState<number>(0);
     const [shiftDurationSeconds, setShiftDurationSeconds] = useState<number>(0);
+    const [shiftDiffMins, setShiftDiffMins] = useState<number | null>(null);
+    const [confirmModalData, setConfirmModalData] = useState<{
+        title: string;
+        message: string;
+        type: 'early' | 'late' | 'unscheduled';
+    } | null>(null);
 
     const watchIdRef = useRef<number | null>(null);
 
@@ -50,12 +56,23 @@ export default function ClockInOutPage() {
             if (activeRecord) {
                 const elapsedMs = Date.now() - activeRecord.clockInTime.toMillis();
                 setShiftDurationSeconds(Math.max(0, Math.floor(elapsedMs / 1000)));
+                setShiftDiffMins(null);
             } else {
                 setShiftDurationSeconds(0);
+                if (todayShift) {
+                    const now = new Date();
+                    const [sh, sm] = todayShift.startTime.split(':').map(Number);
+                    const shiftStart = new Date(todayShift.date.toDate());
+                    shiftStart.setHours(sh, sm, 0, 0);
+                    const diffMs = now.getTime() - shiftStart.getTime();
+                    setShiftDiffMins(Math.round(diffMs / (1000 * 60)));
+                } else {
+                    setShiftDiffMins(null);
+                }
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [activeRecord]);
+    }, [activeRecord, todayShift]);
 
     const formatDuration = (totalSeconds: number) => {
         const hrs = Math.floor(totalSeconds / 3600);
@@ -88,8 +105,24 @@ export default function ClockInOutPage() {
         const snap = await getDocs(q);
         if (snap.empty) return null;
         
-        // Just return the first shift of that day for now
-        return { id: snap.docs[0].id, ...snap.docs[0].data() } as Shift;
+        const shift = { id: snap.docs[0].id, ...snap.docs[0].data() } as Shift;
+        
+        // If clocking in after the shift has ended, do not match it (treat as unrostered)
+        const [eh, em] = shift.endTime.split(':').map(Number);
+        const shiftEnd = new Date(clockInDate);
+        shiftEnd.setHours(eh, em, 0, 0);
+
+        const [sh, sm] = shift.startTime.split(':').map(Number);
+        if (eh < sh || (eh === sh && em < sm)) {
+            shiftEnd.setDate(shiftEnd.getDate() + 1);
+        }
+
+        // Allow a 15-minute grace period after shift end
+        if (clockInTimeMs > shiftEnd.getTime() + 15 * 60 * 1000) {
+            return null;
+        }
+
+        return shift;
     };
 
     // ─────────────────────────────────────────────────────────
@@ -179,7 +212,7 @@ export default function ClockInOutPage() {
                 shiftEnd.setHours(eh, em, 0, 0);
                 
                 // Auto close time = shift end + 30 mins
-                const autoCloseTimeMs = shiftEnd.getTime() + 30 * 60 * 1000;
+                const autoCloseTimeMs = shiftEnd.getTime() + 1 * 60 * 1000;
                 const nowMs = Date.now();
 
                 if (nowMs > autoCloseTimeMs) {
@@ -293,31 +326,62 @@ export default function ClockInOutPage() {
             updatedAt: Timestamp.now(),
         });
 
-        // 2. Auto-generate Timesheet
-        const timesheetPayload: Omit<Timesheet, 'id'> = {
-            staffId: userData.id,
-            shiftId: shift ? shift.id! : null,
-            date: Timestamp.fromDate(clockInDate),
-            weekStartDate: Timestamp.fromDate(getWeekStart(clockInDate)),
-            approvedShiftStart: shift ? shift.startTime : '',
-            approvedShiftEnd: shift ? shift.endTime : '',
-            workedStart: record.clockInRounded,
-            workedEnd: finalWorkedEnd,
-            status: 'PENDING',
-            source,
-            timeRecordId: record.id!,
-            clockInLat: record.clockInLat,
-            clockInLng: record.clockInLng,
-            clockOutLat: geo?.lat ?? undefined,
-            clockOutLng: geo?.lng ?? undefined,
-            clockOutDistanceMetres: geo?.distanceMetres ?? undefined,
-            requiresAdminNote: requiresNote,
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now(),
-        };
+        // 2. Auto-generate Timesheet (or update existing if duplicate)
+        let timesheetId = '';
+        if (shift) {
+            const tsQ = query(
+                collection(db, 'timesheets'),
+                where('staffId', '==', userData.id),
+                where('shiftId', '==', shift.id)
+            );
+            const tsSnap = await getDocs(tsQ);
+            if (!tsSnap.empty) {
+                const tsDoc = tsSnap.docs[0];
+                timesheetId = tsDoc.id;
+                await updateDoc(doc(db, 'timesheets', timesheetId), {
+                    workedStart: record.clockInRounded,
+                    workedEnd: finalWorkedEnd,
+                    source,
+                    timeRecordId: record.id!,
+                    clockInLat: record.clockInLat,
+                    clockInLng: record.clockInLng,
+                    clockOutLat: geo?.lat ?? null,
+                    clockOutLng: geo?.lng ?? null,
+                    clockOutDistanceMetres: geo?.distanceMetres ?? null,
+                    requiresAdminNote: requiresNote,
+                    updatedAt: Timestamp.now(),
+                });
+            }
+        }
 
-        const tsRef = await addDoc(collection(db, 'timesheets'), timesheetPayload);
-        await updateDoc(recordRef, { timesheetId: tsRef.id });
+        if (!timesheetId) {
+            const timesheetPayload: Omit<Timesheet, 'id'> = {
+                staffId: userData.id,
+                shiftId: shift ? shift.id! : null,
+                date: Timestamp.fromDate(clockInDate),
+                weekStartDate: Timestamp.fromDate(getWeekStart(clockInDate)),
+                approvedShiftStart: shift ? shift.startTime : '',
+                approvedShiftEnd: shift ? shift.endTime : '',
+                workedStart: record.clockInRounded,
+                workedEnd: finalWorkedEnd,
+                status: 'PENDING',
+                source,
+                timeRecordId: record.id!,
+                clockInLat: record.clockInLat,
+                clockInLng: record.clockInLng,
+                clockOutLat: geo?.lat ?? null,
+                clockOutLng: geo?.lng ?? null,
+                clockOutDistanceMetres: geo?.distanceMetres ?? null,
+                requiresAdminNote: requiresNote,
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now(),
+            };
+
+            const tsRef = await addDoc(collection(db, 'timesheets'), timesheetPayload);
+            timesheetId = tsRef.id;
+        }
+
+        await updateDoc(recordRef, { timesheetId });
 
         if (isAutoClose) {
             showNotification('Your previous open shift was auto-closed.', 'error');
@@ -333,7 +397,7 @@ export default function ClockInOutPage() {
     // ─────────────────────────────────────────────────────────
     // 5. BUTTON HANDLERS
     // ─────────────────────────────────────────────────────────
-    const handleClockIn = async () => {
+    const handleClockIn = async (force: boolean = false) => {
         if (!userData || !geo || !geo.withinRange) return;
         if (clockInCoolingRemaining > 0) {
             showNotification('Please wait for the cooling period to expire.', 'error');
@@ -344,6 +408,32 @@ export default function ClockInOutPage() {
             return;
         }
 
+        if (!force) {
+            if (!todayShift) {
+                setConfirmModalData({
+                    title: 'Unscheduled Shift',
+                    message: 'You are not rostered for a shift today. Clocking in will record this as an Emergency / Unscheduled shift and will require Admin approval.',
+                    type: 'unscheduled'
+                });
+                return;
+            } else if (shiftDiffMins !== null && shiftDiffMins < -5) {
+                setConfirmModalData({
+                    title: 'Starting Early',
+                    message: `You are clocking in early. Your rostered shift starts at ${todayShift.startTime} (in ${Math.abs(shiftDiffMins)} minutes). Do you want to proceed?`,
+                    type: 'early'
+                });
+                return;
+            } else if (shiftDiffMins !== null && shiftDiffMins > 5) {
+                setConfirmModalData({
+                    title: 'Running Late',
+                    message: `You are clocking in late. Your rostered shift was scheduled to start at ${todayShift.startTime} (${shiftDiffMins} minutes ago). Do you want to proceed?`,
+                    type: 'late'
+                });
+                return;
+            }
+        }
+
+        setConfirmModalData(null);
         setProcessing(true);
         try {
             const now = new Date();
@@ -525,26 +615,19 @@ export default function ClockInOutPage() {
                                             </div>
                                         </div>
                                     </div>
-                                ) : hasCheckedShift && !todayShift ? (
-                                    <div className="mb-8 p-5 bg-amber-50/50 border border-amber-200 rounded-2xl text-left">
-                                        <div className="flex gap-3">
-                                            <span className="text-xl leading-none">⚠️</span>
-                                            <div>
-                                                <h4 className="text-xs font-black uppercase tracking-widest text-amber-800">Unscheduled Shift Detected</h4>
-                                                <p className="text-xs mt-1 text-amber-700 font-medium leading-relaxed">
-                                                    You are not rostered for a shift today. Clocking in will record this as an **Emergency / Unscheduled shift** and will require Admin approval.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
                                 ) : (
-                                    <div className="mb-8 p-10 bg-gray-50 border border-gray-200 rounded-2xl border-dashed">
+                                    <div className="mb-8 p-10 bg-gray-50 border border-gray-200 rounded-2xl border-dashed animate-fade-in">
                                         <p className="text-sm text-gray-400 font-semibold">Ready to start your shift</p>
+                                        {todayShift && (
+                                            <p className="text-xs text-gray-500 font-bold mt-2">
+                                                Rostered: {todayShift.startTime} - {todayShift.endTime}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
 
                                 <button
-                                    onClick={handleClockIn}
+                                    onClick={() => handleClockIn(false)}
                                     disabled={processing || !geo?.withinRange || !!geoError || clockInCoolingRemaining > 0 || (geo && geo.accuracy > 150)}
                                     className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-base font-black uppercase tracking-widest rounded-xl transition-all shadow-sm hover:shadow-md active:scale-[0.99] disabled:cursor-not-allowed"
                                 >
@@ -556,6 +639,38 @@ export default function ClockInOutPage() {
                     </div>
                 </main>
             </div>
+
+            {confirmModalData && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-gray-100 transform scale-100 transition-all text-center animate-scale-in">
+                        <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4 border border-amber-200">
+                            <span className="text-xl">
+                                {confirmModalData.type === 'late' ? '⏰' : '⚠️'}
+                            </span>
+                        </div>
+                        <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-2">
+                            {confirmModalData.title}
+                        </h3>
+                        <p className="text-sm text-gray-500 font-medium leading-relaxed mb-6">
+                            {confirmModalData.message}
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setConfirmModalData(null)}
+                                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-black uppercase tracking-widest rounded-xl transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => handleClockIn(true)}
+                                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+                            >
+                                Proceed
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </ProtectedRoute>
     );
 }

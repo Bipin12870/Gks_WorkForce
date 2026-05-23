@@ -1,20 +1,33 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, TimeRecord } from '@/types';
 import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
-import Logo from '@/components/Logo';
 import { isSignificantOvertime } from '@/lib/geofence';
+import StaffPageShell from '@/components/staff/StaffPageShell';
+import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
+import StaffListRow from '@/components/staff/StaffListRow';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import Card from '@/components/ui/Card';
+import Spinner from '@/components/ui/Spinner';
+import EmptyState from '@/components/ui/EmptyState';
+import Icon from '@/components/ui/Icon';
+import {
+    AlertTriangle,
+    Clock,
+    FileText,
+    MapPin,
+    PenLine,
+} from 'lucide-react';
 
 export default function StaffTimesheetsPage() {
     const { userData } = useAuth();
-    const router = useRouter();
     const { showNotification } = useNotification();
     const [selectedWeek, setSelectedWeek] = useState<Date>(getWeekStart(new Date()));
     const [shifts, setShifts] = useState<Shift[]>([]);
@@ -210,11 +223,11 @@ export default function StaffTimesheetsPage() {
     const getStatusBadge = (status: TimesheetStatus) => {
         switch (status) {
             case 'PENDING':
-                return <span className="px-2 py-1 bg-yellow-50 text-yellow-700 text-[10px] font-black uppercase tracking-wider rounded border border-yellow-100 italic">Pending</span>;
+                return <Badge variant="warning">Pending</Badge>;
             case 'APPROVED':
-                return <span className="px-2 py-1 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-wider rounded border border-green-100">Approved</span>;
+                return <Badge variant="success">Approved</Badge>;
             case 'REJECTED':
-                return <span className="px-2 py-1 bg-red-50 text-red-700 text-[10px] font-black uppercase tracking-wider rounded border border-red-100">Rejected</span>;
+                return <Badge variant="danger">Rejected</Badge>;
             default:
                 return null;
         }
@@ -222,15 +235,31 @@ export default function StaffTimesheetsPage() {
 
     const getSourceBadge = (source: string) => {
         if (source === 'MANUAL') {
-            return <span className="flex items-center gap-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest"><span className="text-sm">✏️</span> Manual Entry</span>;
+            return (
+                <Badge variant="neutral">
+                    <Icon icon={PenLine} size="sm" className="text-gray-500" /> Manual
+                </Badge>
+            );
         }
         if (source === 'AUTO_CLOSED') {
-            return <span className="flex items-center gap-1 text-[10px] font-bold text-orange-600 uppercase tracking-widest"><span className="text-sm">🕐</span> Auto-Closed</span>;
+            return (
+                <Badge variant="warning">
+                    <Icon icon={Clock} size="sm" /> Auto-closed
+                </Badge>
+            );
         }
         if (source === 'GPS_OUTSIDE') {
-            return <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 uppercase tracking-widest"><span className="text-sm">⚠️</span> Outside Geofence</span>;
+            return (
+                <Badge variant="danger">
+                    <Icon icon={AlertTriangle} size="sm" /> Outside geofence
+                </Badge>
+            );
         }
-        return <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 uppercase tracking-widest"><span className="text-sm">📍</span> GPS Verified</span>;
+        return (
+            <Badge variant="info">
+                <Icon icon={MapPin} size="sm" /> GPS verified
+            </Badge>
+        );
     };
 
 
@@ -273,194 +302,131 @@ export default function StaffTimesheetsPage() {
     }, [shifts, timesheets]);
 
     return (
-        <ProtectedRoute requiredRole="STAFF">
-            <div className="min-h-screen bg-background text-gray-900">
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-6">
-                                <Logo width={100} height={35} />
-                                <div className="border-l border-gray-200 pl-6">
-                                    <button
-                                        onClick={() => router.push('/dashboard')}
-                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
-                                    >
-                                        ← Dashboard
-                                    </button>
-                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Shift Timesheets</h1>
+        <StaffPageShell title="Timesheets" description="Submit and track your worked hours">
+            <Card className="mb-6">
+                <StaffWeekPicker
+                    weekStart={selectedWeek}
+                    onPrev={() => changeWeek('prev')}
+                    onNext={() => changeWeek('next')}
+                />
+            </Card>
+
+            {loading ? (
+                <Spinner className="py-16" />
+            ) : unifiedDisplayList.length === 0 ? (
+                <Card>
+                    <EmptyState
+                        icon={FileText}
+                        title="No activity this week"
+                        description="Rostered shifts and submitted timesheets will show here."
+                    />
+                </Card>
+            ) : (
+                <div className="space-y-3">
+                    {unifiedDisplayList.map((item) => {
+                        const shift = item.shift;
+                        const timesheet = item.timesheet;
+                        const isEditing = editMode === item.id;
+                        const isSubmitting = submitting === item.id;
+
+                        const banner =
+                            timesheet && timesheet.source !== 'MANUAL' ? (
+                                <div className="bg-blue-50/80 border-b border-blue-100 px-4 py-2 flex items-center justify-between gap-2">
+                                    {getSourceBadge(timesheet.source)}
+                                    <span className="text-label">From time clock</span>
+                                </div>
+                            ) : undefined;
+
+                        const actions = timesheet ? (
+                            <div className="flex flex-col items-end gap-2">
+                                <p className="text-section-title">
+                                    {timesheet.workedStart} – {timesheet.workedEnd}
+                                </p>
+                                <div className="flex flex-wrap gap-2 justify-end">
+                                    {timesheet.source === 'MANUAL' && getSourceBadge('MANUAL')}
+                                    {getStatusBadge(timesheet.status)}
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </header>
-
-                <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <div className="card-base p-6 mb-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 w-full md:w-auto">
-                            <button
-                                onClick={() => changeWeek('prev')}
-                                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                            </button>
-                            <div className="px-6 py-1.5 text-sm font-bold text-gray-900 whitespace-nowrap flex-grow text-center min-w-[180px]">
-                                Week of {formatDate(selectedWeek)}
+                        ) : isEditing && shift ? (
+                            <div className="w-full space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-label block mb-1">Start</label>
+                                        <Input
+                                            type="time"
+                                            value={workedStart}
+                                            onChange={(e) => setWorkedStart(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-label block mb-1">End</label>
+                                        <Input
+                                            type="time"
+                                            value={workedEnd}
+                                            onChange={(e) => setWorkedEnd(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="primary"
+                                        className="flex-1"
+                                        onClick={() => handleSubmitManualTimesheet(shift)}
+                                        disabled={isSubmitting}
+                                    >
+                                        {isSubmitting ? 'Saving...' : 'Submit'}
+                                    </Button>
+                                    <Button variant="secondary" onClick={() => setEditMode(null)}>
+                                        Cancel
+                                    </Button>
+                                </div>
                             </div>
-                            <button
-                                onClick={() => changeWeek('next')}
-                                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    {loading ? (
-                        <div className="flex justify-center py-20">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        </div>
-                    ) : (
-                        <div className="space-y-6">
-                            {unifiedDisplayList.length === 0 ? (
-                                <div className="card-base p-10 text-center border-2 border-dashed border-gray-100">
-                                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No shifts or activity for this week</p>
+                        ) : shift && isFutureShift(shift) ? (
+                            <div className="text-right">
+                                <Badge variant="neutral">Future shift</Badge>
+                                <p className="text-label mt-1">Available after shift ends</p>
+                            </div>
+                        ) : shift ? (
+                            activeRecord ? (
+                                <div className="text-right">
+                                    <Badge variant="warning">Clock active</Badge>
+                                    <p className="text-label mt-1">Clock out to submit manually</p>
                                 </div>
                             ) : (
-                                unifiedDisplayList.map((item) => {
-                                    const shift = item.shift;
-                                    const timesheet = item.timesheet;
-                                    const isEditing = editMode === item.id;
-                                    const isSubmitting = submitting === item.id;
+                                <Button variant="secondary" onClick={() => handleStartEdit(shift)}>
+                                    Submit manual timesheet
+                                </Button>
+                            )
+                        ) : null;
 
-                                    return (
-                                        <div key={item.id} className="card-base overflow-hidden hover:border-gray-300 transition-colors group">
-
-                                            {/* Timesheet Banner for GPS generated */}
-                                            {timesheet && timesheet.source !== 'MANUAL' && (
-                                                <div className="bg-blue-50/50 border-b border-blue-100 px-6 py-3 flex items-center justify-between">
-                                                    {getSourceBadge(timesheet.source)}
-                                                    <span className="text-[10px] text-gray-500 font-medium">Auto-generated via Clock App</span>
-                                                </div>
-                                            )}
-
-                                            <div className="p-6">
-                                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                                    <div className="flex items-center gap-6">
-                                                        <div className={`bg-white p-3 rounded-lg border shadow-sm ${timesheet && timesheet.source !== 'MANUAL' ? 'border-blue-100' : 'border-gray-100'}`}>
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${timesheet && timesheet.source !== 'MANUAL' ? 'text-blue-600' : 'text-gray-400'}`} viewBox="0 0 20 20" fill="currentColor">
-                                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                                                            </svg>
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <p className="text-sm font-black text-gray-400 uppercase tracking-widest">{getDayName(item.date.toDate().getDay())}</p>
-                                                                {item.type === 'UNROSTERED' && (
-                                                                    <span className="px-2 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 text-[8px] font-black uppercase tracking-wider rounded">
-                                                                        Unrostered
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-lg font-black text-gray-900 tracking-tight">
-                                                                {formatDate(item.date.toDate())}
-                                                            </p>
-                                                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-0.5">
-                                                                {shift
-                                                                    ? `Rostered: ${shift.startTime} - ${shift.endTime}`
-                                                                    : 'Emergency/Extra Work'}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex flex-col md:items-end gap-3">
-                                                        {timesheet ? (
-                                                            <div className="flex flex-col items-end gap-2">
-                                                                <div className="text-right">
-                                                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Worked Hours</p>
-                                                                    <p className="text-lg font-black text-gray-900">{timesheet.workedStart} - {timesheet.workedEnd}</p>
-                                                                </div>
-                                                                <div className="flex gap-2 items-center mt-1">
-                                                                    {timesheet.source === 'MANUAL' && getSourceBadge('MANUAL')}
-                                                                    {getStatusBadge(timesheet.status)}
-                                                                </div>
-                                                            </div>
-                                                        ) : isEditing ? (
-                                                            <div className="flex flex-col gap-4 w-full md:w-auto">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Start</label>
-                                                                        <input
-                                                                            type="time"
-                                                                            value={workedStart}
-                                                                            onChange={(e) => setWorkedStart(e.target.value)}
-                                                                            className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-100 outline-none"
-                                                                        />
-                                                                    </div>
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">End</label>
-                                                                        <input
-                                                                            type="time"
-                                                                            value={workedEnd}
-                                                                            onChange={(e) => setWorkedEnd(e.target.value)}
-                                                                            className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-100 outline-none"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex gap-2">
-                                                                    <button
-                                                                        onClick={() => handleSubmitManualTimesheet(shift!)}
-                                                                        disabled={isSubmitting}
-                                                                        className="flex-grow py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
-                                                                    >
-                                                                        {isSubmitting ? 'Saving...' : 'Submit'}
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setEditMode(null)}
-                                                                        className="px-4 py-2 bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-gray-200 transition-colors"
-                                                                    >
-                                                                        Cancel
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ) : shift && isFutureShift(shift) ? (
-                                                            <div className="flex flex-col items-end">
-                                                                <span className="px-2 py-1 bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-wider rounded border border-gray-100 italic">Future Shift</span>
-                                                                <p className="text-[10px] text-gray-400 font-medium mt-1">Available after shift ends</p>
-                                                            </div>
-                                                        ) : (
-                                                            shift && (
-                                                                activeRecord ? (
-                                                                    <div className="flex flex-col items-end">
-                                                                        <span className="px-2 py-1 bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-wider rounded border border-amber-100 italic">Clock Active</span>
-                                                                        <p className="text-[10px] text-gray-400 font-medium mt-1">Clock out to edit</p>
-                                                                    </div>
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() => handleStartEdit(shift)}
-                                                                        className="px-6 py-2.5 bg-white border border-gray-200 text-gray-900 text-[10px] font-black uppercase tracking-widest rounded-xl hover:border-blue-600 hover:text-blue-600 transition-all shadow-sm flex items-center gap-2 group/btn"
-                                                                    >
-                                                                        Submit Manual Timesheet
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 transform group-hover/btn:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="currentColor">
-                                                                            <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                                                                        </svg>
-                                                                    </button>
-                                                                )
-                                                            )
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-                    )}
-                </main>
-            </div>
-        </ProtectedRoute>
+                        return (
+                            <StaffListRow
+                                key={item.id}
+                                icon={Clock}
+                                iconClassName={
+                                    timesheet && timesheet.source !== 'MANUAL' ? 'text-blue-600' : 'text-gray-400'
+                                }
+                                banner={banner}
+                                title={
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-section-title">{formatDate(item.date.toDate())}</span>
+                                        {item.type === 'UNROSTERED' && <Badge variant="warning">Unrostered</Badge>}
+                                    </div>
+                                }
+                                subtitle={
+                                    <p className="text-label">
+                                        {getDayName(item.date.toDate().getDay())}
+                                        {shift
+                                            ? ` · ${shift.startTime} – ${shift.endTime}`
+                                            : ' · Extra work'}
+                                    </p>
+                                }
+                                trailing={actions}
+                            />
+                        );
+                    })}
+                </div>
+            )}
+        </StaffPageShell>
     );
 }

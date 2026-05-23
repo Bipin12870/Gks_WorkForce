@@ -9,14 +9,21 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 
 export default function DashboardPage() {
-    const { userData, user, logout } = useAuth();
+    const { userData, user, logout, loading } = useAuth();
     const router = useRouter();
     const [pendingTimesheets, setPendingTimesheets] = useState(0);
     const [flaggedCount, setFlaggedCount] = useState(0);
     const [todayShifts, setTodayShifts] = useState(0);
 
     useEffect(() => {
+        if (!loading && userData?.role === 'STAFF') {
+            router.replace('/staff/clock');
+        }
+    }, [userData, loading, router]);
+
+    useEffect(() => {
         if (!user || !userData) return;
+        if (userData.role === 'STAFF') return;
 
         let unsubscribe = () => { };
 
@@ -110,13 +117,13 @@ export default function DashboardPage() {
                                     description="Clock in and out of your shift (GPS Required)"
                                     icon="📍"
                                     badgeCount={todayShifts}
-                                    onClick={() => handleNavigation('/clock')}
+                                    onClick={() => handleNavigation('/staff/clock')}
                                 />
                                 <DashboardCard
                                     title="My Availability"
                                     description="Set your weekly working hours"
                                     icon="📅"
-                                    onClick={() => handleNavigation('/staff/availability')}
+                                    onClick={() => handleNavigation('/staff/profile')}
                                 />
                                 <DashboardCard
                                     title="My Roster"
@@ -134,7 +141,7 @@ export default function DashboardPage() {
                                     title="Hours & Pay"
                                     description="Review your worked hours and estimated pay"
                                     icon="💰"
-                                    onClick={() => handleNavigation('/staff/hours')}
+                                    onClick={() => handleNavigation('/staff/profile')}
                                 />
                             </>
                         )}

@@ -1,6 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
+import Icon from '@/components/ui/Icon';
 
 type NotificationType = 'success' | 'error';
 
@@ -25,6 +28,8 @@ export const useNotification = () => {
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
     const [notification, setNotification] = useState<Notification | null>(null);
+    const pathname = usePathname();
+    const isStaffRoute = pathname?.startsWith('/staff');
 
     const showNotification = useCallback((message: string, type: NotificationType) => {
         setNotification({ message, type });
@@ -34,7 +39,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (notification) {
             const timer = setTimeout(() => {
                 setNotification(null);
-            }, 5000); // Auto-dismiss after 5 seconds
+            }, 5000);
             return () => clearTimeout(timer);
         }
     }, [notification]);
@@ -43,23 +48,28 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         <NotificationContext.Provider value={{ showNotification }}>
             {children}
             {notification && (
-                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-[90%] md:max-w-md animate-in fade-in slide-in-from-top-4 duration-300">
+                <div
+                    className={`fixed left-1/2 -translate-x-1/2 z-[9999] w-full max-w-[90%] md:max-w-md ${
+                        isStaffRoute
+                            ? 'bottom-24 pb-[env(safe-area-inset-bottom)]'
+                            : 'top-6 pt-[env(safe-area-inset-top)]'
+                    }`}
+                    role="status"
+                    aria-live="polite"
+                >
                     <div
-                        className={`px-6 py-4 rounded-xl shadow-2xl border flex items-center gap-3 w-full ${notification.type === 'success'
+                        className={`px-4 py-3 rounded-xl shadow-md border flex items-center gap-3 w-full ${
+                            notification.type === 'success'
                                 ? 'bg-green-50 border-green-200 text-green-800'
                                 : 'bg-red-50 border-red-200 text-red-800'
-                            }`}
+                        }`}
                     >
-                        {notification.type === 'success' ? (
-                            <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                        ) : (
-                            <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                        )}
-                        <span className="font-medium">{notification.message}</span>
+                        <Icon
+                            icon={notification.type === 'success' ? CheckCircle2 : AlertCircle}
+                            size="md"
+                            className={notification.type === 'success' ? 'text-green-500' : 'text-red-500'}
+                        />
+                        <span className="text-sm font-medium">{notification.message}</span>
                     </div>
                 </div>
             )}

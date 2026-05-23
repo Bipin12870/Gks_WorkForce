@@ -9,14 +9,18 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login');
-      } else {
-        router.push('/dashboard');
-      }
+    if (loading) return;
+    if (!user) {
+      router.push('/login');
+      return;
     }
-  }, [user, loading, router]);
+    if (!userData) return;
+    if (userData.role === 'STAFF') {
+      router.push('/staff/clock');
+    } else {
+      router.push('/dashboard');
+    }
+  }, [user, userData, loading, router]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">

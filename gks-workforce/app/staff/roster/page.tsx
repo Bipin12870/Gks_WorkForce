@@ -93,7 +93,6 @@ export default function StaffRosterPage() {
                     weekStart={selectedWeek}
                     onPrev={() => changeWeek('prev')}
                     onNext={() => changeWeek('next')}
-                    trailing={<Badge variant="info">Live</Badge>}
                 />
             </Card>
 

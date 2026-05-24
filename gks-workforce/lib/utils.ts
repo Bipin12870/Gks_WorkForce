@@ -2,7 +2,7 @@
  * Operating hours constants
  */
 export const SHOP_OPEN_TIME = '09:00';
-export const SHOP_CLOSE_TIME = '21:00';
+export const SHOP_CLOSE_TIME = '23:59';
 
 /**
  * Get the Monday (00:00) of the week containing the given date
@@ -123,9 +123,9 @@ export function processTimesheetAutomation(
     result.payroll.roundedPayableMinutes = Math.round(rawMinutes / 5) * 5;
 
     // 4. CLASSIFICATION ENGINE (Flags & Bounds)
-    // Store Hours (09:00 - 21:00)
+    // Store Hours (09:00 - 23:59)
     const shopOpenTotal = 9 * 60;
-    const shopCloseTotal = 21 * 60;
+    const shopCloseTotal = 23 * 60 + 59;
 
     if (startTotal < shopOpenTotal || endTotal > shopCloseTotal) {
         flags.push('AFTER_HOURS');
@@ -212,7 +212,7 @@ export function calculatePayrollRecord(
 }
 
 /**
- * Check if a time string is within the strictly enforced shop hours (09:00-21:00)
+ * Check if a time string is within the strictly enforced shop hours (09:00-23:59)
  */
 export function isWithinShopHours(timeStr: string): boolean {
     if (!timeStr) return false;

@@ -166,7 +166,7 @@ function AdminTimesheetsContent() {
         const finalStart = workedStart || currentTs.workedStart;
         const finalEnd = workedEnd || currentTs.workedEnd;
 
-        // Strictly enforce shop hours (09:00-21:00)
+        // Strictly enforce shop hours (09:00-23:59)
         if (!isWithinShopHours(finalStart) || !isWithinShopHours(finalEnd)) {
             showNotification(`Times must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
             return;

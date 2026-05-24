@@ -6,11 +6,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, updateDoc, doc, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, User } from '@/types';
-import { getWeekStart, formatDate, calculateHours, getDayName, isValidInterval } from '@/lib/utils';
+import { getWeekStart, formatDate, calculateHours, getDayName, isValidInterval, normalizeTo15Minutes } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
-import TimePicker from '@/components/ui/TimePicker';
 import { Suspense } from 'react';
 
 export default function AdminTimesheetsPage() {
@@ -625,16 +624,22 @@ function AdminTimesheetsContent() {
                                 <div className="grid grid-cols-2 gap-4 mb-6">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Adjusted Start</label>
-                                        <TimePicker
+                                        <input
+                                            type="time"
                                             value={adjustStart}
-                                            onChange={(val) => setAdjustStart(val)}
+                                            step="900"
+                                            onChange={(e) => setAdjustStart(normalizeTo15Minutes(e.target.value))}
+                                            className="input-base"
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Adjusted End</label>
-                                        <TimePicker
+                                        <input
+                                            type="time"
                                             value={adjustEnd}
-                                            onChange={(val) => setAdjustEnd(val)}
+                                            step="900"
+                                            onChange={(e) => setAdjustEnd(normalizeTo15Minutes(e.target.value))}
+                                            className="input-base"
                                         />
                                     </div>
                                 </div>

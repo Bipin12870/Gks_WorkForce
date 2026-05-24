@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, TimeRecord } from '@/types';
-import { getWeekStart, getDayName, formatDate, isValidInterval } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, isValidInterval, normalizeTo15Minutes } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import { isSignificantOvertime } from '@/lib/geofence';
 import StaffPageShell from '@/components/staff/StaffPageShell';
@@ -13,7 +13,7 @@ import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffListRow from '@/components/staff/StaffListRow';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import TimePicker from '@/components/ui/TimePicker';
+import Input from '@/components/ui/Input';
 import Card from '@/components/ui/Card';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
@@ -357,16 +357,20 @@ export default function StaffTimesheetsPage() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="text-label block mb-1">Start</label>
-                                        <TimePicker
+                                        <Input
+                                            type="time"
                                             value={workedStart}
-                                            onChange={(val) => setWorkedStart(val)}
+                                            step="900"
+                                            onChange={(e) => setWorkedStart(normalizeTo15Minutes(e.target.value))}
                                         />
                                     </div>
                                     <div>
                                         <label className="text-label block mb-1">End</label>
-                                        <TimePicker
+                                        <Input
+                                            type="time"
                                             value={workedEnd}
-                                            onChange={(val) => setWorkedEnd(val)}
+                                            step="900"
+                                            onChange={(e) => setWorkedEnd(normalizeTo15Minutes(e.target.value))}
                                         />
                                     </div>
                                 </div>

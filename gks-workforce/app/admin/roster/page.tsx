@@ -17,11 +17,10 @@ import {
     doc,
 } from 'firebase/firestore';
 import { Availability, Shift, User, RosterAuditLog } from '@/types';
-import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isValidInterval } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isValidInterval, normalizeTo15Minutes } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
-import TimePicker from '@/components/ui/TimePicker';
 
 export default function AdminRosterPage() {
     const { userData } = useAuth();
@@ -754,18 +753,24 @@ export default function AdminRosterPage() {
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                             Shift Start
                                         </label>
-                                        <TimePicker
+                                        <input
+                                            type="time"
                                             value={shiftForm.startTime}
-                                            onChange={(val) => setShiftForm({ ...shiftForm, startTime: val })}
+                                            step="900"
+                                            onChange={(e) => setShiftForm({ ...shiftForm, startTime: normalizeTo15Minutes(e.target.value) })}
+                                            className="input-base"
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                             Shift End
                                         </label>
-                                        <TimePicker
+                                        <input
+                                            type="time"
                                             value={shiftForm.endTime}
-                                            onChange={(val) => setShiftForm({ ...shiftForm, endTime: val })}
+                                            step="900"
+                                            onChange={(e) => setShiftForm({ ...shiftForm, endTime: normalizeTo15Minutes(e.target.value) })}
+                                            className="input-base"
                                         />
                                     </div>
                                 </div>

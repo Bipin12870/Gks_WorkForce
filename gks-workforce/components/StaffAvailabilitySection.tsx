@@ -125,7 +125,7 @@ export default function StaffAvailabilitySection() {
         const ranges = [...(availability[dayOfWeek] || [])];
         const normalizedValue = normalizeTo15Minutes(value);
         
-        // Enforce store hours (09:00-21:00)
+        // Enforce store hours (09:00-23:59)
         if (!isWithinShopHours(normalizedValue)) {
             showNotification(`Availability must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
             return;

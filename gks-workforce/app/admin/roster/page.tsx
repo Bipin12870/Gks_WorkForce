@@ -166,7 +166,7 @@ export default function AdminRosterPage() {
     const handleSaveShift = async () => {
         if (!selectedStaff || !userData) return;
 
-        // Validate shift times (strictly within operating hours 09:00-21:00)
+        // Validate shift times (strictly within operating hours 09:00-23:59)
         if (!isWithinShopHours(shiftForm.startTime) || !isWithinShopHours(shiftForm.endTime)) {
             showNotification(`Shifts must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
             return;

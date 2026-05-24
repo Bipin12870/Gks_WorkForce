@@ -185,7 +185,7 @@ export default function StaffTimesheetsPage() {
                 where('shiftId', '==', shift.id!)
             );
             const existingSnap = await getDocs(q);
-            // Strictly enforce shop hours (09:00-21:00)
+            // Strictly enforce shop hours (09:00-23:59)
             if (!isWithinShopHours(workedStart) || !isWithinShopHours(workedEnd)) {
                 showNotification(`Times must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
                 return;

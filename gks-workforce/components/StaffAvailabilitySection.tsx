@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, setDoc, deleteDoc, doc } from 'firebase/firestore';
 import { TimeRange, Availability } from '@/types';
-import { getWeekStart, getDayName, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isTimeBefore, isValidInterval, normalizeTo15Minutes } from '@/lib/utils';
+import { getWeekStart, getDayName, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isTimeBefore, isValidInterval, normalizeTo15Minutes, incrementTime, decrementTime, hasOverlap } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffAlert from '@/components/staff/StaffAlert';
@@ -78,9 +78,37 @@ export default function StaffAvailabilitySection() {
     };
 
     const addTimeRange = (dayOfWeek: number) => {
+        const existingRanges = availability[dayOfWeek] || [];
+        
+        // Find the first available gap of at least 1 hour
+        let start = SHOP_OPEN_TIME;
+        let end = '17:00';
+        
+        // If there are existing ranges, try to find a gap after the last one
+        if (existingRanges.length > 0) {
+            const lastRange = [...existingRanges].sort((a, b) => isTimeBefore(a.start, b.start) ? -1 : 1)[existingRanges.length - 1];
+            start = lastRange.end;
+            
+            if (start === '24:00' || !isTimeBefore(start, SHOP_CLOSE_TIME)) {
+                showNotification('No more space for additional ranges on this day', 'error');
+                return;
+            }
+            
+            end = incrementTime(start, 60);
+            if (isTimeBefore(SHOP_CLOSE_TIME, end)) {
+                end = SHOP_CLOSE_TIME;
+            }
+        }
+
+        // Final check for overlap just in case
+        if (hasOverlap({ start, end }, existingRanges)) {
+            showNotification('Cannot add range: conflicts with existing availability', 'error');
+            return;
+        }
+        
         setAvailability({
             ...availability,
-            [dayOfWeek]: [...(availability[dayOfWeek] || []), { start: SHOP_OPEN_TIME, end: '17:00' }],
+            [dayOfWeek]: [...existingRanges, { start, end }],
         });
     };
 
@@ -95,8 +123,25 @@ export default function StaffAvailabilitySection() {
 
     const updateTimeRange = (dayOfWeek: number, index: number, field: 'start' | 'end', value: string) => {
         const ranges = [...(availability[dayOfWeek] || [])];
-        // Normalize to 15-minute intervals as fallback for native pickers
-        ranges[index][field] = normalizeTo15Minutes(value);
+        const normalizedValue = normalizeTo15Minutes(value);
+        
+        // Create a new object for the updated range to avoid mutation glitches
+        const updatedRange = { ...ranges[index], [field]: normalizedValue };
+        
+        // Auto-correct: Ensure end is always after start
+        if (field === 'start' && !isTimeBefore(normalizedValue, updatedRange.end)) {
+            updatedRange.end = normalizedValue === '24:00' ? '24:00' : normalizeTo15Minutes(incrementTime(normalizedValue, 15));
+        } else if (field === 'end' && !isTimeBefore(updatedRange.start, normalizedValue)) {
+            updatedRange.start = normalizedValue === '00:00' ? '00:00' : normalizeTo15Minutes(decrementTime(normalizedValue, 15));
+        }
+
+        // Overlap Check: Ensure this change doesn't conflict with OTHER ranges on the same day
+        if (hasOverlap(updatedRange, ranges, index)) {
+            showNotification('Time range conflicts with another availability period on this day', 'error');
+            return;
+        }
+
+        ranges[index] = updatedRange;
         setAvailability({
             ...availability,
             [dayOfWeek]: ranges,
@@ -131,26 +176,53 @@ export default function StaffAvailabilitySection() {
     const handleSubmit = async () => {
         if (!userData) return;
 
-        for (const ranges of Object.values(availability)) {
-            for (const range of ranges) {
-                if (isTimeBefore(range.start, SHOP_OPEN_TIME) || isTimeBefore(SHOP_CLOSE_TIME, range.end)) {
-                    showNotification(`Availability must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
-                    return;
-                }
-                if (!isTimeBefore(range.start, range.end)) {
-                    showNotification('Start time must be before end time', 'error');
-                    return;
-                }
-                if (!isValidInterval(range.start) || !isValidInterval(range.end)) {
-                    showNotification('Times must be in 15-minute intervals (e.g., :00, :15, :30, :45)', 'error');
-                    return;
-                }
-            }
-        }
-
         setLoading(true);
-
         try {
+            // Clean up and validate ranges
+            const cleanedAvailability: Record<number, TimeRange[]> = {};
+
+            for (const [dayStr, ranges] of Object.entries(availability)) {
+                const dayOfWeek = parseInt(dayStr);
+                if (isNaN(dayOfWeek)) continue;
+
+                // Sort ranges by start time
+                const sortedRanges = [...ranges].sort((a, b) => {
+                    if (a.start === b.start) return 0;
+                    return isTimeBefore(a.start, b.start) ? -1 : 1;
+                });
+
+                const mergedRanges: TimeRange[] = [];
+                for (const range of sortedRanges) {
+                     // Basic validation
+                     if (!isTimeBefore(range.start, range.end)) {
+                         continue; // Skip invalid ranges
+                     }
+                     
+                     // Enforce 15-minute intervals
+                     if (!isValidInterval(range.start) || !isValidInterval(range.end)) {
+                         showNotification('Availability times must be in 15-minute intervals', 'error');
+                         setLoading(false);
+                         return;
+                     }
+
+                    if (mergedRanges.length === 0) {
+                        mergedRanges.push({ ...range });
+                    } else {
+                        const lastRange = mergedRanges[mergedRanges.length - 1];
+                        // If current range starts before or at last range's end, they overlap
+                        if (!isTimeBefore(lastRange.end, range.start)) {
+                            // Merge by taking the later end time
+                            if (isTimeBefore(lastRange.end, range.end)) {
+                                lastRange.end = range.end;
+                            }
+                        } else {
+                            mergedRanges.push({ ...range });
+                        }
+                    }
+                }
+                cleanedAvailability[dayOfWeek] = mergedRanges;
+            }
+
             const weekStart = Timestamp.fromDate(selectedWeek);
             const weekStartStr = selectedWeek.toISOString().split('T')[0];
             const promises = [];
@@ -158,7 +230,7 @@ export default function StaffAvailabilitySection() {
             for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
                 const dayId = `${userData.id}_${weekStartStr}_${dayOfWeek}`;
                 const docRef = doc(db, 'availability', dayId);
-                const dayRanges = availability[dayOfWeek] || [];
+                const dayRanges = cleanedAvailability[dayOfWeek] || [];
 
                 if (dayRanges.length > 0) {
                     promises.push(
@@ -180,6 +252,9 @@ export default function StaffAvailabilitySection() {
             }
 
             await Promise.all(promises);
+            
+            // Update local state with cleaned ranges
+            setAvailability(cleanedAvailability);
             showNotification('Availability submitted successfully!', 'success');
         } catch (error) {
             console.error('Error submitting availability:', error);
@@ -255,7 +330,7 @@ export default function StaffAvailabilitySection() {
                                 </div>
                             </button>
                             {isOpen && (
-                                <div className="p-4 space-y-3 border-t border-gray-100">
+                                <div className="p-3.5 sm:p-4 space-y-4 border-t border-gray-100">
                                     {!isRostered && (
                                         <Button variant="ghost-primary" size="sm" onClick={() => addTimeRange(dayOfWeek)}>
                                             <Icon icon={Plus} size="sm" /> Add range
@@ -265,8 +340,8 @@ export default function StaffAvailabilitySection() {
                                         <p className="text-label text-center py-2">No availability set</p>
                                     ) : (
                                         ranges.map((range, index) => (
-                                            <div key={index} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                                <div className="w-full sm:flex-1">
+                                            <div key={index} className="flex items-end gap-2 sm:gap-4">
+                                                <div className="flex-1 min-w-0">
                                                     <label className="text-label block mb-1">From</label>
                                                     <Input
                                                         type="time"
@@ -274,9 +349,10 @@ export default function StaffAvailabilitySection() {
                                                         step="900"
                                                         onChange={(e) => updateTimeRange(dayOfWeek, index, 'start', e.target.value)}
                                                         disabled={isRostered}
+                                                        className="px-2 sm:px-4"
                                                     />
                                                 </div>
-                                                <div className="w-full sm:flex-1">
+                                                <div className="flex-1 min-w-0">
                                                     <label className="text-label block mb-1">To</label>
                                                     <Input
                                                         type="time"
@@ -284,6 +360,7 @@ export default function StaffAvailabilitySection() {
                                                         step="900"
                                                         onChange={(e) => updateTimeRange(dayOfWeek, index, 'end', e.target.value)}
                                                         disabled={isRostered}
+                                                        className="px-2 sm:px-4"
                                                     />
                                                 </div>
                                                 {!isRostered && (
@@ -292,7 +369,7 @@ export default function StaffAvailabilitySection() {
                                                         size="sm"
                                                         onClick={() => removeTimeRange(dayOfWeek, index)}
                                                         aria-label="Remove range"
-                                                        className="min-w-11"
+                                                        className="shrink-0 min-w-10 sm:min-w-11"
                                                     >
                                                         <Icon icon={Trash2} size="sm" />
                                                     </Button>

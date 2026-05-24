@@ -99,6 +99,48 @@ export function normalizeTo15Minutes(timeStr: string): string {
 }
 
 /**
+ * Increment a time string by specified minutes
+ */
+export function incrementTime(timeStr: string, minsToAdd: number): string {
+    const { hours, minutes } = parseTime(timeStr);
+    let totalMinutes = hours * 60 + minutes + minsToAdd;
+    
+    // Clamp to 24:00
+    if (totalMinutes > 1440) totalMinutes = 1440;
+    
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Decrement a time string by specified minutes
+ */
+export function decrementTime(timeStr: string, minsToSub: number): string {
+    const { hours, minutes } = parseTime(timeStr);
+    let totalMinutes = hours * 60 + minutes - minsToSub;
+    
+    // Clamp to 00:00
+    if (totalMinutes < 0) totalMinutes = 0;
+    
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Check if a new range overlaps with existing ranges
+ */
+export function hasOverlap(newRange: { start: string, end: string }, existingRanges: { start: string, end: string }[], excludeIndex?: number): boolean {
+    return existingRanges.some((range, index) => {
+        if (excludeIndex !== undefined && index === excludeIndex) return false;
+        
+        // A overlaps B if (A.start < B.end) AND (A.end > B.start)
+        return isTimeBefore(newRange.start, range.end) && isTimeBefore(range.start, newRange.end);
+    });
+}
+
+/**
  * Check if a shift time is within availability time ranges
  */
 export function isWithinAvailability(

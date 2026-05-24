@@ -113,6 +113,7 @@ export type TimesheetStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
  * - GPS_OUTSIDE    → clocked out outside 100m — rostered end time applied
  * - AUTO_CLOSED    → system auto-closed because staff forgot to clock out
  * - GPS_UNMATCHED  → clocked in/out but no matching shift found
+ * - AFTER_HOURS    → clocked out after store hours (21:00)
  */
 export type TimesheetSource =
     | 'MANUAL'
@@ -120,7 +121,8 @@ export type TimesheetSource =
     | 'GPS_OVERTIME'
     | 'GPS_OUTSIDE'
     | 'AUTO_CLOSED'
-    | 'GPS_UNMATCHED';
+    | 'GPS_UNMATCHED'
+    | 'AFTER_HOURS';
 
 export interface Timesheet {
     id?: string;

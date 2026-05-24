@@ -8,7 +8,7 @@ import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/
 import { User, Timesheet, Shift } from '@/types';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
-import { getWeekStart, formatDate } from '@/lib/utils';
+import { getWeekStart, formatDate, calculatePayrollRecord } from '@/lib/utils';
 import {
     BarChart,
     Bar,
@@ -96,16 +96,6 @@ export default function AnalyticsPage() {
     // DATA AGGREGATION
     // ─────────────────────────────────────────────────────────
 
-    // Helper: calculate hours difference between "HH:mm" strings
-    const calculateHours = (start: string, end: string): number => {
-        if (!start || !end) return 0;
-        const [sh, sm] = start.split(':').map(Number);
-        const [eh, em] = end.split(':').map(Number);
-        let diff = (eh * 60 + em) - (sh * 60 + sm);
-        if (diff < 0) diff += 24 * 60; // Cross-midnight
-        return diff / 60;
-    };
-
     const analyticsData = useMemo(() => {
         let totalWages = 0; // Only approved
         let projectedWages = 0; // Based on roster
@@ -136,7 +126,8 @@ export default function AnalyticsPage() {
 
         // Process Shifts (Scheduled & Projected Cost)
         shifts.forEach(shift => {
-            const hours = calculateHours(shift.startTime, shift.endTime);
+            const payroll = calculatePayrollRecord(shift.startTime, shift.endTime);
+            const hours = payroll.rawMinutes / 60;
             totalScheduledHours += hours;
 
             const staff = staffList.find(s => s.id === shift.staffId);
@@ -160,7 +151,8 @@ export default function AnalyticsPage() {
         timesheets.forEach(ts => {
             if (ts.status !== 'APPROVED') return;
 
-            const hours = calculateHours(ts.workedStart, ts.workedEnd);
+            const payroll = calculatePayrollRecord(ts.workedStart, ts.workedEnd);
+            const hours = payroll.payableMinutes / 60;
             totalActualHours += hours;
 
             const staff = staffList.find(s => s.id === ts.staffId);

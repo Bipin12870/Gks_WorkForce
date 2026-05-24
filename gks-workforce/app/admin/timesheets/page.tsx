@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, updateDoc, doc, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, User } from '@/types';
-import { getWeekStart, formatDate, calculateHours, getDayName } from '@/lib/utils';
+import { getWeekStart, formatDate, calculateHours, getDayName, isValidInterval, isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, calculatePayrollRecord, processTimesheetAutomation } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
@@ -160,26 +160,38 @@ function AdminTimesheetsContent() {
         workedEnd?: string,
         note?: string
     ) => {
+        const currentTs = timesheets.find(t => t.id === timesheetId);
+        if (!currentTs) return;
+
+        const finalStart = workedStart || currentTs.workedStart;
+        const finalEnd = workedEnd || currentTs.workedEnd;
+
+        // Strictly enforce shop hours (09:00-21:00)
+        if (!isWithinShopHours(finalStart) || !isWithinShopHours(finalEnd)) {
+            showNotification(`Times must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
+            return;
+        }
+
+        // Standardize duration check (reject end <= start)
+        if (calculateHours(finalStart, finalEnd) <= 0) {
+            showNotification('Invalid duration. Worked end must be after start time.', 'error');
+            return;
+        }
+
         // Overlap validation for approved timesheets
         if (status === 'APPROVED') {
-            const currentTs = timesheets.find(t => t.id === timesheetId);
-            if (currentTs) {
-                const start = workedStart || currentTs.workedStart;
-                const end = workedEnd || currentTs.workedEnd;
-                
-                const hasOverlap = timesheets.some(t => 
-                    t.id !== timesheetId && 
-                    t.staffId === currentTs.staffId && 
-                    t.status === 'APPROVED' &&
-                    t.date.toDate().toDateString() === currentTs.date.toDate().toDateString() &&
-                    // A overlaps B if (A.start < B.end) AND (A.end > B.start)
-                    (start < t.workedEnd && end > t.workedStart)
-                );
+            const hasOverlap = timesheets.some(t => 
+                t.id !== timesheetId && 
+                t.staffId === currentTs.staffId && 
+                t.status === 'APPROVED' &&
+                t.date.toDate().toDateString() === currentTs.date.toDate().toDateString() &&
+                // A overlaps B if (A.start < B.end) AND (A.end > B.start)
+                (finalStart < t.workedEnd && finalEnd > t.workedStart)
+            );
 
-                if (hasOverlap) {
-                    showNotification('This timesheet overlaps with another approved timesheet for this staff member on the same day.', 'error');
-                    return;
-                }
+            if (hasOverlap) {
+                showNotification('This timesheet overlaps with another approved timesheet for this staff member on the same day.', 'error');
+                return;
             }
         }
 
@@ -353,23 +365,49 @@ function AdminTimesheetsContent() {
                     </div>
                 ) : (
                     filteredTimesheets.map((ts) => {
-                        const approvedHours = calculateHours(ts.approvedShiftStart, ts.approvedShiftEnd);
-                        const workedHours = calculateHours(ts.workedStart, ts.workedEnd);
+                        const automation = processTimesheetAutomation(
+                            ts.workedStart, 
+                            ts.workedEnd, 
+                            { start: ts.approvedShiftStart, end: ts.approvedShiftEnd },
+                            undefined, // GPS events not available here
+                            ts.source === 'MANUAL'
+                        );
+                        
+                        const approvedPayroll = calculatePayrollRecord(ts.approvedShiftStart, ts.approvedShiftEnd);
+                        
+                        const approvedHours = approvedPayroll.rawMinutes / 60;
+                        const workedHours = automation.payroll.rawMinutes / 60;
+                        const payableHours = automation.payroll.roundedPayableMinutes / 60;
                         const diff = workedHours - approvedHours;
 
                         return (
-                            <div key={ts.id} className={`card-base p-0 overflow-hidden hover:border-blue-300 transition-colors shadow-sm bg-white border ${ts.requiresAdminNote ? 'border-red-200' : 'border-blue-100'
+                            <div key={ts.id} className={`card-base p-0 overflow-hidden hover:border-blue-300 transition-colors shadow-sm bg-white border ${automation.approval.status === 'AUTO_APPROVED' ? 'border-green-200' : automation.approval.status === 'FLAGGED' ? 'border-amber-200' : 'border-red-200'
                                 }`}>
-                                {/* Top Banner for GPS Source */}
-                                <div className={`px-5 py-2.5 flex items-center justify-between border-b ${ts.requiresAdminNote ? 'bg-red-50/50 border-red-100' : 'bg-blue-50/30 border-blue-100'
+                                {/* Top Banner for Approval Status */}
+                                <div className={`px-5 py-2.5 flex items-center justify-between border-b ${automation.approval.status === 'AUTO_APPROVED' ? 'bg-green-50/50 border-green-100' : automation.approval.status === 'FLAGGED' ? 'bg-amber-50/50 border-amber-100' : 'bg-red-50/50 border-red-100'
                                     }`}>
                                     <div className="flex items-center gap-2">
-                                        {getSourceBadge(ts)}
-                                    </div>
-                                    {ts.requiresAdminNote && ts.status === 'PENDING' && (
-                                        <span className="text-[10px] font-black text-red-600 uppercase tracking-widest animate-pulse">
-                                            Review Required
+                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
+                                            automation.approval.status === 'AUTO_APPROVED' ? 'bg-green-100 text-green-700' :
+                                            automation.approval.status === 'FLAGGED' ? 'bg-amber-100 text-amber-700' :
+                                            'bg-red-100 text-red-700'
+                                        }`}>
+                                            {automation.approval.status.replace('_', ' ')}
                                         </span>
+                                        {automation.approval.reason && (
+                                            <span className="text-[9px] font-bold text-gray-400 italic">
+                                                — {automation.approval.reason}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {automation.classification.flags.length > 0 && (
+                                        <div className="flex gap-1">
+                                            {automation.classification.flags.map(flag => (
+                                                <span key={flag} className="text-[8px] font-black bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded uppercase">
+                                                    {flag}
+                                                </span>
+                                            ))}
+                                        </div>
                                     )}
                                 </div>
 
@@ -384,7 +422,7 @@ function AdminTimesheetsContent() {
                                         {getStatusBadge(ts.status)}
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-2 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                    <div className="grid grid-cols-4 gap-2 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
                                         <div>
                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Approved</p>
                                             <p className="text-sm font-bold text-gray-900">{approvedHours.toFixed(2)}h</p>
@@ -392,6 +430,10 @@ function AdminTimesheetsContent() {
                                         <div>
                                             <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Worked</p>
                                             <p className="text-sm font-black text-blue-600">{workedHours.toFixed(2)}h</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-1">Payable</p>
+                                            <p className="text-sm font-black text-green-600">{payableHours.toFixed(2)}h</p>
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Diff</p>

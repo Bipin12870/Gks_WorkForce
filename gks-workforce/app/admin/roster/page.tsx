@@ -17,7 +17,7 @@ import {
     doc,
 } from 'firebase/firestore';
 import { Availability, Shift, User, RosterAuditLog } from '@/types';
-import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isWithinShopHours } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
@@ -166,14 +166,15 @@ export default function AdminRosterPage() {
     const handleSaveShift = async () => {
         if (!selectedStaff || !userData) return;
 
-        // Validate shift times (operating hours)
-        if (isTimeBefore(shiftForm.startTime, SHOP_OPEN_TIME) || isTimeBefore(SHOP_CLOSE_TIME, shiftForm.endTime)) {
+        // Validate shift times (strictly within operating hours 09:00-21:00)
+        if (!isWithinShopHours(shiftForm.startTime) || !isWithinShopHours(shiftForm.endTime)) {
             showNotification(`Shifts must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
             return;
         }
 
-        if (!isTimeBefore(shiftForm.startTime, shiftForm.endTime)) {
-            showNotification('Start time must be before end time', 'error');
+        // Standardize duration check (reject end <= start)
+        if (calculateHours(shiftForm.startTime, shiftForm.endTime) <= 0) {
+            showNotification('Invalid shift duration. End time must be after start time.', 'error');
             return;
         }
 

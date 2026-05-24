@@ -5,9 +5,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, query, where, getDocs, updateDoc, doc, Timestamp, orderBy, limit } from 'firebase/firestore';
-import { TimeRecord, Timesheet, Shift, ShopLocation, TimesheetSource } from '@/types';
+import { TimeRecord, Timesheet, Shift, ShopLocation, TimesheetSource, TimesheetStatus } from '@/types';
 import { getShopLocation, formatTimeToHHmm, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
-import { getWeekStart } from '@/lib/utils';
+import { getWeekStart, processTimesheetAutomation, isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffAlert from '@/components/staff/StaffAlert';
 import Button from '@/components/ui/Button';
@@ -116,23 +116,13 @@ export default function ClockInOutPage() {
         const snap = await getDocs(q);
         if (snap.empty) return null;
         
+        // If there are multiple shifts, we should pick the most relevant one.
+        // For now, we assume one shift per person per day.
         const shift = { id: snap.docs[0].id, ...snap.docs[0].data() } as Shift;
         
-        // If clocking in after the shift has ended, do not match it (treat as unrostered)
-        const [eh, em] = shift.endTime.split(':').map(Number);
-        const shiftEnd = new Date(clockInDate);
-        shiftEnd.setHours(eh, em, 0, 0);
-
-        const [sh, sm] = shift.startTime.split(':').map(Number);
-        if (eh < sh || (eh === sh && em < sm)) {
-            shiftEnd.setDate(shiftEnd.getDate() + 1);
-        }
-
-        // Allow a 15-minute grace period after shift end
-        if (clockInTimeMs > shiftEnd.getTime() + 15 * 60 * 1000) {
-            return null;
-        }
-
+        // RELAXED MATCHING LOGIC:
+        // As long as the staff clocks in on the SAME DAY as the rostered shift, 
+        // we attach it to that shift. This handles extreme lateness correctly.
         return shift;
     };
 
@@ -286,17 +276,23 @@ export default function ClockInOutPage() {
         const clockOutTime = isAutoClose ? null : Timestamp.now();
         
         // For auto-close, use the shift's end time. Otherwise use current rounded time.
-        const clockOutRounded = isAutoClose && shift ? shift.endTime : formatTimeToHHmm(now);
-        
+        let clockOutRounded = isAutoClose && shift ? shift.endTime : formatTimeToHHmm(now);
+
         const clockInDate = record.clockInTime.toDate();
         const [ih, im] = record.clockInRounded.split(':').map(Number);
         clockInDate.setHours(ih, im, 0, 0);
 
-        const clockOutDate = isAutoClose ? new Date(clockInDate) : new Date();
-        const [oh, om] = clockOutRounded.split(':').map(Number);
-        clockOutDate.setHours(oh, om, 0, 0);
+        const automationResult = processTimesheetAutomation(
+            record.clockInRounded, 
+            clockOutRounded, 
+            shift ? { start: shift.startTime, end: shift.endTime } : undefined,
+            (geo && shop && geo.distanceMetres !== null && geo.distanceMetres > shop.radiusMetres) 
+                ? [{ type: 'OUTSIDE', time: clockOutRounded }] 
+                : [],
+            false // isManualEdit
+        );
 
-        const hoursWorked = (clockOutDate.getTime() - clockInDate.getTime()) / (1000 * 60 * 60);
+        const hoursWorked = automationResult.payroll.rawMinutes / 60;
 
         let source: TimesheetSource = 'GPS_UNMATCHED';
         let requiresNote = false;
@@ -304,28 +300,34 @@ export default function ClockInOutPage() {
         if (isAutoClose) {
             source = 'AUTO_CLOSED';
             requiresNote = true;
-        } else if (shift) {
-            if (geo && shop && geo.distanceMetres !== null && geo.distanceMetres > shop.radiusMetres) {
-                source = 'GPS_OUTSIDE';
+        } else {
+            // Map automation status/flags back to legacy source types for DB compatibility
+            if (automationResult.approval.status === 'FLAGGED' || automationResult.approval.status === 'NEEDS_REVIEW') {
                 requiresNote = true;
-            } else if (isSignificantOvertime(clockOutRounded, shift.endTime)) {
-                source = 'GPS_OVERTIME';
-                requiresNote = true;
-            } else {
+                if (automationResult.classification.flags.includes('GPS_OUTSIDE')) {
+                    source = 'GPS_OUTSIDE';
+                } else if (automationResult.classification.flags.includes('OVERTIME')) {
+                    source = 'GPS_OVERTIME';
+                } else if (automationResult.classification.flags.includes('AFTER_HOURS')) {
+                    source = 'AFTER_HOURS';
+                } else if (shift) {
+                    source = 'GPS_VERIFIED';
+                }
+            } else if (shift) {
                 source = 'GPS_VERIFIED';
             }
         }
 
-        // Calculate workedEnd: if GPS_OUTSIDE, clamp it to shift.endTime
-        let finalWorkedEnd = clockOutRounded;
-        if (source === 'GPS_OUTSIDE' && shift) {
-            finalWorkedEnd = shift.endTime; // no extra pay if off-site
+        // 3. Automated Approval Handling
+        let finalStatus: TimesheetStatus = 'PENDING';
+        if (automationResult.approval.status === 'AUTO_APPROVED') {
+            finalStatus = 'APPROVED';
         }
 
         // 1. Update TimeRecord
         const recordRef = doc(db, 'timeRecords', record.id!);
         await updateDoc(recordRef, {
-            clockOutTime: isAutoClose ? Timestamp.fromDate(clockOutDate) : Timestamp.now(),
+            clockOutTime: Timestamp.now(),
             clockOutRounded,
             clockOutLat: geo?.lat ?? null,
             clockOutLng: geo?.lng ?? null,
@@ -351,7 +353,7 @@ export default function ClockInOutPage() {
                 timesheetId = tsDoc.id;
                 await updateDoc(doc(db, 'timesheets', timesheetId), {
                     workedStart: record.clockInRounded,
-                    workedEnd: finalWorkedEnd,
+                    workedEnd: clockOutRounded,
                     source,
                     timeRecordId: record.id!,
                     clockInLat: record.clockInLat,
@@ -360,6 +362,7 @@ export default function ClockInOutPage() {
                     clockOutLng: geo?.lng ?? null,
                     clockOutDistanceMetres: geo?.distanceMetres ?? null,
                     requiresAdminNote: requiresNote,
+                    status: finalStatus,
                     updatedAt: Timestamp.now(),
                 });
             }
@@ -374,8 +377,8 @@ export default function ClockInOutPage() {
                 approvedShiftStart: shift ? shift.startTime : '',
                 approvedShiftEnd: shift ? shift.endTime : '',
                 workedStart: record.clockInRounded,
-                workedEnd: finalWorkedEnd,
-                status: 'PENDING',
+                workedEnd: clockOutRounded,
+                status: finalStatus,
                 source,
                 timeRecordId: record.id!,
                 clockInLat: record.clockInLat,
@@ -399,7 +402,7 @@ export default function ClockInOutPage() {
             setActiveRecord(null);
             setClockInCoolingRemaining(0);
         } else {
-            showNotification(`Clocked out. Timesheet generated (${finalWorkedEnd}).`, 'success');
+            showNotification(`Clocked out. Timesheet generated (${clockOutRounded}).`, 'success');
             setActiveRecord(null);
             setClockInCoolingRemaining(300);
         }
@@ -448,6 +451,16 @@ export default function ClockInOutPage() {
         setProcessing(true);
         try {
             const now = new Date();
+            const clockInTime = formatTimeToHHmm(now);
+
+            if (!isWithinShopHours(clockInTime)) {
+                showNotification(`Clock-in is only allowed between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
+                setLoading(false);
+                return;
+            }
+
+            const shift = await getMatchingShift(now.getTime());
+
             const payload: Omit<TimeRecord, 'id'> = {
                 staffId: userData.id,
                 clockInTime: Timestamp.now(),
@@ -462,7 +475,7 @@ export default function ClockInOutPage() {
                 clockOutAccuracy: null,
                 clockOutWithinGeofence: null,
                 hoursWorked: null,
-                shiftId: null,
+                shiftId: shift ? shift.id! : null,
                 timesheetId: null,
                 source: 'GPS',
                 createdAt: Timestamp.now(),

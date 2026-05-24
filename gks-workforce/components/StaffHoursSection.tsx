@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { Shift, Timesheet } from '@/types';
-import { getWeekStart, formatDate, calculateHours } from '@/lib/utils';
+import { getWeekStart, formatDate, calculatePayrollRecord } from '@/lib/utils';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffStatCard from '@/components/staff/StaffStatCard';
 import StaffListRow from '@/components/staff/StaffListRow';
@@ -92,13 +92,13 @@ export default function StaffHoursSection() {
         setSelectedWeek(getWeekStart(newWeek));
     };
 
-    let totalHours = 0;
-    timesheets
-        .filter((ts) => ts.status === 'APPROVED')
-        .forEach((ts) => {
-            totalHours += calculateHours(ts.workedStart, ts.workedEnd);
-        });
+    const totalPayableMinutes = timesheets.reduce((acc, ts) => {
+        if (ts.status !== 'APPROVED') return acc;
+        const payroll = calculatePayrollRecord(ts.workedStart, ts.workedEnd);
+        return acc + payroll.payableMinutes;
+    }, 0);
 
+    const totalHours = totalPayableMinutes / 60;
     const grossPay = totalHours * (userData?.hourlyRate || 0);
 
     const unifiedLog = useMemo(() => {
@@ -195,8 +195,10 @@ export default function StaffHoursSection() {
                         const ts = item.timesheet;
                         const shift = item.shift;
                         const isApproved = ts?.status === 'APPROVED';
-                        const hours = isApproved ? calculateHours(ts!.workedStart, ts!.workedEnd) : 0;
-                        const rosteredHours = shift ? calculateHours(shift.startTime, shift.endTime) : 0;
+                        const payroll = isApproved ? calculatePayrollRecord(ts!.workedStart, ts!.workedEnd) : null;
+                        const hours = payroll ? payroll.payableMinutes / 60 : 0;
+                        const rosterPayroll = shift ? calculatePayrollRecord(shift.startTime, shift.endTime) : null;
+                        const rosteredHours = rosterPayroll ? rosterPayroll.rawMinutes / 60 : 0;
 
                         return (
                             <StaffListRow

@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, setDoc, deleteDoc, doc } from 'firebase/firestore';
 import { TimeRange, Availability } from '@/types';
-import { getWeekStart, getDayName, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isTimeBefore, isValidInterval, normalizeTo15Minutes, incrementTime, decrementTime, hasOverlap } from '@/lib/utils';
+import { getWeekStart, getDayName, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isTimeBefore, isValidInterval, normalizeTo15Minutes, incrementTime, decrementTime, hasOverlap, isWithinShopHours } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffAlert from '@/components/staff/StaffAlert';
@@ -125,14 +125,20 @@ export default function StaffAvailabilitySection() {
         const ranges = [...(availability[dayOfWeek] || [])];
         const normalizedValue = normalizeTo15Minutes(value);
         
+        // Enforce store hours (09:00-21:00)
+        if (!isWithinShopHours(normalizedValue)) {
+            showNotification(`Availability must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
+            return;
+        }
+
         // Create a new object for the updated range to avoid mutation glitches
         const updatedRange = { ...ranges[index], [field]: normalizedValue };
         
         // Auto-correct: Ensure end is always after start
         if (field === 'start' && !isTimeBefore(normalizedValue, updatedRange.end)) {
-            updatedRange.end = normalizedValue === '24:00' ? '24:00' : normalizeTo15Minutes(incrementTime(normalizedValue, 15));
+            updatedRange.end = normalizedValue === SHOP_CLOSE_TIME ? SHOP_CLOSE_TIME : normalizeTo15Minutes(incrementTime(normalizedValue, 15));
         } else if (field === 'end' && !isTimeBefore(updatedRange.start, normalizedValue)) {
-            updatedRange.start = normalizedValue === '00:00' ? '00:00' : normalizeTo15Minutes(decrementTime(normalizedValue, 15));
+            updatedRange.start = normalizedValue === SHOP_OPEN_TIME ? SHOP_OPEN_TIME : normalizeTo15Minutes(decrementTime(normalizedValue, 15));
         }
 
         // Overlap Check: Ensure this change doesn't conflict with OTHER ranges on the same day

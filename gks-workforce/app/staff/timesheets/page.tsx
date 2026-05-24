@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, TimeRecord } from '@/types';
-import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, calculateHours } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import { isSignificantOvertime } from '@/lib/geofence';
 import StaffPageShell from '@/components/staff/StaffPageShell';
@@ -185,6 +185,18 @@ export default function StaffTimesheetsPage() {
                 where('shiftId', '==', shift.id!)
             );
             const existingSnap = await getDocs(q);
+            // Strictly enforce shop hours (09:00-21:00)
+            if (!isWithinShopHours(workedStart) || !isWithinShopHours(workedEnd)) {
+                showNotification(`Times must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
+                return;
+            }
+
+            // Standardize duration check (reject end <= start)
+            if (calculateHours(workedStart, workedEnd) <= 0) {
+                showNotification('Invalid duration. Worked end must be after start time.', 'error');
+                return;
+            }
+
             if (!existingSnap.empty) {
                 showNotification('A timesheet for this shift has already been submitted.', 'error');
                 setEditMode(null);

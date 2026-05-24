@@ -2,7 +2,7 @@
  * Operating hours constants
  */
 export const SHOP_OPEN_TIME = '09:00';
-export const SHOP_CLOSE_TIME = '24:00';
+export const SHOP_CLOSE_TIME = '21:00';
 
 /**
  * Get the Monday (00:00) of the week containing the given date
@@ -44,17 +44,179 @@ export function formatDate(date: Date): string {
     });
 }
 
+export interface PayrollEngineResult {
+    raw: {
+        clockIn: string;
+        clockOut: string;
+    };
+    validation: {
+        isValid: boolean;
+        reason?: string;
+    };
+    classification: {
+        flags: string[];
+    };
+    payroll: {
+        rawMinutes: number;
+        payableMinutes: number;
+        overtimeMinutes: number;
+        afterHoursMinutes: number;
+        roundedPayableMinutes: number;
+    };
+    approval: {
+        status: 'AUTO_APPROVED' | 'FLAGGED' | 'NEEDS_REVIEW' | 'REJECTED';
+        reason: string;
+    };
+}
+
 /**
- * Calculate hours between two HH:mm time strings
+ * The Hybrid Approval & Payroll Engine.
+ * Standardizes clock data capture, validation, classification, and payroll calculation.
+ */
+export function processTimesheetAutomation(
+    clockIn: string,
+    clockOut: string,
+    roster?: { start: string; end: string },
+    gpsEvents?: { type: 'OUTSIDE' | 'INSIDE'; time: string }[],
+    isManualEdit: boolean = false
+): PayrollEngineResult {
+    const flags: string[] = [];
+    const validationIssues: string[] = [];
+    
+    // 1. RAW DATA CAPTURE
+    const result: PayrollEngineResult = {
+        raw: { clockIn, clockOut },
+        validation: { isValid: true },
+        classification: { flags: [] },
+        payroll: {
+            rawMinutes: 0,
+            payableMinutes: 0,
+            overtimeMinutes: 0,
+            afterHoursMinutes: 0,
+            roundedPayableMinutes: 0
+        },
+        approval: { status: 'NEEDS_REVIEW', reason: '' }
+    };
+
+    if (!clockIn || !clockOut) {
+        result.validation = { isValid: false, reason: 'Missing clock-in or clock-out' };
+        result.approval = { status: 'NEEDS_REVIEW', reason: 'Incomplete timestamps' };
+        return result;
+    }
+
+    const start = parseTime(clockIn);
+    const end = parseTime(clockOut);
+    const startTotal = start.hours * 60 + start.minutes;
+    const endTotal = end.hours * 60 + end.minutes;
+
+    // 2. VALIDATION ENGINE
+    if (endTotal <= startTotal) {
+        result.validation = { isValid: false, reason: 'Negative or zero duration detected' };
+        result.approval = { status: 'REJECTED', reason: 'End time must be after start time' };
+        return result;
+    }
+
+    // 3. PAYROLL ENGINE (Duration Calculation)
+    const rawMinutes = endTotal - startTotal;
+    result.payroll.rawMinutes = rawMinutes;
+    result.payroll.payableMinutes = rawMinutes; // Base payable is raw worked time
+    result.payroll.roundedPayableMinutes = Math.round(rawMinutes / 5) * 5;
+
+    // 4. CLASSIFICATION ENGINE (Flags & Bounds)
+    // Store Hours (09:00 - 21:00)
+    const shopOpenTotal = 9 * 60;
+    const shopCloseTotal = 21 * 60;
+
+    if (startTotal < shopOpenTotal || endTotal > shopCloseTotal) {
+        flags.push('AFTER_HOURS');
+        if (endTotal > shopCloseTotal) {
+            result.payroll.afterHoursMinutes = endTotal - Math.max(startTotal, shopCloseTotal);
+        }
+    }
+
+    // Roster Deviations
+    if (roster) {
+        const rStart = parseTime(roster.start);
+        const rEnd = parseTime(roster.end);
+        const rStartTotal = rStart.hours * 60 + rStart.minutes;
+        const rEndTotal = rEnd.hours * 60 + rEnd.minutes;
+
+        // Overtime (> 15 min past roster)
+        if (endTotal > rEndTotal + 15) {
+            flags.push('OVERTIME');
+            result.payroll.overtimeMinutes = endTotal - rEndTotal;
+        }
+
+        // Late Clock-in (> 15 min past roster)
+        if (startTotal > rStartTotal + 15) {
+            flags.push('LATE_CLOCK_IN');
+        }
+    }
+
+    // GPS Monitoring
+    const hasGpsOutside = gpsEvents?.some(e => e.type === 'OUTSIDE');
+    if (hasGpsOutside) {
+        flags.push('GPS_OUTSIDE');
+    }
+
+    if (isManualEdit) {
+        flags.push('MANUAL_EDIT_DETECTED');
+    }
+
+    result.classification.flags = flags;
+
+    // 5. APPROVAL ENGINE (Hybrid Logic)
+    if (isManualEdit) {
+        result.approval = { status: 'NEEDS_REVIEW', reason: 'Manual admin adjustment requires verification' };
+    } else if (flags.includes('AFTER_HOURS') || flags.includes('GPS_OUTSIDE')) {
+        result.approval = { status: 'FLAGGED', reason: 'Policy violation detected (After-hours or GPS mismatch)' };
+    } else if (flags.includes('OVERTIME') && result.payroll.overtimeMinutes > 15) {
+        result.approval = { status: 'FLAGGED', reason: 'Significant overtime detected (>15 min)' };
+    } else if (flags.includes('LATE_CLOCK_IN')) {
+        result.approval = { status: 'FLAGGED', reason: 'Late arrival detected' };
+    } else {
+        result.approval = { status: 'AUTO_APPROVED', reason: 'Clean shift within standard parameters' };
+    }
+
+    return result;
+}
+
+/**
+ * Backwards compatible helper for legacy calculateHours calls.
  */
 export function calculateHours(startTime: string, endTime: string): number {
-    const start = parseTime(startTime);
-    const end = parseTime(endTime);
+    const result = processTimesheetAutomation(startTime, endTime);
+    return result.payroll.rawMinutes / 60;
+}
 
-    const startMinutes = start.hours * 60 + start.minutes;
-    const endMinutes = end.hours * 60 + end.minutes;
+/**
+ * Backwards compatible helper for legacy calculatePayrollRecord calls.
+ */
+export function calculatePayrollRecord(
+    workedStart: string,
+    workedEnd: string,
+    rosteredEnd?: string,
+    isGpsOutside?: boolean
+): { isValid: boolean; rawMinutes: number; payableMinutes: number; flags: string[] } {
+    const roster = rosteredEnd ? { start: workedStart, end: rosteredEnd } : undefined;
+    const gpsEvents: { type: 'OUTSIDE' | 'INSIDE'; time: string }[] = isGpsOutside ? [{ type: 'OUTSIDE', time: workedEnd }] : [];
+    
+    const result = processTimesheetAutomation(workedStart, workedEnd, roster, gpsEvents);
+    
+    return {
+        isValid: result.validation.isValid,
+        rawMinutes: result.payroll.rawMinutes,
+        payableMinutes: result.payroll.payableMinutes,
+        flags: result.classification.flags
+    };
+}
 
-    return (endMinutes - startMinutes) / 60;
+/**
+ * Check if a time string is within the strictly enforced shop hours (09:00-21:00)
+ */
+export function isWithinShopHours(timeStr: string): boolean {
+    if (!timeStr) return false;
+    return !isTimeBefore(timeStr, SHOP_OPEN_TIME) && !isTimeBefore(SHOP_CLOSE_TIME, timeStr);
 }
 
 /**

@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { Shift, User, Timesheet } from '@/types';
-import { getWeekStart, formatDate, calculateHours } from '@/lib/utils';
+import { getWeekStart, formatDate, calculatePayrollRecord } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
@@ -80,7 +80,8 @@ export default function AdminHoursPage() {
                     hours[ts.staffId] = { hours: 0, pay: 0 };
                 }
 
-                const duration = calculateHours(ts.workedStart, ts.workedEnd);
+                const payroll = calculatePayrollRecord(ts.workedStart, ts.workedEnd);
+                const duration = payroll.payableMinutes / 60;
                 const hourlyRate = map[ts.staffId]?.hourlyRate || 0;
 
                 hours[ts.staffId].hours += duration;
@@ -207,7 +208,7 @@ export default function AdminHoursPage() {
                                                 Rate
                                             </th>
                                             <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                                                Total Hours
+                                                Payable Hours
                                             </th>
                                             <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
                                                 Estimated Pay

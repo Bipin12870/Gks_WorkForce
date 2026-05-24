@@ -46,8 +46,7 @@ export default function ClockInOutPage() {
     const [hasCheckedShift, setHasCheckedShift] = useState(false);
     const [clockInCoolingRemaining, setClockInCoolingRemaining] = useState<number>(0);
     const [clockOutCoolingRemaining, setClockOutCoolingRemaining] = useState<number>(0);
-    const [shiftDurationSeconds, setShiftDurationSeconds] = useState<number>(0);
-    const [shiftDiffMins, setShiftDiffMins] = useState<number | null>(null);
+    const [shiftDurationSeconds, setShiftDurationSeconds] = useState(0);
     const [confirmModalData, setConfirmModalData] = useState<{
         title: string;
         message: string;
@@ -67,19 +66,8 @@ export default function ClockInOutPage() {
             if (activeRecord) {
                 const elapsedMs = Date.now() - activeRecord.clockInTime.toMillis();
                 setShiftDurationSeconds(Math.max(0, Math.floor(elapsedMs / 1000)));
-                setShiftDiffMins(null);
             } else {
                 setShiftDurationSeconds(0);
-                if (todayShift) {
-                    const now = new Date();
-                    const [sh, sm] = todayShift.startTime.split(':').map(Number);
-                    const shiftStart = new Date(todayShift.date.toDate());
-                    shiftStart.setHours(sh, sm, 0, 0);
-                    const diffMs = now.getTime() - shiftStart.getTime();
-                    setShiftDiffMins(Math.round(diffMs / (1000 * 60)));
-                } else {
-                    setShiftDiffMins(null);
-                }
             }
         }, 1000);
         return () => clearInterval(interval);
@@ -430,17 +418,26 @@ export default function ClockInOutPage() {
                     type: 'unscheduled'
                 });
                 return;
-            } else if (shiftDiffMins !== null && shiftDiffMins < -5) {
+            }
+
+            // Calculate fresh diff at moment of interaction
+            const now = new Date();
+            const [sh, sm] = todayShift.startTime.split(':').map(Number);
+            const shiftStart = new Date(todayShift.date.toDate());
+            shiftStart.setHours(sh, sm, 0, 0);
+            const diffMins = Math.round((now.getTime() - shiftStart.getTime()) / (1000 * 60));
+
+            if (diffMins < -5) { // Warn if more than 5 minute early
                 setConfirmModalData({
                     title: 'Starting Early',
-                    message: `You are clocking in early. Your rostered shift starts at ${todayShift.startTime} (in ${Math.abs(shiftDiffMins)} minutes). Do you want to proceed?`,
+                    message: `You are clocking in early. Your rostered shift starts at ${todayShift.startTime} (in ${Math.abs(diffMins)} minutes). Do you want to proceed?`,
                     type: 'early'
                 });
                 return;
-            } else if (shiftDiffMins !== null && shiftDiffMins > 5) {
+            } else if (diffMins > 5) { // Keep 5 min grace for lateness
                 setConfirmModalData({
                     title: 'Running Late',
-                    message: `You are clocking in late. Your rostered shift was scheduled to start at ${todayShift.startTime} (${shiftDiffMins} minutes ago). Do you want to proceed?`,
+                    message: `You are clocking in late. Your rostered shift was scheduled to start at ${todayShift.startTime} (${diffMins} minutes ago). Do you want to proceed?`,
                     type: 'late'
                 });
                 return;

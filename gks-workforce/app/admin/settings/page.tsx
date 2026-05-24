@@ -337,7 +337,7 @@ export default function AdminSettingsPage() {
                             </li>
                             <li className="flex items-start gap-2">
                                 <span className="text-blue-500 mt-0.5">↻</span>
-                                Times are rounded to the nearest 5 minutes automatically
+                                Times are rounded to the nearest 15 minutes automatically
                             </li>
                             <li className="flex items-start gap-2">
                                 <span className="text-amber-500 mt-0.5">⚠</span>

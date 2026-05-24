@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, TimeRecord } from '@/types';
-import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, isValidInterval } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import { isSignificantOvertime } from '@/lib/geofence';
 import StaffPageShell from '@/components/staff/StaffPageShell';
@@ -13,7 +13,7 @@ import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffListRow from '@/components/staff/StaffListRow';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
+import TimePicker from '@/components/ui/TimePicker';
 import Card from '@/components/ui/Card';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
@@ -191,6 +191,11 @@ export default function StaffTimesheetsPage() {
                 return;
             }
 
+            if (!isValidInterval(workedStart) || !isValidInterval(workedEnd)) {
+                showNotification('Worked times must be in 15-minute intervals', 'error');
+                return;
+            }
+
             const requiresNote = isSignificantOvertime(workedEnd, shift.endTime);
 
             const timesheetData: Omit<Timesheet, 'id'> = {
@@ -352,18 +357,16 @@ export default function StaffTimesheetsPage() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="text-label block mb-1">Start</label>
-                                        <Input
-                                            type="time"
+                                        <TimePicker
                                             value={workedStart}
-                                            onChange={(e) => setWorkedStart(e.target.value)}
+                                            onChange={(val) => setWorkedStart(val)}
                                         />
                                     </div>
                                     <div>
                                         <label className="text-label block mb-1">End</label>
-                                        <Input
-                                            type="time"
+                                        <TimePicker
                                             value={workedEnd}
-                                            onChange={(e) => setWorkedEnd(e.target.value)}
+                                            onChange={(val) => setWorkedEnd(val)}
                                         />
                                     </div>
                                 </div>

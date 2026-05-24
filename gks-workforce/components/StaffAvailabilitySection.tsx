@@ -6,13 +6,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, setDoc, deleteDoc, doc } from 'firebase/firestore';
 import { TimeRange, Availability } from '@/types';
-import { getWeekStart, getDayName, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isTimeBefore } from '@/lib/utils';
+import { getWeekStart, getDayName, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isTimeBefore, isValidInterval } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffAlert from '@/components/staff/StaffAlert';
 import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
 import Icon from '@/components/ui/Icon';
+import TimePicker from '@/components/ui/TimePicker';
 import StaffActionFooter from '@/components/staff/StaffActionFooter';
 import { AlertTriangle, ChevronDown, Info, Plus, Trash2 } from 'lucide-react';
 
@@ -140,6 +140,10 @@ export default function StaffAvailabilitySection() {
                     showNotification('Start time must be before end time', 'error');
                     return;
                 }
+                if (!isValidInterval(range.start) || !isValidInterval(range.end)) {
+                    showNotification('Times must be in 15-minute intervals (e.g., :00, :15, :30, :45)', 'error');
+                    return;
+                }
             }
         }
 
@@ -263,19 +267,17 @@ export default function StaffAvailabilitySection() {
                                             <div key={index} className="flex flex-col gap-2 sm:flex-row sm:items-end">
                                                 <div className="w-full sm:flex-1">
                                                     <label className="text-label block mb-1">From</label>
-                                                    <Input
-                                                        type="time"
+                                                    <TimePicker
                                                         value={range.start}
-                                                        onChange={(e) => updateTimeRange(dayOfWeek, index, 'start', e.target.value)}
+                                                        onChange={(val) => updateTimeRange(dayOfWeek, index, 'start', val)}
                                                         disabled={isRostered}
                                                     />
                                                 </div>
                                                 <div className="w-full sm:flex-1">
                                                     <label className="text-label block mb-1">To</label>
-                                                    <Input
-                                                        type="time"
+                                                    <TimePicker
                                                         value={range.end}
-                                                        onChange={(e) => updateTimeRange(dayOfWeek, index, 'end', e.target.value)}
+                                                        onChange={(val) => updateTimeRange(dayOfWeek, index, 'end', val)}
                                                         disabled={isRostered}
                                                     />
                                                 </div>

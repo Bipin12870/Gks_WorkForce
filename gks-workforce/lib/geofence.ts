@@ -14,18 +14,18 @@ import { ShopLocation } from '@/types';
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Round a Date object to the nearest 5-minute mark.
+ * Round a Date object to the nearest 15-minute mark.
  * Returns an HH:mm string.
  *
  * Examples:
  *   09:02 → "09:00"
- *   09:03 → "09:05"
+ *   09:10 → "09:15"
  *   17:28 → "17:30"
  *   23:58 → "00:00" (wraps midnight)
  */
-export function roundToNearest5(date: Date): string {
+export function roundToNearest15(date: Date): string {
     const totalMinutes = date.getHours() * 60 + date.getMinutes();
-    const rounded = Math.round(totalMinutes / 5) * 5;
+    const rounded = Math.round(totalMinutes / 15) * 15;
     const h = Math.floor(rounded / 60) % 24;
     const m = rounded % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;

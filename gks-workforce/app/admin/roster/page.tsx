@@ -17,10 +17,11 @@ import {
     doc,
 } from 'firebase/firestore';
 import { Availability, Shift, User, RosterAuditLog } from '@/types';
-import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isValidInterval } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
+import TimePicker from '@/components/ui/TimePicker';
 
 export default function AdminRosterPage() {
     const { userData } = useAuth();
@@ -174,6 +175,11 @@ export default function AdminRosterPage() {
 
         if (!isTimeBefore(shiftForm.startTime, shiftForm.endTime)) {
             showNotification('Start time must be before end time', 'error');
+            return;
+        }
+
+        if (!isValidInterval(shiftForm.startTime) || !isValidInterval(shiftForm.endTime)) {
+            showNotification('Shift times must be in 15-minute intervals', 'error');
             return;
         }
 
@@ -748,22 +754,18 @@ export default function AdminRosterPage() {
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                             Shift Start
                                         </label>
-                                        <input
-                                            type="time"
+                                        <TimePicker
                                             value={shiftForm.startTime}
-                                            onChange={(e) => setShiftForm({ ...shiftForm, startTime: e.target.value })}
-                                            className="input-base"
+                                            onChange={(val) => setShiftForm({ ...shiftForm, startTime: val })}
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                             Shift End
                                         </label>
-                                        <input
-                                            type="time"
+                                        <TimePicker
                                             value={shiftForm.endTime}
-                                            onChange={(e) => setShiftForm({ ...shiftForm, endTime: e.target.value })}
-                                            className="input-base"
+                                            onChange={(val) => setShiftForm({ ...shiftForm, endTime: val })}
                                         />
                                     </div>
                                 </div>

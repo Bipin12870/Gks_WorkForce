@@ -6,10 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, updateDoc, doc, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, User } from '@/types';
-import { getWeekStart, formatDate, calculateHours, getDayName } from '@/lib/utils';
+import { getWeekStart, formatDate, calculateHours, getDayName, isValidInterval } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
+import TimePicker from '@/components/ui/TimePicker';
 import { Suspense } from 'react';
 
 export default function AdminTimesheetsPage() {
@@ -160,6 +161,15 @@ function AdminTimesheetsContent() {
         workedEnd?: string,
         note?: string
     ) => {
+        if (workedStart && !isValidInterval(workedStart)) {
+            showNotification('Start time must be in 15-minute intervals', 'error');
+            return;
+        }
+        if (workedEnd && !isValidInterval(workedEnd)) {
+            showNotification('End time must be in 15-minute intervals', 'error');
+            return;
+        }
+
         try {
             const updates: any = { status, updatedAt: Timestamp.now() };
             if (workedStart) updates.workedStart = workedStart;
@@ -615,20 +625,16 @@ function AdminTimesheetsContent() {
                                 <div className="grid grid-cols-2 gap-4 mb-6">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Adjusted Start</label>
-                                        <input
-                                            type="time"
+                                        <TimePicker
                                             value={adjustStart}
-                                            onChange={(e) => setAdjustStart(e.target.value)}
-                                            className="input-base"
+                                            onChange={(val) => setAdjustStart(val)}
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Adjusted End</label>
-                                        <input
-                                            type="time"
+                                        <TimePicker
                                             value={adjustEnd}
-                                            onChange={(e) => setAdjustEnd(e.target.value)}
-                                            className="input-base"
+                                            onChange={(val) => setAdjustEnd(val)}
                                         />
                                     </div>
                                 </div>

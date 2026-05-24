@@ -71,6 +71,34 @@ export function isTimeBefore(time1: string, time2: string): boolean {
 }
 
 /**
+ * Check if a time string (HH:mm) is on a 15-minute interval
+ */
+export function isValidInterval(timeStr: string): boolean {
+    if (!timeStr) return false;
+    const { minutes } = parseTime(timeStr);
+    return minutes % 15 === 0;
+}
+
+/**
+ * Normalize a time string to the nearest 15-minute interval
+ */
+export function normalizeTo15Minutes(timeStr: string): string {
+    if (!timeStr) return timeStr;
+    const { hours, minutes } = parseTime(timeStr);
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+
+    let finalHours = hours;
+    let finalMinutes = roundedMinutes;
+
+    if (finalMinutes === 60) {
+        finalMinutes = 0;
+        finalHours += 1;
+    }
+
+    return `${finalHours.toString().padStart(2, '0')}:${finalMinutes.toString().padStart(2, '0')}`;
+}
+
+/**
  * Check if a shift time is within availability time ranges
  */
 export function isWithinAvailability(

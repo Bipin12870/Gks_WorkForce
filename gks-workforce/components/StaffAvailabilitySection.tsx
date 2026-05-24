@@ -340,9 +340,9 @@ export default function StaffAvailabilitySection() {
                                         <p className="text-label text-center py-2">No availability set</p>
                                     ) : (
                                         ranges.map((range, index) => (
-                                            <div key={index} className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 p-3 bg-white border border-gray-100 rounded-xl">
-                                                <div className="flex-1 space-y-3 sm:space-y-0 sm:flex sm:gap-4">
-                                                    <div className="flex-1">
+                                            <div key={index} className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 p-3.5 bg-white border border-gray-100 rounded-xl">
+                                                <div className="flex-1 flex gap-3 sm:gap-4">
+                                                    <div className="flex-1 min-w-0">
                                                         <label className="text-label block mb-1 text-center">From</label>
                                                         <Input
                                                             type="time"
@@ -350,10 +350,10 @@ export default function StaffAvailabilitySection() {
                                                             step="900"
                                                             onChange={(e) => updateTimeRange(dayOfWeek, index, 'start', e.target.value)}
                                                             disabled={isRostered}
-                                                            className="text-center"
+                                                            className="text-center px-2"
                                                         />
                                                     </div>
-                                                    <div className="flex-1">
+                                                    <div className="flex-1 min-w-0">
                                                         <label className="text-label block mb-1 text-center">To</label>
                                                         <Input
                                                             type="time"
@@ -361,18 +361,18 @@ export default function StaffAvailabilitySection() {
                                                             step="900"
                                                             onChange={(e) => updateTimeRange(dayOfWeek, index, 'end', e.target.value)}
                                                             disabled={isRostered}
-                                                            className="text-center"
+                                                            className="text-center px-2"
                                                         />
                                                     </div>
                                                 </div>
                                                 {!isRostered && (
-                                                    <div className="flex justify-center pt-1 sm:pt-0">
+                                                    <div className="flex justify-center pt-1 sm:pt-0 shrink-0">
                                                         <Button
                                                             variant="ghost-danger"
                                                             size="sm"
                                                             onClick={() => removeTimeRange(dayOfWeek, index)}
                                                             aria-label="Remove range"
-                                                            className="shrink-0 min-w-11 min-h-11"
+                                                            className="min-w-11 min-h-11"
                                                         >
                                                             <Icon icon={Trash2} size="sm" />
                                                         </Button>

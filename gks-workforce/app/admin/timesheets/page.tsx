@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, updateDoc, doc, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, User } from '@/types';
-import { getWeekStart, formatDate, calculateHours, getDayName, isValidInterval, normalizeTo15Minutes } from '@/lib/utils';
+import { getWeekStart, formatDate, calculateHours, getDayName } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
@@ -160,13 +160,27 @@ function AdminTimesheetsContent() {
         workedEnd?: string,
         note?: string
     ) => {
-        if (workedStart && !isValidInterval(workedStart)) {
-            showNotification('Start time must be in 15-minute intervals', 'error');
-            return;
-        }
-        if (workedEnd && !isValidInterval(workedEnd)) {
-            showNotification('End time must be in 15-minute intervals', 'error');
-            return;
+        // Overlap validation for approved timesheets
+        if (status === 'APPROVED') {
+            const currentTs = timesheets.find(t => t.id === timesheetId);
+            if (currentTs) {
+                const start = workedStart || currentTs.workedStart;
+                const end = workedEnd || currentTs.workedEnd;
+                
+                const hasOverlap = timesheets.some(t => 
+                    t.id !== timesheetId && 
+                    t.staffId === currentTs.staffId && 
+                    t.status === 'APPROVED' &&
+                    t.date.toDate().toDateString() === currentTs.date.toDate().toDateString() &&
+                    // A overlaps B if (A.start < B.end) AND (A.end > B.start)
+                    (start < t.workedEnd && end > t.workedStart)
+                );
+
+                if (hasOverlap) {
+                    showNotification('This timesheet overlaps with another approved timesheet for this staff member on the same day.', 'error');
+                    return;
+                }
+            }
         }
 
         try {
@@ -627,8 +641,7 @@ function AdminTimesheetsContent() {
                                         <input
                                             type="time"
                                             value={adjustStart}
-                                            step="900"
-                                            onChange={(e) => setAdjustStart(normalizeTo15Minutes(e.target.value))}
+                                            onChange={(e) => setAdjustStart(e.target.value)}
                                             className="input-base"
                                         />
                                     </div>
@@ -637,8 +650,7 @@ function AdminTimesheetsContent() {
                                         <input
                                             type="time"
                                             value={adjustEnd}
-                                            step="900"
-                                            onChange={(e) => setAdjustEnd(normalizeTo15Minutes(e.target.value))}
+                                            onChange={(e) => setAdjustEnd(e.target.value)}
                                             className="input-base"
                                         />
                                     </div>

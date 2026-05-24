@@ -17,7 +17,7 @@ import {
     doc,
 } from 'firebase/firestore';
 import { Availability, Shift, User, RosterAuditLog } from '@/types';
-import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isValidInterval, normalizeTo15Minutes } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import Logo from '@/components/Logo';
@@ -174,11 +174,6 @@ export default function AdminRosterPage() {
 
         if (!isTimeBefore(shiftForm.startTime, shiftForm.endTime)) {
             showNotification('Start time must be before end time', 'error');
-            return;
-        }
-
-        if (!isValidInterval(shiftForm.startTime) || !isValidInterval(shiftForm.endTime)) {
-            showNotification('Shift times must be in 15-minute intervals', 'error');
             return;
         }
 
@@ -756,8 +751,7 @@ export default function AdminRosterPage() {
                                         <input
                                             type="time"
                                             value={shiftForm.startTime}
-                                            step="900"
-                                            onChange={(e) => setShiftForm({ ...shiftForm, startTime: normalizeTo15Minutes(e.target.value) })}
+                                            onChange={(e) => setShiftForm({ ...shiftForm, startTime: e.target.value })}
                                             className="input-base"
                                         />
                                     </div>
@@ -768,8 +762,7 @@ export default function AdminRosterPage() {
                                         <input
                                             type="time"
                                             value={shiftForm.endTime}
-                                            step="900"
-                                            onChange={(e) => setShiftForm({ ...shiftForm, endTime: normalizeTo15Minutes(e.target.value) })}
+                                            onChange={(e) => setShiftForm({ ...shiftForm, endTime: e.target.value })}
                                             className="input-base"
                                         />
                                     </div>

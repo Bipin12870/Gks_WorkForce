@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, TimeRecord } from '@/types';
-import { getWeekStart, getDayName, formatDate, isValidInterval, normalizeTo15Minutes } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import { isSignificantOvertime } from '@/lib/geofence';
 import StaffPageShell from '@/components/staff/StaffPageShell';
@@ -191,11 +191,6 @@ export default function StaffTimesheetsPage() {
                 return;
             }
 
-            if (!isValidInterval(workedStart) || !isValidInterval(workedEnd)) {
-                showNotification('Worked times must be in 15-minute intervals', 'error');
-                return;
-            }
-
             const requiresNote = isSignificantOvertime(workedEnd, shift.endTime);
 
             const timesheetData: Omit<Timesheet, 'id'> = {
@@ -360,8 +355,7 @@ export default function StaffTimesheetsPage() {
                                         <Input
                                             type="time"
                                             value={workedStart}
-                                            step="900"
-                                            onChange={(e) => setWorkedStart(normalizeTo15Minutes(e.target.value))}
+                                            onChange={(e) => setWorkedStart(e.target.value)}
                                         />
                                     </div>
                                     <div>
@@ -369,8 +363,7 @@ export default function StaffTimesheetsPage() {
                                         <Input
                                             type="time"
                                             value={workedEnd}
-                                            step="900"
-                                            onChange={(e) => setWorkedEnd(normalizeTo15Minutes(e.target.value))}
+                                            onChange={(e) => setWorkedEnd(e.target.value)}
                                         />
                                     </div>
                                 </div>

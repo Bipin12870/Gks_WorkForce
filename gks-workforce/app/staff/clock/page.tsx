@@ -6,7 +6,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, query, where, getDocs, updateDoc, doc, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { TimeRecord, Timesheet, Shift, ShopLocation, TimesheetSource } from '@/types';
-import { getShopLocation, roundToNearest15, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
+import { getShopLocation, formatTimeToHHmm, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
 import { getWeekStart } from '@/lib/utils';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffAlert from '@/components/staff/StaffAlert';
@@ -286,7 +286,7 @@ export default function ClockInOutPage() {
         const clockOutTime = isAutoClose ? null : Timestamp.now();
         
         // For auto-close, use the shift's end time. Otherwise use current rounded time.
-        const clockOutRounded = isAutoClose && shift ? shift.endTime : roundToNearest15(now);
+        const clockOutRounded = isAutoClose && shift ? shift.endTime : formatTimeToHHmm(now);
         
         const clockInDate = record.clockInTime.toDate();
         const [ih, im] = record.clockInRounded.split(':').map(Number);
@@ -451,7 +451,7 @@ export default function ClockInOutPage() {
             const payload: Omit<TimeRecord, 'id'> = {
                 staffId: userData.id,
                 clockInTime: Timestamp.now(),
-                clockInRounded: roundToNearest15(now),
+                clockInRounded: formatTimeToHHmm(now),
                 clockInLat: geo.lat,
                 clockInLng: geo.lng,
                 clockInAccuracy: geo.accuracy,

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -260,7 +261,7 @@ export default function StaffAvailabilitySection() {
                                     ) : (
                                         ranges.map((range, index) => (
                                             <div key={index} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                                <div className="flex-1">
+                                                <div className="w-full sm:flex-1">
                                                     <label className="text-label block mb-1">From</label>
                                                     <Input
                                                         type="time"
@@ -269,7 +270,7 @@ export default function StaffAvailabilitySection() {
                                                         disabled={isRostered}
                                                     />
                                                 </div>
-                                                <div className="flex-1">
+                                                <div className="w-full sm:flex-1">
                                                     <label className="text-label block mb-1">To</label>
                                                     <Input
                                                         type="time"

@@ -14,11 +14,22 @@ import { ShopLocation } from '@/types';
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Format a Date object as an HH:mm string.
+ * Format a Date object as an HH:mm string (actual clock time, no rounding).
  */
 export function formatTimeToHHmm(date: Date): string {
     const h = date.getHours();
     const m = date.getMinutes();
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * Round a Date to the nearest 5-minute mark for stored clock in/out times.
+ */
+export function roundToNearest5Minutes(date: Date): string {
+    const totalMinutes = date.getHours() * 60 + date.getMinutes();
+    const rounded = Math.round(totalMinutes / 5) * 5;
+    const h = Math.floor(rounded / 60) % 24;
+    const m = rounded % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 

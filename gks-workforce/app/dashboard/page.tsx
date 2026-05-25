@@ -4,6 +4,8 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
+import AdminDashboardWrapper from '@/components/admin/AdminDashboardWrapper';
+import AdminOperationalDashboard from '@/components/admin/AdminOperationalDashboard';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
@@ -11,8 +13,6 @@ import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firest
 export default function DashboardPage() {
     const { userData, user, logout, loading } = useAuth();
     const router = useRouter();
-    const [pendingTimesheets, setPendingTimesheets] = useState(0);
-    const [flaggedCount, setFlaggedCount] = useState(0);
     const [todayShifts, setTodayShifts] = useState(0);
 
     useEffect(() => {
@@ -28,31 +28,7 @@ export default function DashboardPage() {
         let unsubscribe = () => { };
 
         if (userData.role === 'ADMIN') {
-            // All pending timesheets
-            const qAll = query(
-                collection(db, 'timesheets'),
-                where('status', '==', 'PENDING')
-            );
-
-            // Specifically flagged timesheets
-            const qFlagged = query(
-                collection(db, 'timesheets'),
-                where('status', '==', 'PENDING'),
-                where('requiresAdminNote', '==', true)
-            );
-
-            const unsubAll = onSnapshot(qAll, (snapshot) => {
-                setPendingTimesheets(snapshot.size);
-            });
-
-            const unsubFlagged = onSnapshot(qFlagged, (snapshot) => {
-                setFlaggedCount(snapshot.size);
-            });
-
-            unsubscribe = () => {
-                unsubAll();
-                unsubFlagged();
-            };
+            return;
         } else {
             const startOfToday = new Date();
             startOfToday.setHours(0, 0, 0, 0);
@@ -82,23 +58,30 @@ export default function DashboardPage() {
         router.push(path);
     };
 
+    if (userData?.role === 'ADMIN') {
+        return (
+            <AdminDashboardWrapper>
+                <AdminOperationalDashboard />
+            </AdminDashboardWrapper>
+        );
+    }
+
     return (
         <ProtectedRoute>
             <div className="min-h-screen bg-background">
-                {/* Header */}
                 <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-6">
                                 <Logo width={110} height={36} />
                                 <div className="border-l border-gray-200 pl-4 sm:pl-6">
-                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Workforce</h1>
-                                    <p className="text-[10px] sm:text-xs text-gray-400 font-black uppercase tracking-widest">Hi {userData?.name}</p>
+                                    <h1 className="text-page-title">Workforce</h1>
+                                    <p className="text-label mt-0.5">Hi {userData?.name}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={handleLogout}
-                                className="px-4 py-2 text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all border border-gray-100 shadow-sm"
+                                className="btn-secondary text-xs"
                             >
                                 Sign Out
                             </button>
@@ -106,10 +89,8 @@ export default function DashboardPage() {
                     </div>
                 </header>
 
-                {/* Main Content */}
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {/* Staff Features */}
                         {userData?.role === 'STAFF' && (
                             <>
                                 <DashboardCard
@@ -123,7 +104,7 @@ export default function DashboardPage() {
                                     title="My Availability"
                                     description="Set your weekly working hours"
                                     icon="📅"
-                                    onClick={() => handleNavigation('/staff/profile')}
+                                    onClick={() => handleNavigation('/staff/profile/availability')}
                                 />
                                 <DashboardCard
                                     title="My Roster"
@@ -142,59 +123,6 @@ export default function DashboardPage() {
                                     description="Review your worked hours and estimated pay"
                                     icon="💰"
                                     onClick={() => handleNavigation('/staff/profile')}
-                                />
-                            </>
-                        )}
-
-                        {/* Admin Features */}
-                        {userData?.role === 'ADMIN' && (
-                            <>
-                                <DashboardCard
-                                    title="Staff Management"
-                                    description="Manage staff profiles and accounts"
-                                    icon="👥"
-                                    onClick={() => handleNavigation('/admin/staff')}
-                                />
-                                <DashboardCard
-                                    title="Availability & Roster"
-                                    description="Schedule shifts and approve availability"
-                                    icon="📊"
-                                    onClick={() => handleNavigation('/admin/roster')}
-                                />
-                                <DashboardCard
-                                    title="Timesheet Approval"
-                                    description="Verify and approve staff timesheets"
-                                    icon="✅"
-                                    badgeCount={pendingTimesheets}
-                                    onClick={() => handleNavigation('/admin/timesheets?filter=pending')}
-                                />
-                                {flaggedCount > 0 && (
-                                    <DashboardCard
-                                        title="Flagged Issues"
-                                        description="Review geofence violations or overtime alerts"
-                                        icon="⚠️"
-                                        badgeCount={flaggedCount}
-                                        isWarning
-                                        onClick={() => handleNavigation('/admin/timesheets?filter=flagged')}
-                                    />
-                                )}
-                                <DashboardCard
-                                    title="Hours Summary"
-                                    description="View payroll and hours overview"
-                                    icon="📈"
-                                    onClick={() => handleNavigation('/admin/hours')}
-                                />
-                                <DashboardCard
-                                    title="Settings"
-                                    description="Configure shop location and geofence for GPS clock-in"
-                                    icon="⚙️"
-                                    onClick={() => handleNavigation('/admin/settings')}
-                                />
-                                <DashboardCard
-                                    title="Analytics"
-                                    description="Labor costs, hours summary, and performance metrics"
-                                    icon="📊"
-                                    onClick={() => handleNavigation('/admin/analytics')}
                                 />
                             </>
                         )}

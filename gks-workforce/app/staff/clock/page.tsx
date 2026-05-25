@@ -6,7 +6,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, query, where, getDocs, updateDoc, doc, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { TimeRecord, Timesheet, Shift, ShopLocation, TimesheetSource, TimesheetStatus } from '@/types';
-import { getShopLocation, formatTimeToHHmm, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
+import { getShopLocation, formatTimeToHHmm, roundToNearest5Minutes, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
 import { getWeekStart, processTimesheetAutomation, isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffAlert from '@/components/staff/StaffAlert';
@@ -48,9 +48,10 @@ export default function ClockInOutPage() {
     const [clockOutCoolingRemaining, setClockOutCoolingRemaining] = useState<number>(0);
     const [shiftDurationSeconds, setShiftDurationSeconds] = useState(0);
     const [confirmModalData, setConfirmModalData] = useState<{
+        action: 'clock-in' | 'clock-out';
         title: string;
         message: string;
-        type: 'early' | 'late' | 'unscheduled';
+        type: 'early' | 'late' | 'unscheduled' | 'offsite';
     } | null>(null);
 
     const watchIdRef = useRef<number | null>(null);
@@ -264,7 +265,7 @@ export default function ClockInOutPage() {
         const clockOutTime = isAutoClose ? null : Timestamp.now();
         
         // For auto-close, use the shift's end time. Otherwise use current rounded time.
-        let clockOutRounded = isAutoClose && shift ? shift.endTime : formatTimeToHHmm(now);
+        let clockOutRounded = isAutoClose && shift ? shift.endTime : roundToNearest5Minutes(now);
 
         const clockInDate = record.clockInTime.toDate();
         const [ih, im] = record.clockInRounded.split(':').map(Number);
@@ -411,34 +412,45 @@ export default function ClockInOutPage() {
         }
 
         if (!force) {
+            const now = new Date();
+            const roundedIn = roundToNearest5Minutes(now);
+            const actualIn = formatTimeToHHmm(now);
+            const roundingNote =
+                roundedIn !== actualIn
+                    ? ` Recorded time will be ${roundedIn} (rounded to the nearest 5 minutes from ${actualIn}).`
+                    : ` Recorded time will be ${roundedIn}.`;
+
             if (!todayShift) {
                 setConfirmModalData({
+                    action: 'clock-in',
                     title: 'Unscheduled Shift',
-                    message: 'You are not rostered for a shift today. Clocking in will record this as an Emergency / Unscheduled shift and will require Admin approval.',
-                    type: 'unscheduled'
+                    message:
+                        'You are not rostered for a shift today. Clocking in will record this as an Emergency / Unscheduled shift and will require Admin approval.' +
+                        roundingNote,
+                    type: 'unscheduled',
                 });
                 return;
             }
 
-            // Calculate fresh diff at moment of interaction
-            const now = new Date();
             const [sh, sm] = todayShift.startTime.split(':').map(Number);
             const shiftStart = new Date(todayShift.date.toDate());
             shiftStart.setHours(sh, sm, 0, 0);
             const diffMins = Math.round((now.getTime() - shiftStart.getTime()) / (1000 * 60));
 
-            if (diffMins < -5) { // Warn if more than 5 minute early
+            if (diffMins < -5) {
                 setConfirmModalData({
+                    action: 'clock-in',
                     title: 'Starting Early',
-                    message: `You are clocking in early. Your rostered shift starts at ${todayShift.startTime} (in ${Math.abs(diffMins)} minutes). Do you want to proceed?`,
-                    type: 'early'
+                    message: `You are clocking in early. Your rostered shift starts at ${todayShift.startTime} (in ${Math.abs(diffMins)} minutes). Do you want to proceed?${roundingNote}`,
+                    type: 'early',
                 });
                 return;
-            } else if (diffMins > 5) { // Keep 5 min grace for lateness
+            } else if (diffMins > 5) {
                 setConfirmModalData({
+                    action: 'clock-in',
                     title: 'Running Late',
-                    message: `You are clocking in late. Your rostered shift was scheduled to start at ${todayShift.startTime} (${diffMins} minutes ago). Do you want to proceed?`,
-                    type: 'late'
+                    message: `You are clocking in late. Your rostered shift was scheduled to start at ${todayShift.startTime} (${diffMins} minutes ago). Do you want to proceed?${roundingNote}`,
+                    type: 'late',
                 });
                 return;
             }
@@ -448,11 +460,11 @@ export default function ClockInOutPage() {
         setProcessing(true);
         try {
             const now = new Date();
-            const clockInTime = formatTimeToHHmm(now);
+            const clockInRounded = roundToNearest5Minutes(now);
 
-            if (!isWithinShopHours(clockInTime)) {
+            if (!isWithinShopHours(clockInRounded)) {
                 showNotification(`Clock-in is only allowed between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
-                setLoading(false);
+                setProcessing(false);
                 return;
             }
 
@@ -461,7 +473,7 @@ export default function ClockInOutPage() {
             const payload: Omit<TimeRecord, 'id'> = {
                 staffId: userData.id,
                 clockInTime: Timestamp.now(),
-                clockInRounded: formatTimeToHHmm(now),
+                clockInRounded,
                 clockInLat: geo.lat,
                 clockInLng: geo.lng,
                 clockInAccuracy: geo.accuracy,
@@ -491,12 +503,77 @@ export default function ClockInOutPage() {
         }
     };
 
-    const handleClockOut = async () => {
+    const handleClockOut = async (force: boolean = false) => {
         if (!userData || !activeRecord) return;
         if (clockOutCoolingRemaining > 0) {
             showNotification('Please wait before clocking out.', 'error');
             return;
         }
+
+        if (!force) {
+            const now = new Date();
+            const roundedOut = roundToNearest5Minutes(now);
+            const actualOut = formatTimeToHHmm(now);
+            const roundingNote =
+                roundedOut !== actualOut
+                    ? ` Recorded time will be ${roundedOut} (rounded to the nearest 5 minutes from ${actualOut}).`
+                    : ` Recorded time will be ${roundedOut}.`;
+
+            const shift = await getMatchingShift(activeRecord.clockInTime.toMillis());
+
+            if (geo && shop && geo.distanceMetres !== null && !geo.withinRange) {
+                setConfirmModalData({
+                    action: 'clock-out',
+                    title: 'Clocking Out Off-Site',
+                    message:
+                        `You are about ${geo.distanceMetres}m from the shop. Payroll may use rostered end times when clocking out away from site.${roundingNote}`,
+                    type: 'offsite',
+                });
+                return;
+            }
+
+            if (!shift) {
+                setConfirmModalData({
+                    action: 'clock-out',
+                    title: 'Unscheduled Clock-Out',
+                    message:
+                        'This session is not linked to a rostered shift. Your timesheet may need admin review.' +
+                        roundingNote,
+                    type: 'unscheduled',
+                });
+                return;
+            }
+
+            const [eh, em] = shift.endTime.split(':').map(Number);
+            const shiftEnd = new Date(shift.date.toDate());
+            shiftEnd.setHours(eh, em, 0, 0);
+            const diffMins = Math.round((now.getTime() - shiftEnd.getTime()) / (1000 * 60));
+
+            if (diffMins < -5) {
+                setConfirmModalData({
+                    action: 'clock-out',
+                    title: 'Clocking Out Early',
+                    message: `Your rostered shift ends at ${shift.endTime} (in ${Math.abs(diffMins)} minutes). Do you want to clock out now?${roundingNote}`,
+                    type: 'early',
+                });
+                return;
+            }
+
+            if (diffMins > 5) {
+                const overtimeNote = isSignificantOvertime(roundedOut, shift.endTime)
+                    ? ' This may be flagged as significant overtime for admin review.'
+                    : '';
+                setConfirmModalData({
+                    action: 'clock-out',
+                    title: 'Clocking Out Late',
+                    message: `Your rostered shift ended at ${shift.endTime} (${diffMins} minutes ago).${overtimeNote}${roundingNote}`,
+                    type: 'late',
+                });
+                return;
+            }
+        }
+
+        setConfirmModalData(null);
         setProcessing(true);
         try {
             const shift = await getMatchingShift(activeRecord.clockInTime.toMillis());
@@ -579,7 +656,7 @@ export default function ClockInOutPage() {
                             variant="danger"
                             size="lg"
                             fullWidth
-                            onClick={handleClockOut}
+                            onClick={() => handleClockOut(false)}
                             disabled={processing || clockOutCoolingRemaining > 0}
                         >
                             {processing ? 'Processing...' : 'Clock out'}
@@ -647,14 +724,30 @@ export default function ClockInOutPage() {
                 icon={
                     <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center border border-amber-200">
                         <Icon
-                            icon={confirmModalData?.type === 'late' ? Clock : AlertTriangle}
+                            icon={
+                                confirmModalData?.type === 'offsite'
+                                    ? MapPinOff
+                                    : confirmModalData?.type === 'late' ||
+                                        confirmModalData?.type === 'early'
+                                      ? Clock
+                                      : AlertTriangle
+                            }
                             size="lg"
                             className="text-amber-600"
                         />
                     </div>
                 }
                 secondaryAction={{ label: 'Cancel', onClick: () => setConfirmModalData(null) }}
-                primaryAction={{ label: 'Proceed', onClick: () => handleClockIn(true) }}
+                primaryAction={{
+                    label: 'Proceed',
+                    onClick: () => {
+                        if (confirmModalData?.action === 'clock-out') {
+                            handleClockOut(true);
+                        } else {
+                            handleClockIn(true);
+                        }
+                    },
+                }}
             />
         </StaffPageShell>
     );

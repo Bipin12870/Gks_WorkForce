@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, Timestamp } from 'firebase/firestore';
@@ -9,7 +8,11 @@ import { getShopLocation } from '@/lib/geofence';
 import { ShopLocation } from '@/types';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useRouter } from 'next/navigation';
-import Logo from '@/components/Logo';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
+import Button from '@/components/ui/Button';
+import Spinner from '@/components/ui/Spinner';
+import Icon from '@/components/ui/Icon';
+import { MapPin, AlertTriangle, LocateFixed } from 'lucide-react';
 
 export default function AdminSettingsPage() {
     const { userData } = useAuth();
@@ -117,29 +120,11 @@ export default function AdminSettingsPage() {
     const radiusNum = parseInt(radius, 10) || 100;
 
     return (
-        <ProtectedRoute requiredRole="ADMIN">
-            <div className="min-h-screen bg-background text-gray-900">
-                {/* Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-6">
-                                <Logo width={100} height={35} />
-                                <div className="border-l border-gray-200 pl-6">
-                                    <button
-                                        onClick={() => router.push('/dashboard')}
-                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
-                                    >
-                                        ← Dashboard
-                                    </button>
-                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Settings</h1>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
-                <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <div className="max-w-4xl mx-auto w-full space-y-8">
+            <AdminPageHeader
+                title="Settings"
+                description="Shop location, geofence radius, and clock-in policies."
+            />
 
                     {/* Current Status Banner */}
                     {!loadingCurrent && (
@@ -147,12 +132,14 @@ export default function AdminSettingsPage() {
                                 ? 'bg-green-50 border-green-100'
                                 : 'bg-amber-50 border-amber-100'
                             }`}>
-                            <span className="text-lg">{current ? '📍' : '⚠️'}</span>
+                            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${current ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                <Icon icon={current ? MapPin : AlertTriangle} size="md" />
+                            </span>
                             <div>
                                 {current ? (
                                     <>
-                                        <p className="text-xs font-black uppercase tracking-widest text-green-700">
-                                            Shop Location Active
+                                        <p className="admin-kicker text-green-700">
+                                            Shop location active
                                         </p>
                                         <p className="text-sm font-semibold text-green-800 mt-0.5">
                                             {current.name} — {current.lat.toFixed(5)}, {current.lng.toFixed(5)} · {current.radiusMetres}m radius
@@ -160,8 +147,8 @@ export default function AdminSettingsPage() {
                                     </>
                                 ) : (
                                     <>
-                                        <p className="text-xs font-black uppercase tracking-widest text-amber-700">
-                                            No Shop Location Set
+                                        <p className="admin-kicker text-amber-700">
+                                            No shop location set
                                         </p>
                                         <p className="text-sm font-semibold text-amber-800 mt-0.5">
                                             Staff cannot use GPS clock-in until a location is configured.
@@ -173,10 +160,10 @@ export default function AdminSettingsPage() {
                     )}
 
                     {/* Shop Location Card */}
-                    <div className="card-base p-6">
+                    <div className="admin-section-card p-6">
                         <div className="mb-6">
-                            <h2 className="text-base font-black text-gray-900 uppercase tracking-widest">
-                                Shop / Work Location
+                            <h2 className="text-section-title">
+                                Shop / work location
                             </h2>
                             <p className="text-sm text-gray-500 mt-1">
                                 Staff must be within the set radius to clock in. Set this to your current
@@ -186,28 +173,14 @@ export default function AdminSettingsPage() {
 
                         {/* Use My Location Button */}
                         <div className="mb-6">
-                            <button
+                            <Button
+                                variant="primary"
                                 onClick={handleUseMyLocation}
                                 disabled={locating}
-                                className="flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-black uppercase tracking-widest rounded-xl transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
                             >
-                                {locating ? (
-                                    <>
-                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                        </svg>
-                                        Getting Location...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                                        </svg>
-                                        Use My Current Location
-                                    </>
-                                )}
-                            </button>
+                                <Icon icon={LocateFixed} size="sm" />
+                                {locating ? 'Getting location…' : 'Use my current location'}
+                            </Button>
                             <p className="text-xs text-gray-400 mt-2">
                                 Browser will ask for location permission. Use this while at the shop, or use it at home/office for testing.
                             </p>
@@ -316,19 +289,20 @@ export default function AdminSettingsPage() {
                         </div>
 
                         {/* Save Button */}
-                        <button
+                        <Button
+                            variant="primary"
+                            fullWidth
                             onClick={handleSave}
                             disabled={saving || !lat || !lng}
-                            className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-black uppercase tracking-widest rounded-xl transition-all shadow-sm hover:shadow-md active:scale-[0.99] disabled:cursor-not-allowed"
                         >
-                            {saving ? 'Saving...' : 'Save Shop Location'}
-                        </button>
+                            {saving ? 'Saving…' : 'Save shop location'}
+                        </Button>
                     </div>
 
                     {/* Info Card */}
                     <div className="card-base p-5 bg-gray-50/50">
-                        <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 mb-3">
-                            How Geofencing Works
+                        <h3 className="text-section-title mb-3">
+                            How geofencing works
                         </h3>
                         <ul className="space-y-2 text-sm text-gray-600">
                             <li className="flex items-start gap-2">
@@ -350,8 +324,6 @@ export default function AdminSettingsPage() {
                         </ul>
                     </div>
 
-                </main>
-            </div>
-        </ProtectedRoute>
+        </div>
     );
 }

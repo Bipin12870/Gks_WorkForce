@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { db, auth, firebaseConfig } from '@/lib/firebase';
 import { collection, setDoc, getDocs, updateDoc, doc, Timestamp, query, where, writeBatch, deleteDoc } from 'firebase/firestore';
@@ -10,7 +9,14 @@ import { initializeApp, deleteApp } from 'firebase/app';
 import { useNotification } from '@/contexts/NotificationContext';
 import { User } from '@/types';
 import { useRouter } from 'next/navigation';
-import Logo from '@/components/Logo';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
+import Accordion from '@/components/ui/Accordion';
+import Button from '@/components/ui/Button';
+import Badge from '@/components/ui/Badge';
+import Spinner from '@/components/ui/Spinner';
+import AdminDataTable, { AdminTableHead, AdminTableTh, AdminTableBody, AdminTableRow, AdminTableTd } from '@/components/admin/AdminDataTable';
+import AdminFormModal, { AdminModalFooter } from '@/components/admin/AdminFormModal';
+import { UserPlus } from 'lucide-react';
 import { resetStaffPassword, deleteStaffAccount } from '@/app/actions/staff-actions';
 
 export default function AdminStaffPage() {
@@ -263,46 +269,33 @@ export default function AdminStaffPage() {
     };
 
     return (
-        <ProtectedRoute requiredRole="ADMIN">
-            <div className="min-h-screen bg-background">
-                {/* Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-6">
-                                <Logo width={100} height={35} />
-                                <div className="border-l border-gray-200 pl-6">
-                                    <button
-                                        onClick={() => router.push('/dashboard')}
-                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
-                                    >
-                                        ← Dashboard
-                                    </button>
-                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Staff Management</h1>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </header>
+        <>
+            <AdminPageHeader
+                title="Staff management"
+                description="Profiles, hourly rates, credentials, and account status."
+                actions={
+                    <Button
+                        variant={showCreateForm ? 'secondary' : 'primary'}
+                        size="sm"
+                        onClick={() => setShowCreateForm(!showCreateForm)}
+                    >
+                        <UserPlus className="w-4 h-4" />
+                        {showCreateForm ? 'Cancel' : 'Add staff'}
+                    </Button>
+                }
+            />
 
-                {/* Main Content */}
-                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-
-                    {/* Create Staff Button */}
-                    <div className="mb-8">
-                        <button
-                            onClick={() => setShowCreateForm(!showCreateForm)}
-                            className={showCreateForm ? "btn-secondary" : "btn-primary"}
-                        >
-                            {showCreateForm ? 'Cancel Creation' : '+ Add New Staff Member'}
-                        </button>
-                    </div>
-
-                    {/* Create Staff Form */}
-                    {showCreateForm && (
-                        <div className="card-base p-8 mb-8 border-blue-100 bg-blue-50/10">
-                            <h2 className="text-lg font-bold text-gray-900 mb-6">Create Staff Account</h2>
-                            <form onSubmit={handleCreateStaff} className="space-y-6">
+            {showCreateForm && (
+                <div className="mb-6">
+                    <Accordion
+                        items={[
+                            {
+                                id: 'create',
+                                title: 'New staff account',
+                                description: 'Creates login and Firestore profile',
+                                defaultOpen: true,
+                                content: (
+                            <form onSubmit={handleCreateStaff} className="space-y-6 pt-2">
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                     <div>
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
@@ -379,59 +372,42 @@ export default function AdminStaffPage() {
                                     </div>
                                 </div>
                                 <div className="flex justify-end pt-2">
-                                    <button
-                                        type="submit"
-                                        className="btn-primary px-8"
-                                    >
-                                        Create Account
-                                    </button>
+                                    <Button type="submit" variant="primary">Create account</Button>
                                 </div>
                             </form>
-                        </div>
-                    )}
+                                ),
+                            },
+                        ]}
+                    />
+                </div>
+            )}
 
-                    {/* Staff List */}
                     {loading ? (
-                        <div className="flex justify-center py-20">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        </div>
+                        <Spinner className="py-20" />
                     ) : (
-                        <div className="card-base">
-                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                                <h3 className="font-bold text-gray-900">Active Staff Directory</h3>
-                                <span className="text-xs font-medium text-gray-500">{staff.length} Members</span>
+                        <div className="admin-section-card">
+                            <div className="admin-section-card-header">
+                                <h3 className="text-section-title">Active directory</h3>
+                                <span className="text-label">{staff.length} members</span>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="bg-gray-50/50">
-                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                                                Staff Member
-                                            </th>
-                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                                                Username / Login
-                                            </th>
-                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                                                Hourly Rate
-                                            </th>
-                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                                                Acc. Status
-                                            </th>
-                                            <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                                                Management
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                            <AdminDataTable isEmpty={staff.length === 0} emptyMessage="No staff members yet">
+                                    <AdminTableHead>
+                                            <AdminTableTh>Staff</AdminTableTh>
+                                            <AdminTableTh>Login</AdminTableTh>
+                                            <AdminTableTh>Rate</AdminTableTh>
+                                            <AdminTableTh>Status</AdminTableTh>
+                                            <AdminTableTh align="right">Actions</AdminTableTh>
+                                    </AdminTableHead>
+                                    <AdminTableBody>
                                         {staff.map((member) => (
-                                            <tr key={member.id} className="hover:bg-gray-50/80 transition-colors group">
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                            <AdminTableRow key={member.id}>
+                                                <AdminTableTd>
                                                     <div className="font-semibold text-gray-900">{member.name}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm text-gray-500 font-medium">{member.username || member.email}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                </AdminTableTd>
+                                                <AdminTableTd>
+                                                    <div className="text-sm text-gray-500">{member.username || member.email}</div>
+                                                </AdminTableTd>
+                                                <AdminTableTd>
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="text-gray-400 text-sm">$</span>
                                                         <input
@@ -448,64 +424,56 @@ export default function AdminStaffPage() {
                                                             min="0"
                                                         />
                                                     </div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span
-                                                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold tracking-tight uppercase ${member.isActive
-                                                            ? 'bg-green-50 text-green-700'
-                                                            : 'bg-red-50 text-red-700'
-                                                            }`}
-                                                    >
+                                                </AdminTableTd>
+                                                <AdminTableTd>
+                                                    <Badge variant={member.isActive ? 'success' : 'danger'}>
                                                         {member.isActive ? 'Active' : 'Inactive'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                    <div className="flex justify-end gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
-                                                        <button
-                                                            onClick={() => openEditModal(member)}
-                                                            className="btn-ghost-primary"
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                        <button
+                                                    </Badge>
+                                                </AdminTableTd>
+                                                <AdminTableTd align="right">
+                                                    <div className="flex justify-end gap-2 flex-wrap">
+                                                        <Button variant="ghost-primary" size="sm" onClick={() => openEditModal(member)}>Edit</Button>
+                                                        <Button
+                                                            variant={member.isActive ? 'ghost-danger' : 'ghost-primary'}
+                                                            size="sm"
                                                             onClick={() => toggleStaffStatus(member.id, member.isActive)}
-                                                            className={member.isActive ? "btn-ghost-danger" : "btn-ghost-primary"}
                                                         >
                                                             {member.isActive ? 'Deactivate' : 'Activate'}
-                                                        </button>
-                                                        <button
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost-danger"
+                                                            size="sm"
                                                             onClick={() => handleDeleteStaff(member.id, member.name)}
-                                                            className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                                            title="Permanently Delete Staff"
+                                                            aria-label="Delete staff"
                                                         >
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                                                            </svg>
-                                                        </button>
+                                                            Delete
+                                                        </Button>
                                                     </div>
-                                                </td>
-                                            </tr>
+                                                </AdminTableTd>
+                                            </AdminTableRow>
                                         ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                    </AdminTableBody>
+                            </AdminDataTable>
                         </div>
                     )}
-                </main>
 
-                {/* Edit Modal */}
-                {showEditModal && editingStaff && (
-                    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-                        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden">
-                            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                                <h2 className="text-lg font-bold text-gray-900 tracking-tight">Modify {editingStaff.name}</h2>
-                                <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <form onSubmit={handleUpdateStaff} className="p-6 space-y-6">
+            <AdminFormModal
+                open={showEditModal && !!editingStaff}
+                onClose={() => setShowEditModal(false)}
+                title={editingStaff ? `Edit ${editingStaff.name}` : 'Edit staff'}
+                footer={
+                    <AdminModalFooter
+                        onCancel={() => setShowEditModal(false)}
+                        onPrimary={() =>
+                            (document.getElementById('staff-edit-form') as HTMLFormElement | null)?.requestSubmit()
+                        }
+                        primaryLabel={loading ? 'Saving…' : 'Save changes'}
+                        primaryDisabled={loading}
+                    />
+                }
+            >
+                {editingStaff && (
+                            <form id="staff-edit-form" onSubmit={handleUpdateStaff} className="space-y-6">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                         Full Name
@@ -566,41 +534,24 @@ export default function AdminStaffPage() {
                                                 )}
                                             </button>
                                         </div>
-                                        <button
+                                        <Button
                                             type="button"
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={handleResetPassword}
                                             disabled={resettingPassword || !newPassword}
-                                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold tracking-tight uppercase transition-all disabled:opacity-50"
                                         >
-                                            {resettingPassword ? '...' : 'Reset'}
-                                        </button>
+                                            {resettingPassword ? '…' : 'Reset password'}
+                                        </Button>
                                     </div>
                                     <p className="text-[10px] text-amber-700/60 mt-2 font-medium">
                                         * Login using username + new password. No email needed.
                                     </p>
                                 </div>
 
-                                <div className="flex gap-3 pt-4 border-t border-gray-100">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowEditModal(false)}
-                                        className="btn-secondary flex-1"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="btn-primary flex-1"
-                                        disabled={loading}
-                                    >
-                                        {loading ? 'Updating...' : 'Save Changes'}
-                                    </button>
-                                </div>
                             </form>
-                        </div>
-                    </div>
                 )}
-            </div>
-        </ProtectedRoute>
+            </AdminFormModal>
+        </>
     );
 }

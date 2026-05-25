@@ -1,13 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
 import { User, Timesheet, Shift } from '@/types';
-import { useRouter } from 'next/navigation';
-import Logo from '@/components/Logo';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
+import AdminWeekPicker from '@/components/admin/AdminWeekPicker';
+import AdminStatCard from '@/components/admin/AdminStatCard';
+import Button from '@/components/ui/Button';
+import Spinner from '@/components/ui/Spinner';
+import { DollarSign, Clock, TrendingUp } from 'lucide-react';
 import { getWeekStart, formatDate, calculatePayrollRecord } from '@/lib/utils';
 import {
     BarChart,
@@ -24,8 +27,6 @@ import {
 
 export default function AnalyticsPage() {
     const { userData } = useAuth();
-    const router = useRouter();
-
     const [staffList, setStaffList] = useState<User[]>([]);
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [shifts, setShifts] = useState<Shift[]>([]);
@@ -214,118 +215,51 @@ export default function AnalyticsPage() {
     };
 
     return (
-        <ProtectedRoute requiredRole="ADMIN">
-            <div className="min-h-screen bg-background text-gray-900 pb-12">
-                {/* Header */}
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex items-center gap-6">
-                                <Logo width={100} height={35} />
-                                <div className="border-l border-gray-200 pl-6">
-                                    <button
-                                        onClick={() => router.push('/dashboard')}
-                                        className="text-blue-600 hover:text-blue-700 text-xs font-bold uppercase tracking-wider mb-0.5 block transition-colors"
-                                    >
-                                        ← Dashboard
-                                    </button>
-                                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                                        Analytics
-                                    </h1>
-                                </div>
-                            </div>
+        <>
+            <AdminPageHeader
+                title="Analytics"
+                description="Labor cost, hours trends, and roster coverage for the selected week."
+            />
 
-                            {/* Date Navigation */}
-                            <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl border border-gray-200">
-                                <button
-                                    onClick={handlePreviousWeek}
-                                    className="p-2 hover:bg-white rounded-lg text-gray-600 hover:text-gray-900 transition-colors hover:shadow-sm"
-                                    aria-label="Previous week"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                </button>
-
-                                <div className="px-4 py-1 text-center min-w-[160px]">
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                        Week Starting
-                                    </p>
-                                    <p className="text-sm font-semibold text-gray-900 whitespace-nowrap">
-                                        {formatDate(weekStart)}
-                                    </p>
-                                </div>
-
-                                <button
-                                    onClick={handleNextWeek}
-                                    className="p-2 hover:bg-white rounded-lg text-gray-600 hover:text-gray-900 transition-colors hover:shadow-sm"
-                                    aria-label="Next week"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </button>
-                                <button
-                                    onClick={handleCurrentWeek}
-                                    className="hidden md:block ml-2 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg uppercase tracking-wider transition-colors"
-                                >
-                                    Current
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
-                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="admin-toolbar mb-6">
+                <AdminWeekPicker
+                    weekStart={weekStart}
+                    onPrev={handlePreviousWeek}
+                    onNext={handleNextWeek}
+                />
+                <Button variant="ghost-primary" size="sm" onClick={handleCurrentWeek}>
+                    Current week
+                </Button>
+            </div>
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center py-20">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                            <p className="text-gray-500 font-medium">Loading analytics...</p>
-                        </div>
+                        <Spinner className="py-20" label="Loading analytics…" />
                     ) : (
-                        <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className="space-y-8">
 
-                            {/* KPI Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="card-base p-6 bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-md">
-                                    <p className="text-blue-100 text-xs font-black uppercase tracking-widest mb-1">
-                                        Actual Wages (Approved)
-                                    </p>
-                                    <p className="text-4xl font-bold tracking-tight">
-                                        {formatCurrency(analyticsData.totalWages)}
-                                    </p>
-                                    <p className="text-blue-100 text-xs mt-2 font-medium">
-                                        Budgeted: {formatCurrency(analyticsData.projectedWages)} (from roster)
-                                    </p>
-                                </div>
-
-                                <div className="card-base p-6">
-                                    <p className="text-gray-500 text-xs font-black uppercase tracking-widest mb-1">
-                                        Total Hours
-                                    </p>
-                                    <div className="flex items-baseline gap-2">
-                                        <p className="text-4xl font-bold text-gray-900 tracking-tight">
-                                            {analyticsData.totalActualHours.toFixed(1)}<span className="text-xl text-gray-400 font-medium ml-1">hrs</span>
-                                        </p>
-                                    </div>
-                                    <p className="text-gray-500 text-xs mt-2 font-medium">
-                                        vs {analyticsData.totalScheduledHours.toFixed(1)} hrs scheduled
-                                    </p>
-                                </div>
-
-                                <div className={`card-base p-6 border-l-4 ${analyticsData.laborVariance > 0 ? 'border-amber-500' : 'border-green-500'}`}>
-                                    <p className="text-gray-500 text-xs font-black uppercase tracking-widest mb-1">
-                                        Labor Variance
-                                    </p>
-                                    <p className={`text-4xl font-bold tracking-tight ${analyticsData.laborVariance > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                                        {analyticsData.laborVariance > 0 ? '+' : ''}{analyticsData.laborVariance.toFixed(1)}<span className="text-xl font-medium ml-1">hrs</span>
-                                    </p>
-                                    <p className="text-gray-500 text-xs mt-2 font-medium">
-                                        {analyticsData.laborVariance > 0
-                                            ? "Staff worked more hours than rostered"
-                                            : "Staff worked fewer hours than rostered"}
-                                    </p>
-                                </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <AdminStatCard
+                                    label="Actual wages (approved)"
+                                    value={formatCurrency(analyticsData.totalWages)}
+                                    subtext={`Budgeted ${formatCurrency(analyticsData.projectedWages)} from roster`}
+                                    icon={DollarSign}
+                                />
+                                <AdminStatCard
+                                    label="Total hours"
+                                    value={`${analyticsData.totalActualHours.toFixed(1)} hrs`}
+                                    subtext={`vs ${analyticsData.totalScheduledHours.toFixed(1)} hrs scheduled`}
+                                    icon={Clock}
+                                />
+                                <AdminStatCard
+                                    label="Labor variance"
+                                    value={`${analyticsData.laborVariance > 0 ? '+' : ''}${analyticsData.laborVariance.toFixed(1)} hrs`}
+                                    subtext={
+                                        analyticsData.laborVariance > 0
+                                            ? 'Worked more than rostered'
+                                            : 'Worked less than rostered'
+                                    }
+                                    icon={TrendingUp}
+                                    variant={analyticsData.laborVariance > 0 ? 'warning' : 'success'}
+                                />
                             </div>
 
                             {/* Charts Row */}
@@ -334,8 +268,8 @@ export default function AnalyticsPage() {
                                 {/* Employee Cost Breakdown */}
                                 <div className="card-base p-6 flex flex-col">
                                     <div className="mb-6">
-                                        <h2 className="text-base font-black text-gray-900 uppercase tracking-widest">
-                                            Cost: Budget vs Actual
+                                        <h2 className="text-section-title">
+                                            Cost: budget vs actual
                                         </h2>
                                         <p className="text-sm text-gray-500 mt-1">
                                             Comparison of rostered costs vs approved pay
@@ -374,8 +308,8 @@ export default function AnalyticsPage() {
                                 {/* Scheduled vs Actual Line Chart */}
                                 <div className="card-base p-6 flex flex-col">
                                     <div className="mb-6">
-                                        <h2 className="text-base font-black text-gray-900 uppercase tracking-widest">
-                                            Rostered vs Worked Hours
+                                        <h2 className="text-section-title">
+                                            Rostered vs worked hours
                                         </h2>
                                         <p className="text-sm text-gray-500 mt-1">
                                             Daily breakdown of planned hours vs actual worked time
@@ -431,8 +365,6 @@ export default function AnalyticsPage() {
                             </div>
                         </div>
                     )}
-                </main>
-            </div>
-        </ProtectedRoute>
+        </>
     );
 }

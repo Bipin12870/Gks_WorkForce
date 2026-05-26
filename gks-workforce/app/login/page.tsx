@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Logo from '@/components/Logo';
 
 export default function LoginPage() {
@@ -88,7 +89,9 @@ export default function LoginPage() {
         <div className="min-h-screen flex items-center justify-center bg-background px-4">
             <div className="max-w-md w-full card-base p-8">
                 <div className="text-center mb-10">
-                    <Logo className="mb-6 mx-auto" width={140} height={45} />
+                    <Link href="/dashboard">
+                        <Logo className="mb-6 mx-auto" width={140} height={45} />
+                    </Link>
                     <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Workforce</h1>
                     <p className="text-sm text-gray-500 mt-1">Sign in to your shop account</p>
                 </div>

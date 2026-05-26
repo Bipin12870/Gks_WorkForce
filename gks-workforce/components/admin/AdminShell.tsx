@@ -75,7 +75,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 }`}
             >
                 <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-                    <Logo width={88} height={28} />
+                    <Link href="/dashboard">
+                        <Logo width={88} height={28} />
+                    </Link>
                     <button
                         type="button"
                         onClick={() => setMobileOpen(false)}

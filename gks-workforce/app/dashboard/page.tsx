@@ -3,6 +3,7 @@
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Logo from '@/components/Logo';
 import AdminDashboardWrapper from '@/components/admin/AdminDashboardWrapper';
 import AdminOperationalDashboard from '@/components/admin/AdminOperationalDashboard';
@@ -73,7 +74,9 @@ export default function DashboardPage() {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-6">
-                                <Logo width={110} height={36} />
+                                <Link href="/dashboard">
+                                    <Logo width={110} height={36} />
+                                </Link>
                                 <div className="border-l border-gray-200 pl-4 sm:pl-6">
                                     <h1 className="text-page-title">Workforce</h1>
                                     <p className="text-label mt-0.5">Hi {userData?.name}</p>

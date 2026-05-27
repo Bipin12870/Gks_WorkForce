@@ -4,10 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, updateDoc, doc, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { TimeRecord, Timesheet, Shift, ShopLocation, TimesheetSource, TimesheetStatus } from '@/types';
 import { getShopLocation, formatTimeToHHmm, roundToNearest5Minutes, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
 import { getWeekStart, processTimesheetAutomation, isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
+import { clockIn, clockOut } from '@/app/actions/clock';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffAlert from '@/components/staff/StaffAlert';
 import Button from '@/components/ui/Button';
@@ -261,139 +262,33 @@ export default function ClockInOutPage() {
     ) => {
         if (!userData) return;
 
-        const now = new Date();
-        const clockOutTime = isAutoClose ? null : Timestamp.now();
-        
-        // For auto-close, use the shift's end time. Otherwise use current rounded time.
-        let clockOutRounded = isAutoClose && shift ? shift.endTime : roundToNearest5Minutes(now);
-
-        const clockInDate = record.clockInTime.toDate();
-        const [ih, im] = record.clockInRounded.split(':').map(Number);
-        clockInDate.setHours(ih, im, 0, 0);
-
-        const automationResult = processTimesheetAutomation(
-            record.clockInRounded, 
-            clockOutRounded, 
-            shift ? { start: shift.startTime, end: shift.endTime } : undefined,
-            (geo && shop && geo.distanceMetres !== null && geo.distanceMetres > shop.radiusMetres) 
-                ? [{ type: 'OUTSIDE', time: clockOutRounded }] 
-                : [],
-            false // isManualEdit
-        );
-
-        const hoursWorked = automationResult.payroll.rawMinutes / 60;
-
-        let source: TimesheetSource = 'GPS_UNMATCHED';
-        let requiresNote = false;
-
-        if (isAutoClose) {
-            source = 'AUTO_CLOSED';
-            requiresNote = true;
-        } else {
-            // Map automation status/flags back to legacy source types for DB compatibility
-            if (automationResult.approval.status === 'FLAGGED' || automationResult.approval.status === 'NEEDS_REVIEW') {
-                requiresNote = true;
-                if (automationResult.classification.flags.includes('GPS_OUTSIDE')) {
-                    source = 'GPS_OUTSIDE';
-                } else if (automationResult.classification.flags.includes('OVERTIME')) {
-                    source = 'GPS_OVERTIME';
-                } else if (automationResult.classification.flags.includes('AFTER_HOURS')) {
-                    source = 'AFTER_HOURS';
-                } else if (shift) {
-                    source = 'GPS_VERIFIED';
-                }
-            } else if (shift) {
-                source = 'GPS_VERIFIED';
-            }
-        }
-
-        // 3. Automated Approval Handling
-        let finalStatus: TimesheetStatus = 'PENDING';
-        if (automationResult.approval.status === 'AUTO_APPROVED') {
-            finalStatus = 'APPROVED';
-        }
-
-        // 1. Update TimeRecord
-        const recordRef = doc(db, 'timeRecords', record.id!);
-        await updateDoc(recordRef, {
-            clockOutTime: Timestamp.now(),
-            clockOutRounded,
-            clockOutLat: geo?.lat ?? null,
-            clockOutLng: geo?.lng ?? null,
-            clockOutAccuracy: geo?.accuracy ?? null,
-            clockOutWithinGeofence: geo?.withinRange ?? null,
-            hoursWorked,
-            source: isAutoClose ? 'AUTO_CLOSED' : 'GPS',
-            shiftId: shift ? shift.id : null,
-            updatedAt: Timestamp.now(),
-        });
-
-        // 2. Auto-generate Timesheet (or update existing if duplicate)
-        let timesheetId = '';
-        if (shift) {
-            const tsQ = query(
-                collection(db, 'timesheets'),
-                where('staffId', '==', userData.id),
-                where('shiftId', '==', shift.id)
+        try {
+            const now = new Date();
+            const result = await clockOut(
+                record.id!,
+                geo?.lat ?? 0,
+                geo?.lng ?? 0,
+                geo?.accuracy ?? 0,
+                isAutoClose,
+                now.getTime(),
+                now.getTimezoneOffset()
             );
-            const tsSnap = await getDocs(tsQ);
-            if (!tsSnap.empty) {
-                const tsDoc = tsSnap.docs[0];
-                timesheetId = tsDoc.id;
-                await updateDoc(doc(db, 'timesheets', timesheetId), {
-                    workedStart: record.clockInRounded,
-                    workedEnd: clockOutRounded,
-                    source,
-                    timeRecordId: record.id!,
-                    clockInLat: record.clockInLat,
-                    clockInLng: record.clockInLng,
-                    clockOutLat: geo?.lat ?? null,
-                    clockOutLng: geo?.lng ?? null,
-                    clockOutDistanceMetres: geo?.distanceMetres ?? null,
-                    requiresAdminNote: requiresNote,
-                    status: finalStatus,
-                    updatedAt: Timestamp.now(),
-                });
+
+            if (result.success) {
+                if (isAutoClose) {
+                    showNotification('Your previous open shift was auto-closed.', 'error');
+                    setActiveRecord(null);
+                    setClockInCoolingRemaining(0);
+                } else {
+                    const clockOutRounded = roundToNearest5Minutes(now);
+                    showNotification(`Clocked out. Timesheet generated (${clockOutRounded}).`, 'success');
+                    setActiveRecord(null);
+                    setClockInCoolingRemaining(300);
+                }
             }
-        }
-
-        if (!timesheetId) {
-            const timesheetPayload: Omit<Timesheet, 'id'> = {
-                staffId: userData.id,
-                shiftId: shift ? shift.id! : null,
-                date: Timestamp.fromDate(clockInDate),
-                weekStartDate: Timestamp.fromDate(getWeekStart(clockInDate)),
-                approvedShiftStart: shift ? shift.startTime : '',
-                approvedShiftEnd: shift ? shift.endTime : '',
-                workedStart: record.clockInRounded,
-                workedEnd: clockOutRounded,
-                status: finalStatus,
-                source,
-                timeRecordId: record.id!,
-                clockInLat: record.clockInLat,
-                clockInLng: record.clockInLng,
-                clockOutLat: geo?.lat ?? null,
-                clockOutLng: geo?.lng ?? null,
-                clockOutDistanceMetres: geo?.distanceMetres ?? null,
-                requiresAdminNote: requiresNote,
-                createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now(),
-            };
-
-            const tsRef = await addDoc(collection(db, 'timesheets'), timesheetPayload);
-            timesheetId = tsRef.id;
-        }
-
-        await updateDoc(recordRef, { timesheetId });
-
-        if (isAutoClose) {
-            showNotification('Your previous open shift was auto-closed.', 'error');
-            setActiveRecord(null);
-            setClockInCoolingRemaining(0);
-        } else {
-            showNotification(`Clocked out. Timesheet generated (${clockOutRounded}).`, 'success');
-            setActiveRecord(null);
-            setClockInCoolingRemaining(300);
+        } catch (error: any) {
+            console.error('Error clocking out:', error);
+            showNotification(error.message || 'Failed to clock out.', 'error');
         }
     };
 
@@ -468,36 +363,22 @@ export default function ClockInOutPage() {
                 return;
             }
 
-            const shift = await getMatchingShift(now.getTime());
+            const result = await clockIn(
+                geo.lat,
+                geo.lng,
+                geo.accuracy,
+                now.getTime(),
+                now.getTimezoneOffset()
+            );
 
-            const payload: Omit<TimeRecord, 'id'> = {
-                staffId: userData.id,
-                clockInTime: Timestamp.now(),
-                clockInRounded,
-                clockInLat: geo.lat,
-                clockInLng: geo.lng,
-                clockInAccuracy: geo.accuracy,
-                clockOutTime: null,
-                clockOutRounded: null,
-                clockOutLat: null,
-                clockOutLng: null,
-                clockOutAccuracy: null,
-                clockOutWithinGeofence: null,
-                hoursWorked: null,
-                shiftId: shift ? shift.id! : null,
-                timesheetId: null,
-                source: 'GPS',
-                createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now(),
-            };
-
-            await addDoc(collection(db, 'timeRecords'), payload);
-            showNotification('Clocked in successfully!', 'success');
-            setClockOutCoolingRemaining(60); // 1 minute safety clock-out lock
-            await checkActiveClockIn();
-        } catch (error) {
+            if (result.success) {
+                showNotification('Clocked in successfully!', 'success');
+                setClockOutCoolingRemaining(60); // 1 minute safety clock-out lock
+                await checkActiveClockIn();
+            }
+        } catch (error: any) {
             console.error('Error clocking in:', error);
-            showNotification('Failed to clock in.', 'error');
+            showNotification(error.message || 'Failed to clock in.', 'error');
         } finally {
             setProcessing(false);
         }

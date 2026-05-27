@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { saveShopLocation } from '@/app/actions/settings';
 import { getShopLocation } from '@/lib/geofence';
 import { ShopLocation } from '@/types';
 import { useNotification } from '@/contexts/NotificationContext';
@@ -97,21 +96,13 @@ export default function AdminSettingsPage() {
 
         setSaving(true);
         try {
-            const payload: ShopLocation = {
-                lat: parsedLat,
-                lng: parsedLng,
-                radiusMetres: parsedRadius,
-                name: name.trim(),
-                setAt: Timestamp.now(),
-                setBy: userData.id,
-            };
-
-            await setDoc(doc(db, 'config', 'shopLocation'), payload);
-            setCurrent(payload);
+            await saveShopLocation(parsedLat, parsedLng, parsedRadius, name);
+            const updated = { lat: parsedLat, lng: parsedLng, radiusMetres: parsedRadius, name: name.trim() };
+            setCurrent(updated as any);
             showNotification('Shop location saved successfully!', 'success');
         } catch (err) {
             console.error('Error saving shop location:', err);
-            showNotification('Failed to save location. Please try again.', 'error');
+            showNotification((err as Error).message || 'Failed to save location. Please try again.', 'error');
         } finally {
             setSaving(false);
         }

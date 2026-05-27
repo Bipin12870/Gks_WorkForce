@@ -8,15 +8,12 @@ import {
     query,
     where,
     onSnapshot,
-    addDoc,
     getDocs,
     Timestamp,
-    updateDoc,
-    deleteDoc,
-    doc,
 } from 'firebase/firestore';
-import { Availability, Shift, User, RosterAuditLog } from '@/types';
-import { getWeekStart, getDayName, formatDate, isWithinAvailability, isTimeBefore, calculateHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, isWithinShopHours } from '@/lib/utils';
+import { Availability, Shift, User } from '@/types';
+import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
+import { createShift, updateShift, deleteShift } from '@/app/actions/shifts';
 import { useNotification } from '@/contexts/NotificationContext';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminFilterBar from '@/components/admin/AdminFilterBar';
@@ -174,86 +171,28 @@ export default function AdminRosterPage() {
     const handleSaveShift = async () => {
         if (!selectedStaff || !userData) return;
 
-        // Validate shift times (strictly within operating hours 09:00-23:59)
-        if (!isWithinShopHours(shiftForm.startTime) || !isWithinShopHours(shiftForm.endTime)) {
-            showNotification(`Shifts must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
-            return;
-        }
-
-        // Standardize duration check (reject end <= start)
-        if (calculateHours(shiftForm.startTime, shiftForm.endTime) <= 0) {
-            showNotification('Invalid shift duration. End time must be after start time.', 'error');
-            return;
-        }
-
-        if (selectedStaff.ranges.length === 0) {
-            showNotification('No submitted availability for this staff on this day', 'error');
-            return;
-        }
-
-        // Validate shift is within availability
-        if (!isWithinAvailability(shiftForm.startTime, shiftForm.endTime, selectedStaff.ranges)) {
-            showNotification('Shift must be within staff availability', 'error');
-            return;
-        }
-        // Determine the target date of the shift we are trying to save
-        const targetDate = (() => {
+        try {
             if (isEditingShift && editingShiftId) {
-                const prevShift = shifts.find(s => s.id === editingShiftId);
-                return prevShift ? prevShift.date.toDate() : null;
+                await updateShift(editingShiftId, {
+                    startTime: shiftForm.startTime,
+                    endTime: shiftForm.endTime,
+                });
+                showNotification('Shift updated successfully!', 'success');
             } else {
+                // Determine the target date from the selected week + day
                 const dayDate = new Date(selectedWeek);
                 const shiftDay = selectedStaff.dayOfWeek ?? selectedDay;
                 const finalDay = shiftDay === -1 ? new Date().getDay() : shiftDay;
                 dayDate.setDate(dayDate.getDate() + (finalDay === 0 ? 6 : finalDay - 1));
                 dayDate.setHours(0, 0, 0, 0);
-                return dayDate;
-            }
-        })();
 
-        if (!targetDate) return;
-        const targetDateString = targetDate.toDateString();
-
-        // Check for overlapping shifts ONLY on the same day
-        const existingShifts = shifts.filter((s) => 
-            s.staffId === selectedStaff.id && 
-            s.id !== editingShiftId &&
-            s.date.toDate().toDateString() === targetDateString
-        );
-        for (const shift of existingShifts) {
-            const shiftStartsBefore = isTimeBefore(shiftForm.startTime, shift.endTime);
-            const shiftEndsAfter = isTimeBefore(shift.startTime, shiftForm.endTime);
-            if (shiftStartsBefore && shiftEndsAfter) {
-                showNotification('Shift overlaps with existing shift for this staff on this day', 'error');
-                return;
-            }
-        }
-
-        try {
-            const shiftData = {
-                staffId: selectedStaff.id,
-                startTime: shiftForm.startTime,
-                endTime: shiftForm.endTime,
-                updatedAt: Timestamp.now(),
-                updatedBy: userData.id
-            };
-
-            if (isEditingShift && editingShiftId) {
-                const prevShift = shifts.find(s => s.id === editingShiftId);
-                await updateDoc(doc(db, 'shifts', editingShiftId), shiftData);
-                await logRosterAction(editingShiftId, selectedStaff.id, 'EDIT', prevShift, shiftData);
-                showNotification('Shift updated successfully!', 'success');
-            } else {
-                const newShift = {
-                    ...shiftData,
-                    date: Timestamp.fromDate(targetDate),
-                    status: 'APPROVED' as const,
-                    approvedBy: userData.id,
-                    approvedAt: Timestamp.now(),
-                    createdAt: Timestamp.now(),
-                };
-                const docRef = await addDoc(collection(db, 'shifts'), newShift);
-                // No need to log creation as per requirements (only edits/removals), but could be added.
+                await createShift({
+                    staffId: selectedStaff.id,
+                    dateMs: dayDate.getTime(),
+                    startTime: shiftForm.startTime,
+                    endTime: shiftForm.endTime,
+                });
+                showNotification('Shift approved successfully!', 'success');
             }
 
             setShowApprovalModal(false);
@@ -262,7 +201,7 @@ export default function AdminRosterPage() {
             setEditingShiftId(null);
         } catch (error) {
             console.error('Error saving shift:', error);
-            showNotification('Failed to save shift. Please try again.', 'error');
+            showNotification((error as Error).message || 'Failed to save shift. Please try again.', 'error');
         }
     };
 
@@ -270,35 +209,11 @@ export default function AdminRosterPage() {
         if (!window.confirm(`Are you sure you want to remove ${staffMap[shift.staffId]?.name || 'this staff'} from this shift?`)) return;
 
         try {
-            await deleteDoc(doc(db, 'shifts', shift.id!));
-            await logRosterAction(shift.id!, shift.staffId, 'REMOVE', shift);
+            await deleteShift(shift.id!);
             showNotification('Shift removed successfully', 'success');
         } catch (error) {
             console.error('Error removing shift:', error);
-            showNotification('Failed to remove shift', 'error');
-        }
-    };
-
-    const logRosterAction = async (
-        shiftId: string,
-        staffId: string,
-        action: 'EDIT' | 'REMOVE',
-        previousData?: Partial<Shift>,
-        newData?: Partial<Shift>
-    ) => {
-        if (!userData) return;
-        try {
-            await addDoc(collection(db, 'rosterAuditLogs'), {
-                adminId: userData.id,
-                shiftId,
-                staffId,
-                action,
-                previousData: previousData || null,
-                newData: newData || null,
-                timestamp: Timestamp.now(),
-            });
-        } catch (error) {
-            console.error('Error logging roster action:', error);
+            showNotification((error as Error).message || 'Failed to remove shift', 'error');
         }
     };
 

@@ -3,11 +3,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, Timestamp, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, TimeRecord } from '@/types';
-import { getWeekStart, getDayName, formatDate, isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, calculateHours } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
-import { isSignificantOvertime } from '@/lib/geofence';
+import { createManualTimesheet } from '@/app/actions/timesheets';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffListRow from '@/components/staff/StaffListRow';
@@ -178,55 +178,14 @@ export default function StaffTimesheetsPage() {
 
         setSubmitting(shift.id!);
         try {
-            // Check if timesheet already exists to prevent duplicate submissions
-            const q = query(
-                collection(db, 'timesheets'),
-                where('staffId', '==', userData.id),
-                where('shiftId', '==', shift.id!)
-            );
-            const existingSnap = await getDocs(q);
-            // Strictly enforce shop hours (09:00-23:59)
-            if (!isWithinShopHours(workedStart) || !isWithinShopHours(workedEnd)) {
-                showNotification(`Times must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
-                return;
-            }
-
-            // Standardize duration check (reject end <= start)
-            if (calculateHours(workedStart, workedEnd) <= 0) {
-                showNotification('Invalid duration. Worked end must be after start time.', 'error');
-                return;
-            }
-
-            if (!existingSnap.empty) {
-                showNotification('A timesheet for this shift has already been submitted.', 'error');
+            const result = await createManualTimesheet(shift.id!, workedStart, workedEnd);
+            if (result.success) {
+                showNotification('Manual timesheet submitted successfully', 'success');
                 setEditMode(null);
-                return;
             }
-
-            const requiresNote = isSignificantOvertime(workedEnd, shift.endTime);
-
-            const timesheetData: Omit<Timesheet, 'id'> = {
-                staffId: userData.id,
-                shiftId: shift.id!,
-                date: shift.date,
-                weekStartDate: Timestamp.fromDate(getWeekStart(shift.date.toDate())),
-                approvedShiftStart: shift.startTime,
-                approvedShiftEnd: shift.endTime,
-                workedStart: workedStart,
-                workedEnd: workedEnd,
-                status: 'PENDING',
-                source: 'MANUAL',
-                requiresAdminNote: requiresNote,
-                createdAt: serverTimestamp() as Timestamp,
-                updatedAt: serverTimestamp() as Timestamp
-            };
-
-            await addDoc(collection(db, 'timesheets'), timesheetData);
-            showNotification('Manual timesheet submitted successfully', 'success');
-            setEditMode(null);
         } catch (error) {
             console.error('Error submitting timesheet:', error);
-            showNotification('Failed to submit timesheet', 'error');
+            showNotification((error as Error).message || 'Failed to submit timesheet', 'error');
         } finally {
             setSubmitting(null);
         }

@@ -165,3 +165,36 @@ export interface ShopLocation {
     setAt: Timestamp;
     setBy: string;          // admin uid
 }
+
+// ─────────────────────────────────────────────────────────────
+// AUDIT LOGS
+// ─────────────────────────────────────────────────────────────
+
+export interface AuditLog {
+    id?: string;
+    actorId: string; // uid
+    actorRole: UserRole;
+    action: string; // e.g., 'TIMESHEET_APPROVE', 'RATE_CHANGE', 'SHIFT_EDIT'
+    targetCollection: string; // e.g., 'timesheets', 'users'
+    targetDocumentId: string;
+    previousValues?: Record<string, any>;
+    newValues?: Record<string, any>;
+    reason?: string;
+    timestamp: Timestamp;
+}
+
+// ─────────────────────────────────────────────────────────────
+// TIMESHEET CORRECTIONS
+// ─────────────────────────────────────────────────────────────
+
+export interface TimesheetCorrection {
+    id?: string;
+    originalTimesheetId: string;
+    correctedBy: string; // admin uid
+    previousWorkedStart: string;
+    previousWorkedEnd: string;
+    newWorkedStart: string;
+    newWorkedEnd: string;
+    reason: string;
+    createdAt: Timestamp;
+}

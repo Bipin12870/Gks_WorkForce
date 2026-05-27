@@ -4,60 +4,118 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /*
-    GLOBAL DEV MODE
-    ----------------
-    - No Firebase Auth implemented yet
-    - Role logic handled at application level
-    - Internal / hobby project
+    ===== SECURITY MODEL =====
+    - All WRITE operations are performed exclusively via Firebase Admin SDK
+      in Next.js Server Actions. The Admin SDK bypasses these rules entirely.
+    - Client-side code (onSnapshot, getDocs) requires READ access for real-time UI.
+    - Role checks use the `role` field in the /users/{uid} document.
+
+    Helper functions:
     */
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN';
+    }
+
+    function isOwner(staffId) {
+      return isSignedIn() && request.auth.uid == staffId;
+    }
+
     /* USERS
-       - Created and managed by admin via UI
-       - Used for staff profiles and pay rates
+       - Admin: full read
+       - Staff: read own document only
+       - No client writes — managed via Server Actions (Admin SDK)
     */
     match /users/{userId} {
-      allow read, write: if true;
+      allow read: if isAdmin() || isOwner(userId);
+      allow write: if false;
     }
 
     /* AVAILABILITY
-       - Staff submits weekly availability
-       - Admin reviews and approves
+       - Admin: full read
+       - Staff: read own submissions only
+       - No client writes — submitted via Server Actions
     */
     match /availability/{availabilityId} {
-      allow read, write: if true;
+      allow read: if isAdmin() ||
+        (isSignedIn() && resource.data.staffId == request.auth.uid);
+      allow write: if false;
     }
 
-    /* SHIFTS (APPROVED SHIFTS)
-       - Admin creates, edits, approves, deletes
-       - Source of truth for roster + weekly pay
+    /* SHIFTS (ROSTERED SHIFTS)
+       - Admin: full read
+       - Staff: read own approved shifts only
+       - No client writes — managed via Server Actions
     */
     match /shifts/{shiftId} {
-      allow read, write: if true;
+      allow read: if isAdmin() ||
+        (isSignedIn() && resource.data.staffId == request.auth.uid);
+      allow write: if false;
     }
 
-    /* TIME RECORDS (FUTURE USE)
-       - Clock-in / clock-out placeholder
-       - Not active yet
+    /* TIME RECORDS (Clock-in / Clock-out)
+       - Admin: full read
+       - Staff: read own records only
+       - No client writes — managed via Server Actions
     */
     match /timeRecords/{recordId} {
-      allow read, write: if true;
-    }
-    
-    /* TIMESHEETS
-       - Staff submits worked hours
-       - Admin reviews and approves
-    */
-    match /timesheets/{timesheetId} {
-      allow read, write: if true;
-    }
-    
-    match /rosterAuditLogs/{logId} {
-      allow read, write: if true;
+      allow read: if isAdmin() ||
+        (isSignedIn() && resource.data.staffId == request.auth.uid);
+      allow write: if false;
     }
 
-    /* CONFIG (Shop Location, Geofence Settings) */
+    /* TIMESHEETS
+       - Admin: full read
+       - Staff: read own timesheets only
+       - No client writes — managed via Server Actions
+    */
+    match /timesheets/{timesheetId} {
+      allow read: if isAdmin() ||
+        (isSignedIn() && resource.data.staffId == request.auth.uid);
+      allow write: if false;
+    }
+
+    /* TIMESHEET CORRECTIONS (Audit trail for approved timesheet edits)
+       - Admin: read only
+       - No client writes
+    */
+    match /timesheetCorrections/{correctionId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    /* AUDIT LOGS (Unified audit trail)
+       - Admin: read only
+       - No client writes
+    */
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    /* ROSTER AUDIT LOGS (Legacy — kept for backwards compatibility)
+       - Admin: read only
+       - No client writes
+    */
+    match /rosterAuditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    /* CONFIG (Shop location, geofence settings)
+       - Admin: full read
+       - Staff: read only (needed for geofence check on clock-in)
+       - No client writes — managed via Server Actions
+    */
     match /config/{docId} {
-      allow read, write: if true;
+      allow read: if isSignedIn();
+      allow write: if false;
     }
   }
 }

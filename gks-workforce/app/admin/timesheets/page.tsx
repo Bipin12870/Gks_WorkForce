@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, Timestamp, updateDoc, doc, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, User } from '@/types';
-import { getWeekStart, getDayName, calculateHours, isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, hasOverlap } from '@/lib/utils';
+import { getWeekStart, getDayName } from '@/lib/utils';
+import { updateTimesheetStatus } from '@/app/actions/timesheets';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
@@ -170,56 +171,13 @@ function AdminTimesheetsContent() {
         workedEnd?: string,
         note?: string
     ) => {
-        const currentTs = timesheets.find(t => t.id === timesheetId);
-        if (!currentTs) return;
-
-        const finalStart = workedStart || currentTs.workedStart;
-        const finalEnd = workedEnd || currentTs.workedEnd;
-
-        // Strictly enforce shop hours (09:00-23:59)
-        if (!isWithinShopHours(finalStart) || !isWithinShopHours(finalEnd)) {
-            showNotification(`Times must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`, 'error');
-            return;
-        }
-
-        // Standardize duration check (reject end <= start)
-        if (calculateHours(finalStart, finalEnd) <= 0) {
-            showNotification('Invalid duration. Worked end must be after start time.', 'error');
-            return;
-        }
-
-        // Overlap validation for approved timesheets
-        if (status === 'APPROVED') {
-            const overlapsApproved = timesheets.some(
-                (t) =>
-                    t.id !== timesheetId &&
-                    t.staffId === currentTs.staffId &&
-                    t.status === 'APPROVED' &&
-                    t.date.toDate().toDateString() === currentTs.date.toDate().toDateString() &&
-                    hasOverlap(
-                        { start: finalStart, end: finalEnd },
-                        [{ start: t.workedStart, end: t.workedEnd }]
-                    )
-            );
-
-            if (overlapsApproved) {
-                showNotification('This timesheet overlaps with another approved timesheet for this staff member on the same day.', 'error');
-                return;
-            }
-        }
-
         try {
-            const updates: any = { status, updatedAt: Timestamp.now() };
-            if (workedStart) updates.workedStart = workedStart;
-            if (workedEnd) updates.workedEnd = workedEnd;
-            if (note !== undefined) updates.adminNote = note;
-
-            await updateDoc(doc(db, 'timesheets', timesheetId), updates);
+            await updateTimesheetStatus(timesheetId, status, workedStart, workedEnd, note);
             showNotification(`Timesheet ${status.toLowerCase()} successfully`, 'success');
             setShowAdjustModal(false);
         } catch (error) {
             console.error('Error updating timesheet:', error);
-            showNotification('Failed to update timesheet', 'error');
+            showNotification((error as Error).message || 'Failed to update timesheet', 'error');
         }
     };
 

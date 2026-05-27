@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db, auth, firebaseConfig } from '@/lib/firebase';
-import { collection, setDoc, getDocs, updateDoc, doc, Timestamp, query, where, writeBatch, deleteDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
-import { initializeApp, deleteApp } from 'firebase/app';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, query } from 'firebase/firestore';
 import { useNotification } from '@/contexts/NotificationContext';
 import { User } from '@/types';
 import { useRouter } from 'next/navigation';
@@ -17,7 +15,7 @@ import Spinner from '@/components/ui/Spinner';
 import AdminDataTable, { AdminTableHead, AdminTableTh, AdminTableBody, AdminTableRow, AdminTableTd } from '@/components/admin/AdminDataTable';
 import AdminFormModal, { AdminModalFooter } from '@/components/admin/AdminFormModal';
 import { UserPlus } from 'lucide-react';
-import { resetStaffPassword, deleteStaffAccount } from '@/app/actions/staff-actions';
+import { createStaffAccount, updateStaffProfile, toggleStaffActive, resetStaffPassword, deleteStaffAccountFull } from '@/app/actions/staff';
 
 export default function AdminStaffPage() {
     const { userData } = useAuth();
@@ -73,38 +71,12 @@ export default function AdminStaffPage() {
         e.preventDefault();
 
         try {
-            // Construct dummy email for staff username
-            const dummyEmail = `${formData.username.trim()}@internal.gks`;
-
-            // Create a secondary Firebase app to create the user without signing out the admin
-            const tempAppName = `temp-app-${Date.now()}`;
-            const tempApp = initializeApp(firebaseConfig, tempAppName);
-            const tempAuth = getAuth(tempApp);
-
-            // Create Firebase Auth user using the temporary auth instance
-            const userCredential = await createUserWithEmailAndPassword(
-                tempAuth,
-                dummyEmail,
-                formData.password
+            await createStaffAccount(
+                formData.username,
+                formData.password,
+                formData.name,
+                formData.hourlyRate
             );
-
-            const newUser = userCredential.user;
-
-            // Create Firestore user document using the main db instance
-            // We use setDoc with the UID as the document ID to ensure isOwner rules work
-            await setDoc(doc(db, 'users', newUser.uid), {
-                name: formData.name,
-                email: dummyEmail,
-                username: formData.username.trim(),
-                role: 'STAFF',
-                hourlyRate: formData.hourlyRate,
-                isActive: true,
-                createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now(),
-            });
-
-            // Clean up the temporary app
-            await deleteApp(tempApp);
 
             showNotification('Staff account created successfully!', 'success');
             setFormData({ name: '', username: '', password: '', hourlyRate: 25 });
@@ -112,41 +84,29 @@ export default function AdminStaffPage() {
             loadStaff();
         } catch (error: any) {
             console.error('Error creating staff:', error);
-            let message = error.message || 'Failed to create staff account';
-            if (error.code === 'auth/email-already-in-use') {
-                message = 'This username is already taken. Please choose another one.';
-            } else if (error.code === 'auth/weak-password') {
-                message = 'Password is too weak. Please use at least 6 characters.';
-            }
-            showNotification(message, 'error');
+            showNotification(error.message || 'Failed to create staff account', 'error');
         }
     };
 
     const toggleStaffStatus = async (staffId: string, currentStatus: boolean) => {
         try {
-            await updateDoc(doc(db, 'users', staffId), {
-                isActive: !currentStatus,
-                updatedAt: Timestamp.now(),
-            });
+            await toggleStaffActive(staffId, currentStatus);
             loadStaff();
             showNotification(`Staff ${!currentStatus ? 'activated' : 'deactivated'} successfully`, 'success');
         } catch (error) {
             console.error('Error updating staff status:', error);
-            showNotification('Failed to update staff status', 'error');
+            showNotification((error as Error).message || 'Failed to update staff status', 'error');
         }
     };
 
-    const updateHourlyRate = async (staffId: string, newRate: number) => {
+    const updateHourlyRate = async (staffMember: User, newRate: number) => {
         try {
-            await updateDoc(doc(db, 'users', staffId), {
-                hourlyRate: newRate,
-                updatedAt: Timestamp.now(),
-            });
+            await updateStaffProfile(staffMember.id, staffMember.name, newRate);
             loadStaff();
             showNotification('Hourly rate updated successfully', 'success');
         } catch (error) {
             console.error('Error updating hourly rate:', error);
-            showNotification('Failed to update hourly rate', 'error');
+            showNotification((error as Error).message || 'Failed to update hourly rate', 'error');
         }
     };
 
@@ -156,11 +116,7 @@ export default function AdminStaffPage() {
 
         try {
             setLoading(true);
-            await updateDoc(doc(db, 'users', editingStaff.id), {
-                name: editFormData.name,
-                hourlyRate: editFormData.hourlyRate,
-                updatedAt: Timestamp.now(),
-            });
+            await updateStaffProfile(editingStaff.id, editFormData.name, editFormData.hourlyRate);
 
             showNotification('Staff updated successfully!', 'success');
             setShowEditModal(false);
@@ -198,40 +154,7 @@ export default function AdminStaffPage() {
 
         try {
             setLoading(true);
-            const batch = writeBatch(db);
-
-            // 1. Delete all shifts
-            const shiftsQuery = query(collection(db, 'shifts'), where('staffId', '==', staffId));
-            const shiftsSnapshot = await getDocs(shiftsQuery);
-            shiftsSnapshot.forEach((doc) => batch.delete(doc.ref));
-
-            // 2. Delete all availability
-            const availabilityQuery = query(collection(db, 'availability'), where('staffId', '==', staffId));
-            const availabilitySnapshot = await getDocs(availabilityQuery);
-            availabilitySnapshot.forEach((doc) => batch.delete(doc.ref));
-
-            // 3. Delete all time records
-            const timeRecordsQuery = query(collection(db, 'timeRecords'), where('staffId', '==', staffId));
-            const timeRecordsSnapshot = await getDocs(timeRecordsQuery);
-            timeRecordsSnapshot.forEach((doc) => batch.delete(doc.ref));
-
-            // 4. Delete all roster audit logs
-            const auditLogsQuery = query(collection(db, 'rosterAuditLogs'), where('staffId', '==', staffId));
-            const auditLogsSnapshot = await getDocs(auditLogsQuery);
-            auditLogsSnapshot.forEach((doc) => batch.delete(doc.ref));
-
-            // 5. Delete the user document in Firestore
-            batch.delete(doc(db, 'users', staffId));
-
-            // 6. Delete the Firebase Auth account using Server Action
-            // We do this BEFORE the Firestore batch commit to ensure we don't leave orphaned Auth accounts
-            const authDeleteResult = await deleteStaffAccount(staffId);
-            if (!authDeleteResult.success) {
-                throw new Error(`Critical Error: Could not delete the login account (${authDeleteResult.error}). Staff data was not removed. Please try again.`);
-            }
-
-            // Commit the batch
-            await batch.commit();
+            await deleteStaffAccountFull(staffId);
 
             showNotification(`${staffName} and all associated data have been permanently deleted.`, 'success');
             loadStaff();
@@ -252,14 +175,9 @@ export default function AdminStaffPage() {
 
         try {
             setResettingPassword(true);
-            const result = await resetStaffPassword(editingStaff.id, newPassword);
-
-            if (result.success) {
-                showNotification('Password reset successfully!', 'success');
-                setNewPassword('');
-            } else {
-                throw new Error(result.error);
-            }
+            await resetStaffPassword(editingStaff.id, newPassword);
+            showNotification('Password reset successfully!', 'success');
+            setNewPassword('');
         } catch (error: any) {
             console.error('Error resetting password:', error);
             showNotification(error.message || 'Failed to reset password', 'error');
@@ -416,7 +334,7 @@ export default function AdminStaffPage() {
                                                             onChange={(e) => {
                                                                 const value = parseFloat(e.target.value);
                                                                 if (!isNaN(value)) {
-                                                                    updateHourlyRate(member.id, value);
+                                                                    updateHourlyRate(member, value);
                                                                 }
                                                             }}
                                                             className="w-20 px-2 py-1 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-500 focus:bg-white rounded transition-all text-sm font-semibold text-gray-900 outline-none"

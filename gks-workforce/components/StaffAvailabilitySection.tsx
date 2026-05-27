@@ -4,12 +4,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, getDoc, Timestamp, setDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { TimeRange, Availability } from '@/types';
 import {
     getWeekStart,
     getDayName,
-    formatLocalDateKey,
     SHOP_OPEN_TIME,
     SHOP_CLOSE_TIME,
     isTimeBefore,
@@ -19,6 +18,7 @@ import {
     hasOverlap,
     isWithinShopHours,
 } from '@/lib/utils';
+import { submitAvailability } from '@/app/actions/availability';
 import { useNotification } from '@/contexts/NotificationContext';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffAlert from '@/components/staff/StaffAlert';
@@ -240,6 +240,7 @@ export default function StaffAvailabilitySection() {
 
         setLoading(true);
         try {
+            // Client-side validation for immediate UX feedback
             const cleanedAvailability: Record<number, TimeRange[]> = {};
 
             for (const [dayStr, ranges] of Object.entries(availability)) {
@@ -275,48 +276,14 @@ export default function StaffAvailabilitySection() {
                 cleanedAvailability[dayOfWeek] = sortedRanges;
             }
 
-            const weekStart = Timestamp.fromDate(selectedWeek);
-            const weekStartStr = formatLocalDateKey(selectedWeek);
-            const writes: Promise<void>[] = [];
-
-            for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-                if (isDayLocked(dayOfWeek)) continue;
-
-                const dayId = `${userData.id}_${weekStartStr}_${dayOfWeek}`;
-                const docRef = doc(db, 'availability', dayId);
-                const dayRanges = cleanedAvailability[dayOfWeek] || [];
-
-                if (dayRanges.length > 0) {
-                    writes.push(
-                        (async () => {
-                            const existing = await getDoc(docRef);
-                            await setDoc(docRef, {
-                                staffId: userData.id,
-                                weekStartDate: weekStart,
-                                dayOfWeek,
-                                timeRanges: dayRanges,
-                                isRecurring,
-                                status: 'SUBMITTED',
-                                submittedAt: Timestamp.now(),
-                                updatedAt: Timestamp.now(),
-                                createdAt: existing.exists()
-                                    ? (existing.data().createdAt as Timestamp)
-                                    : Timestamp.now(),
-                            });
-                        })()
-                    );
-                } else {
-                    writes.push(deleteDoc(docRef).then(() => undefined));
-                }
-            }
-
-            await Promise.all(writes);
+            // Submit via server action (handles day-lock enforcement, auth, and audit logging)
+            await submitAvailability(selectedWeek.getTime(), cleanedAvailability, isRecurring);
 
             showNotification('Availability submitted successfully!', 'success');
             await loadAvailability();
         } catch (error) {
             console.error('Error submitting availability:', error);
-            showNotification('Failed to submit availability. Please try again.', 'error');
+            showNotification((error as Error).message || 'Failed to submit availability. Please try again.', 'error');
         } finally {
             setLoading(false);
         }

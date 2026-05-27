@@ -31,6 +31,8 @@
   },
   "overrides": {
     "protobufjs": "^7.5.8",
-    "postcss": "^8.5.6"
+    "postcss": "^8.5.6",
+    "@tootallnate/once": ">=2.0.1",
+    "uuid": ">=9.0.1"
   }
 }

@@ -245,7 +245,7 @@ export default function StaffAvailabilitySection() {
 
             for (const [dayStr, ranges] of Object.entries(availability)) {
                 const dayOfWeek = parseInt(dayStr);
-                if (isNaN(dayOfWeek) || isDayLocked(dayOfWeek)) continue;
+                if (isNaN(dayOfWeek)) continue;
 
                 const sortedRanges = [...ranges].sort((a, b) =>
                     isTimeBefore(a.start, b.start) ? -1 : 1

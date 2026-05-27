@@ -48,6 +48,7 @@ export interface Shift {
     createdAt: Timestamp;
     updatedAt?: Timestamp;
     updatedBy?: string;
+    availabilityOverride?: boolean;
 }
 
 export interface RosterAuditLog {

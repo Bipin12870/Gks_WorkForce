@@ -9,18 +9,20 @@ import { getWeekStart, parseTime, isWithinShopHours, hasOverlap, isWithinAvailab
 /**
  * Creates a new rostered shift (Admin only).
  * Validates shop hours, overlap rules, and availability rules on the server.
+ * Pass forceOverride=true to roster outside submitted availability (logged to audit trail).
  */
 export async function createShift(shiftData: {
     staffId: string;
     dateMs: number;
     startTime: string;
     endTime: string;
+    forceOverride?: boolean;
 }) {
     try {
         const adminUser = await requireAdmin();
         const db = getAdminDb();
 
-        const { staffId, dateMs, startTime, endTime } = shiftData;
+        const { staffId, dateMs, startTime, endTime, forceOverride } = shiftData;
 
         // 1. Validate shop hours & duration
         if (!isWithinShopHours(startTime) || !isWithinShopHours(endTime)) {
@@ -44,26 +46,31 @@ export async function createShift(shiftData: {
         const dateTimestamp = admin.firestore.Timestamp.fromDate(targetDate);
         const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStartDate);
 
-        // 2. Validate availability rules
-        const availSnap = await db.collection('availability')
-            .where('staffId', '==', staffId)
-            .where('weekStartDate', '==', weekStartTimestamp)
-            .where('dayOfWeek', '==', dayOfWeek)
-            .where('status', '==', 'SUBMITTED')
-            .get();
+        // 2. Validate availability rules (skip when forceOverride is true)
+        let availabilityOverride = false;
+        if (!forceOverride) {
+            const availSnap = await db.collection('availability')
+                .where('staffId', '==', staffId)
+                .where('weekStartDate', '==', weekStartTimestamp)
+                .where('dayOfWeek', '==', dayOfWeek)
+                .where('status', '==', 'SUBMITTED')
+                .get();
 
-        if (availSnap.empty) {
-            throw new Error('No submitted availability for this staff on this day.');
+            if (availSnap.empty) {
+                throw new Error('AVAILABILITY_CONFLICT:No submitted availability for this staff on this day.');
+            }
+
+            const availabilityData = availSnap.docs[0].data();
+            const timeRanges = availabilityData.timeRanges || [];
+
+            if (!isWithinAvailability(startTime, endTime, timeRanges)) {
+                throw new Error('AVAILABILITY_CONFLICT:Shift must be within staff availability.');
+            }
+        } else {
+            availabilityOverride = true;
         }
 
-        const availabilityData = availSnap.docs[0].data();
-        const timeRanges = availabilityData.timeRanges || [];
-
-        if (!isWithinAvailability(startTime, endTime, timeRanges)) {
-            throw new Error('Shift must be within staff availability.');
-        }
-
-        // 3. Overlap check on the same day
+        // 3. Overlap check on the same day (always enforced)
         const existingShiftsSnap = await db.collection('shifts')
             .where('staffId', '==', staffId)
             .where('date', '==', dateTimestamp)
@@ -92,6 +99,7 @@ export async function createShift(shiftData: {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedBy: adminUser.id,
+            ...(availabilityOverride && { availabilityOverride: true }),
         };
 
         const docRef = await db.collection('shifts').add(newShiftPayload);
@@ -108,6 +116,7 @@ export async function createShift(shiftData: {
                 date: dateTimestamp,
                 startTime,
                 endTime,
+                ...(availabilityOverride && { availabilityOverride: true }),
             },
         });
 
@@ -121,19 +130,21 @@ export async function createShift(shiftData: {
 /**
  * Updates an existing rostered shift (Admin only).
  * Validates overlap and availability constraints against updated times.
+ * Pass forceOverride=true to update outside submitted availability (logged to audit trail).
  */
 export async function updateShift(
     shiftId: string,
     shiftData: {
         startTime: string;
         endTime: string;
+        forceOverride?: boolean;
     }
 ) {
     try {
         const adminUser = await requireAdmin();
         const db = getAdminDb();
 
-        const { startTime, endTime } = shiftData;
+        const { startTime, endTime, forceOverride } = shiftData;
 
         // 1. Fetch existing shift
         const shiftDoc = await db.collection('shifts').doc(shiftId).get();
@@ -161,26 +172,31 @@ export async function updateShift(
         const weekStartDate = getWeekStart(targetDate);
         const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStartDate);
 
-        // 3. Validate availability rules
-        const availSnap = await db.collection('availability')
-            .where('staffId', '==', existingShift.staffId)
-            .where('weekStartDate', '==', weekStartTimestamp)
-            .where('dayOfWeek', '==', dayOfWeek)
-            .where('status', '==', 'SUBMITTED')
-            .get();
+        // 3. Validate availability rules (skip when forceOverride is true)
+        let availabilityOverride = false;
+        if (!forceOverride) {
+            const availSnap = await db.collection('availability')
+                .where('staffId', '==', existingShift.staffId)
+                .where('weekStartDate', '==', weekStartTimestamp)
+                .where('dayOfWeek', '==', dayOfWeek)
+                .where('status', '==', 'SUBMITTED')
+                .get();
 
-        if (availSnap.empty) {
-            throw new Error('No submitted availability for this staff on this day.');
+            if (availSnap.empty) {
+                throw new Error('AVAILABILITY_CONFLICT:No submitted availability for this staff on this day.');
+            }
+
+            const availabilityData = availSnap.docs[0].data();
+            const timeRanges = availabilityData.timeRanges || [];
+
+            if (!isWithinAvailability(startTime, endTime, timeRanges)) {
+                throw new Error('AVAILABILITY_CONFLICT:Shift must be within staff availability.');
+            }
+        } else {
+            availabilityOverride = true;
         }
 
-        const availabilityData = availSnap.docs[0].data();
-        const timeRanges = availabilityData.timeRanges || [];
-
-        if (!isWithinAvailability(startTime, endTime, timeRanges)) {
-            throw new Error('Shift must be within staff availability.');
-        }
-
-        // 4. Overlap check on the same day (excluding current shift)
+        // 4. Overlap check on the same day (always enforced, excluding current shift)
         const existingShiftsSnap = await db.collection('shifts')
             .where('staffId', '==', existingShift.staffId)
             .where('date', '==', existingShift.date)
@@ -205,6 +221,7 @@ export async function updateShift(
             endTime,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedBy: adminUser.id,
+            ...(availabilityOverride && { availabilityOverride: true }),
         };
 
         await db.collection('shifts').doc(shiftId).update(updatePayload);
@@ -223,6 +240,7 @@ export async function updateShift(
             newValues: {
                 startTime,
                 endTime,
+                ...(availabilityOverride && { availabilityOverride: true }),
             },
         });
 

@@ -26,10 +26,11 @@ export async function getCurrentUser(): Promise<User | null> {
             return null;
         }
 
-        const userData = userDoc.data();
+        const userData = userDoc.data() || {};
         return {
             id: userDoc.id,
             ...userData,
+            isActive: userData.isActive !== false,
         } as User;
     } catch (error) {
         console.error('Error getting current user:', error);

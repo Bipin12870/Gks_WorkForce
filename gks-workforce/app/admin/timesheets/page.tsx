@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, User } from '@/types';
 import { getWeekStart, getDayName } from '@/lib/utils';
-import { updateTimesheetStatus } from '@/app/actions/timesheets';
+import { updateTimesheetStatus, correctTimesheet } from '@/app/actions/timesheets';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
@@ -369,12 +369,27 @@ function AdminTimesheetsContent() {
                     selectedTimesheet ? (
                         <AdminModalFooter
                             onCancel={() => setShowAdjustModal(false)}
-                            onPrimary={() => {
-                                if (selectedTimesheet.requiresAdminNote && !adminNote.trim()) {
-                                    showNotification('Admin note is required to resolve this record', 'error');
-                                    return;
+                            onPrimary={async () => {
+                                if (selectedTimesheet.status === 'APPROVED') {
+                                    if (!adminNote.trim()) {
+                                        showNotification('Admin note is required for corrections', 'error');
+                                        return;
+                                    }
+                                    try {
+                                        await correctTimesheet(selectedTimesheet.id!, adjustStart, adjustEnd, adminNote);
+                                        showNotification('Timesheet corrected successfully', 'success');
+                                        setShowAdjustModal(false);
+                                    } catch (error) {
+                                        console.error('Error correcting timesheet:', error);
+                                        showNotification((error as Error).message || 'Failed to correct timesheet', 'error');
+                                    }
+                                } else {
+                                    if (selectedTimesheet.requiresAdminNote && !adminNote.trim()) {
+                                        showNotification('Admin note is required to resolve this record', 'error');
+                                        return;
+                                    }
+                                    handleUpdateStatus(selectedTimesheet.id!, 'APPROVED', adjustStart, adjustEnd, adminNote);
                                 }
-                                handleUpdateStatus(selectedTimesheet.id!, 'APPROVED', adjustStart, adjustEnd, adminNote);
                             }}
                             primaryLabel={
                                 selectedTimesheet.requiresAdminNote && selectedTimesheet.status === 'PENDING'

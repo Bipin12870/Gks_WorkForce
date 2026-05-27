@@ -180,14 +180,14 @@ export default function AdminSettingsPage() {
                         {/* Divider */}
                         <div className="flex items-center gap-3 mb-6">
                             <div className="flex-1 h-px bg-gray-100" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">or enter manually</span>
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">or enter manually</span>
                             <div className="flex-1 h-px bg-gray-100" />
                         </div>
 
                         {/* Coordinate Inputs */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                             <div>
-                                <label className="block text-xs font-black text-gray-600 uppercase tracking-wider mb-2">
+                                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
                                     Latitude
                                 </label>
                                 <input
@@ -202,7 +202,7 @@ export default function AdminSettingsPage() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-black text-gray-600 uppercase tracking-wider mb-2">
+                                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
                                     Longitude
                                 </label>
                                 <input
@@ -220,7 +220,7 @@ export default function AdminSettingsPage() {
 
                         {/* Location Name */}
                         <div className="mb-6">
-                            <label className="block text-xs font-black text-gray-600 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">
                                 Location Name
                             </label>
                             <input
@@ -235,10 +235,10 @@ export default function AdminSettingsPage() {
                         {/* Radius Slider */}
                         <div className="mb-8">
                             <div className="flex justify-between items-center mb-2">
-                                <label className="text-xs font-black text-gray-600 uppercase tracking-wider">
+                                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
                                     Geofence Radius
                                 </label>
-                                <span className="text-sm font-black text-blue-600 tabular-nums">
+                                <span className="text-sm font-semibold text-blue-600 tabular-nums">
                                     {radiusNum}m
                                 </span>
                             </div>
@@ -251,7 +251,7 @@ export default function AdminSettingsPage() {
                                 onChange={(e) => setRadius(e.target.value)}
                                 className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer accent-blue-600"
                             />
-                            <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
+                            <div className="flex justify-between text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">
                                 <span>10m</span>
                                 <span>Recommended: 100m</span>
                                 <span>500m</span>
@@ -274,7 +274,7 @@ export default function AdminSettingsPage() {
                                     <div className="relative w-3 h-3 rounded-full bg-blue-600 shadow z-10" />
                                 </div>
                             </div>
-                            <p className="text-center text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
+                            <p className="text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">
                                 {radiusNum}m radius from shop
                             </p>
                         </div>

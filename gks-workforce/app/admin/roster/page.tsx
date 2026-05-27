@@ -26,7 +26,7 @@ import Badge from '@/components/ui/Badge';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
-import { CalendarDays, LayoutList } from 'lucide-react';
+import { CalendarDays, LayoutList, AlertTriangle, Calendar } from 'lucide-react';
 
 export default function AdminRosterPage() {
     const { userData } = useAuth();
@@ -535,6 +535,18 @@ export default function AdminRosterPage() {
                 {selectedStaff && (
                     (() => {
                         const hasConflict = !isWithinAvailability(shiftForm.startTime, shiftForm.endTime, selectedStaff.ranges || []);
+                        
+                        // Check if target date is in the past
+                        const targetDate = new Date(selectedWeek);
+                        const shiftDay = selectedStaff.dayOfWeek ?? selectedDay;
+                        const finalDay = shiftDay === -1 ? new Date().getDay() : shiftDay;
+                        targetDate.setDate(targetDate.getDate() + (finalDay === 0 ? 6 : finalDay - 1));
+                        targetDate.setHours(0, 0, 0, 0);
+                        
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const isPastDate = targetDate.getTime() < today.getTime();
+
                         return (
                             <>
                                 <div className="mb-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
@@ -549,6 +561,17 @@ export default function AdminRosterPage() {
                                         ))
                                     )}
                                 </div>
+
+                                {isPastDate && (
+                                    <div className="mb-4 p-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold flex gap-2.5 items-start">
+                                        <Calendar size={16} className="text-slate-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-semibold text-slate-800">Past Date Warning</p>
+                                            <p className="text-slate-600 mt-0.5">You are scheduling a rostered shift for a day that has already passed.</p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="space-y-4">
                                     <div>
                                         <label className="text-label block mb-1">Shift start</label>
@@ -569,9 +592,12 @@ export default function AdminRosterPage() {
 
                                     {hasConflict && (
                                         <div className="space-y-3 pt-2">
-                                            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-semibold space-y-1">
-                                                <p className="font-extrabold text-amber-800">⚠️ Availability Conflict</p>
-                                                <p>This shift falls outside the staff member's submitted availability times.</p>
+                                            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-semibold flex gap-2.5 items-start">
+                                                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="font-semibold text-amber-800">Availability Conflict</p>
+                                                    <p className="text-amber-700 mt-0.5">This shift falls outside the staff member's submitted availability times.</p>
+                                                </div>
                                             </div>
                                             <label className="flex items-center gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/50 transition-colors">
                                                 <input
@@ -580,7 +606,7 @@ export default function AdminRosterPage() {
                                                     onChange={(e) => setForceOverride(e.target.checked)}
                                                     className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 focus:ring-offset-0"
                                                 />
-                                                <span className="text-xs font-bold text-slate-700 select-none">
+                                                <span className="text-xs font-semibold text-slate-700 select-none">
                                                     Force override availability limits
                                                 </span>
                                             </label>

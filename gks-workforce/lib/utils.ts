@@ -1,7 +1,7 @@
 /**
  * Operating hours constants
  */
-export const SHOP_OPEN_TIME = '09:00';
+export const SHOP_OPEN_TIME = '05:00'; // TODO: revert to '09:00' after testing
 export const SHOP_CLOSE_TIME = '23:59';
 
 /**
@@ -131,8 +131,8 @@ export function processTimesheetAutomation(
     result.payroll.roundedPayableMinutes = Math.round(rawMinutes / 5) * 5;
 
     // 4. CLASSIFICATION ENGINE (Flags & Bounds)
-    // Store Hours (09:00 - 23:59)
-    const shopOpenTotal = 9 * 60;
+    // Store Hours (05:00 - 23:59) — TODO: revert to 09:00 after testing
+    const shopOpenTotal = 5 * 60;
     const shopCloseTotal = 23 * 60 + 59;
 
     if (startTotal < shopOpenTotal || endTotal > shopCloseTotal) {
@@ -179,7 +179,9 @@ export function processTimesheetAutomation(
     result.classification.flags = flags;
 
     // 5. APPROVAL ENGINE (Hybrid Logic)
-    if (isManualEdit) {
+    if (!roster) {
+        result.approval = { status: 'NEEDS_REVIEW', reason: 'Unscheduled shift — no roster entry found. Admin must verify.' };
+    } else if (isManualEdit) {
         result.approval = { status: 'NEEDS_REVIEW', reason: 'Manual admin adjustment requires verification' };
     } else if (flags.includes('AFTER_HOURS') || flags.includes('GPS_OUTSIDE')) {
         result.approval = { status: 'FLAGGED', reason: 'Policy violation detected (After-hours or GPS mismatch)' };

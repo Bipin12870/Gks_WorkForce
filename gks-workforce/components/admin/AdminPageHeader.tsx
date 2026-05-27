@@ -10,8 +10,8 @@ export default function AdminPageHeader({ title, description, actions }: AdminPa
     return (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
             <div className="min-w-0">
-                <h1 className="text-page-title">{title}</h1>
-                {description && <p className="text-sm text-gray-500 mt-1 max-w-2xl">{description}</p>}
+                <h1 className="text-lg font-semibold text-gray-900 tracking-tight">{title}</h1>
+                {description && <p className="text-sm text-gray-400 font-normal mt-0.5 max-w-2xl">{description}</p>}
             </div>
             {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
         </div>

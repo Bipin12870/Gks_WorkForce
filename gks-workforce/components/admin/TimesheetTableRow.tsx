@@ -58,28 +58,38 @@ export default function TimesheetTableRow({
 
     // Style variance badge
     const getVarianceBadge = (val: number) => {
-        if (val === 0) return <span className="text-slate-350 font-normal text-xs">-</span>;
+        if (val === 0) return <span className="text-gray-300 font-normal text-xs">—</span>;
         const sign = val > 0 ? '+' : '';
         const text = `${sign}${val.toFixed(2)}h`;
         const cls =
             val > 0.5
-                ? 'bg-amber-50/50 text-amber-800 border-amber-200/40'
+                ? 'text-amber-600 border-amber-200 bg-amber-50/40'
                 : val > 0
-                ? 'bg-emerald-50/60 text-emerald-800 border-emerald-250/20'
-                : 'bg-rose-50/50 text-rose-800 border-rose-200/40';
-        return <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-sm border ${cls}`}>{text}</span>;
+                ? 'text-emerald-600 border-emerald-200 bg-emerald-50/40'
+                : 'text-rose-500 border-rose-200 bg-rose-50/40';
+        return <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${cls}`}>{text}</span>;
     };
+
+    const statusBorderColor =
+        ts.status === 'APPROVED' ? 'border-l-emerald-500' :
+        ts.status === 'REJECTED' ? 'border-l-rose-500' :
+        'border-l-amber-400';
+
+    const connectorColor =
+        ts.status === 'APPROVED' ? 'border-emerald-200' :
+        ts.status === 'REJECTED' ? 'border-rose-200' :
+        'border-amber-200';
 
     return (
         <>
             <tr
-                className={`border-b border-slate-100/70 transition-all hover:bg-slate-50/50 cursor-pointer ${
-                    isSelected ? 'bg-slate-50 hover:bg-slate-100/40' : ''
+                className={`border-b border-gray-50 transition-all hover:bg-gray-50/60 cursor-pointer ${
+                    isSelected ? 'bg-blue-50/30 hover:bg-blue-50/40' : ''
                 }`}
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 {/* Bulk Select Checkbox */}
-                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                <td className={`border-l-4 ${statusBorderColor} px-4 py-3`} onClick={(e) => e.stopPropagation()}>
                     {ts.status === 'PENDING' && !ts.requiresAdminNote && ts.workedStart ? (
                         <input
                             type="checkbox"
@@ -93,51 +103,51 @@ export default function TimesheetTableRow({
                 </td>
 
                 {/* Staff Info */}
-                <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-6 h-6 rounded bg-slate-100 border border-slate-200/50 text-slate-550 flex items-center justify-center text-[10px] font-bold uppercase tracking-wider select-none shrink-0">
+                <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 text-gray-500 flex items-center justify-center text-[10px] font-semibold uppercase tracking-wide select-none shrink-0">
                             {getInitials(staffName)}
                         </div>
-                        <span className="font-medium text-slate-900 text-sm truncate max-w-[140px]" title={staffName}>
+                        <span className="font-medium text-gray-900 text-sm truncate max-w-[140px]" title={staffName}>
                             {staffName}
                         </span>
                     </div>
                 </td>
 
                 {/* Date & Day */}
-                <td className="px-4 py-3 text-slate-700 text-sm font-medium tabular-nums">
+                <td className="px-5 py-4 text-gray-600 text-sm font-medium tabular-nums">
                     {formatDate(ts.date.toDate())}
                 </td>
 
                 {/* Rostered Schedule */}
-                <td className="px-4 py-3">
+                <td className="px-5 py-4">
                     <div className="flex flex-col">
-                        <span className="text-slate-500 text-sm font-medium tabular-nums">
-                            {ts.approvedShiftStart ? `${ts.approvedShiftStart}–${ts.approvedShiftEnd}` : 'Unscheduled'}
+                        <span className="text-gray-500 text-sm font-medium tabular-nums">
+                            {ts.approvedShiftStart ? `${ts.approvedShiftStart}\u2013${ts.approvedShiftEnd}` : 'Unscheduled'}
                         </span>
                         {ts.approvedShiftStart && (
-                            <span className="text-[10px] text-slate-400 font-medium">{approvedHours.toFixed(2)}h rostered</span>
+                            <span className="text-[10px] text-gray-400 font-medium mt-0.5">{approvedHours.toFixed(2)}h rostered</span>
                         )}
                     </div>
                 </td>
 
                 {/* Worked Actuals */}
-                <td className="px-4 py-3">
+                <td className="px-5 py-4">
                     <div className="flex flex-col">
-                        <span className={`text-sm font-semibold tabular-nums ${!ts.workedStart ? 'text-amber-600 font-medium' : 'text-slate-900'}`}>
-                            {ts.workedStart ? `${ts.workedStart}–${ts.workedEnd}` : 'No clock-in'}
+                        <span className={`text-sm font-medium tabular-nums ${!ts.workedStart ? 'text-amber-600' : 'text-gray-900'}`}>
+                            {ts.workedStart ? `${ts.workedStart}\u2013${ts.workedEnd}` : 'No clock-in'}
                         </span>
                         {ts.workedStart && (
-                            <span className="text-[10px] text-slate-550 font-medium">{workedHours.toFixed(2)}h clocked</span>
+                            <span className="text-[10px] text-gray-400 font-medium mt-0.5">{workedHours.toFixed(2)}h clocked</span>
                         )}
                     </div>
                 </td>
 
                 {/* Variance */}
-                <td className="px-4 py-3">{getVarianceBadge(diff)}</td>
+                <td className="px-5 py-4">{getVarianceBadge(diff)}</td>
 
                 {/* Source & Integrity */}
-                <td className="px-4 py-3">
+                <td className="px-5 py-4">
                     <div className="flex flex-col gap-1 items-start">
                         <TimesheetSourceBadge source={ts.source} distanceMetres={ts.clockOutDistanceMetres} />
                         {automation.approval.status !== 'AUTO_APPROVED' && (
@@ -147,36 +157,36 @@ export default function TimesheetTableRow({
                 </td>
 
                 {/* Row Actions */}
-                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-1 justify-end">
+                <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2 justify-end">
                         {ts.status === 'PENDING' && (
                             <>
                                 {!ts.requiresAdminNote && ts.workedStart && (
                                     <button
                                         onClick={onQuickApprove}
                                         title="Approve immediately"
-                                        className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50/60 hover:border-emerald-255/40 transition-all border border-transparent rounded-md cursor-pointer"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium text-emerald-600 border border-emerald-300 rounded-full hover:bg-emerald-50 transition-all cursor-pointer"
                                     >
-                                        <Check size={14} />
+                                        <Check size={11} /> Approve
                                     </button>
                                 )}
                                 <button
                                     onClick={onReview}
                                     title={ts.requiresAdminNote ? "Requires admin review" : "Review & adjust details"}
-                                    className={`p-1.5 transition-all border border-transparent rounded-md cursor-pointer ${
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium border rounded-full transition-all cursor-pointer ${
                                         ts.requiresAdminNote || !ts.workedStart
-                                            ? "text-amber-600 hover:text-amber-705 hover:bg-amber-50 hover:border-amber-200/60"
-                                            : "text-slate-400 hover:text-slate-700 hover:bg-slate-50 hover:border-slate-200"
+                                            ? "text-amber-600 border-amber-300 hover:bg-amber-50"
+                                            : "text-gray-500 border-gray-200 hover:bg-gray-50"
                                     }`}
                                 >
-                                    <Edit2 size={14} />
+                                    <Edit2 size={11} /> Review
                                 </button>
                                 <button
                                     onClick={onReject}
                                     title="Reject shift"
-                                    className="p-1.5 text-slate-400 hover:text-red-650 hover:bg-red-50/65 hover:border-red-200/40 transition-all border border-transparent rounded-md cursor-pointer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium text-red-500 border border-red-200 rounded-full hover:bg-red-50 transition-all cursor-pointer"
                                 >
-                                    <X size={14} />
+                                    <X size={11} /> Reject
                                 </button>
                             </>
                         )}
@@ -184,119 +194,95 @@ export default function TimesheetTableRow({
                             <button
                                 onClick={onReview}
                                 title="Submit correction / edit note"
-                                className="px-2 py-0.5 text-[11px] font-semibold border border-slate-200 rounded hover:bg-slate-50 text-slate-600 transition-colors flex items-center gap-1 cursor-pointer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium text-gray-500 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors cursor-pointer"
                             >
-                                <Edit2 size={10} /> Correct
+                                <Edit2 size={11} /> Correct
                             </button>
                         )}
                         {ts.status === 'REJECTED' && (
                             <button
                                 onClick={onReview}
                                 title="Re-review & approve"
-                                className="px-2 py-0.5 text-[11px] font-semibold border border-slate-200 rounded hover:bg-slate-50 text-slate-655 transition-colors flex items-center gap-1 cursor-pointer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium text-gray-500 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors cursor-pointer"
                             >
                                 Review
                             </button>
                         )}
-                        <button className="p-1 text-slate-400 hover:text-slate-600 ml-0.5 cursor-pointer">
-                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        {/* Expand toggle — icon pill */}
+                        <button
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            title={isExpanded ? 'Collapse' : 'Expand details'}
+                            className="inline-flex items-center justify-center w-7 h-7 text-gray-400 border border-gray-200 rounded-full hover:bg-gray-50 hover:text-gray-600 transition-all cursor-pointer"
+                        >
+                            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                         </button>
                     </div>
                 </td>
             </tr>
 
-            {/* Expanded Detailed Audit Panel */}
+            {/* Expanded Detailed Audit Panel — flows from parent row */}
             {isExpanded && (
-                <tr className="bg-slate-50/30">
-                    <td colSpan={8} className="px-6 py-4 border-b border-slate-100/60">
-                        <div className="border border-slate-200/80 rounded-xl bg-white p-5 shadow-xs flex flex-col gap-5">
-                            {/* Comparison Column Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                {/* Column 1: Roster */}
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                        Rostered Schedule
+                <tr className="bg-blue-50/20">
+                    <td colSpan={8} className="pb-4 pt-0 border-b border-gray-100">
+                        {/* Left connector bar — visually links to parent row */}
+                        <div className={`ml-[4.5rem] mr-6 border-l-2 ${connectorColor} pl-5`}>
+
+                            {/* Data columns */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4 py-4">
+
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Rostered</span>
+                                    <span className="text-sm font-medium text-gray-700 tabular-nums">
+                                        {ts.approvedShiftStart ? `${ts.approvedShiftStart} – ${ts.approvedShiftEnd}` : '—'}
                                     </span>
-                                    <span className="text-sm font-semibold text-slate-800 tabular-nums">
-                                        {ts.approvedShiftStart ? `${ts.approvedShiftStart} – ${ts.approvedShiftEnd}` : 'Unscheduled'}
-                                    </span>
-                                    <span className="text-xs text-slate-500 font-medium">
-                                        {ts.approvedShiftStart ? `${approvedHours.toFixed(2)}h expected` : 'No roster entry'}
+                                    <span className="text-xs text-gray-400">
+                                        {ts.approvedShiftStart ? `${approvedHours.toFixed(2)}h expected` : 'Unscheduled shift'}
                                     </span>
                                 </div>
 
-                                {/* Column 2: Clocked */}
-                                <div className="flex flex-col gap-1 md:pl-6 md:border-l border-slate-100">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                        Clocked Actuals
-                                    </span>
-                                    <span className={`text-sm font-semibold tabular-nums ${!ts.workedStart ? 'text-slate-400 font-medium' : 'text-slate-800'}`}>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Clocked</span>
+                                    <span className={`text-sm font-medium tabular-nums ${!ts.workedStart ? 'text-gray-400' : 'text-gray-700'}`}>
                                         {ts.workedStart ? `${ts.workedStart} – ${ts.workedEnd}` : 'No clock-in'}
                                     </span>
-                                    <span className="text-xs text-slate-500 font-medium">
-                                        {ts.workedStart ? `${workedHours.toFixed(2)}h tracked` : 'No recorded activity'}
+                                    <span className="text-xs text-gray-400">
+                                        {ts.workedStart ? `${workedHours.toFixed(2)}h tracked` : 'No activity recorded'}
                                     </span>
                                 </div>
 
-                                {/* Column 3: Payable & Variance */}
-                                <div className="flex flex-col gap-1 md:pl-6 md:border-l border-slate-100">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                        Rounded Payable
-                                    </span>
-                                    <span className="text-sm font-bold text-emerald-700 tabular-nums">
-                                        {payableHours.toFixed(2)}h
-                                    </span>
-                                    <span className={`text-xs font-semibold ${
-                                        !ts.approvedShiftStart 
-                                            ? 'text-slate-400' 
-                                            : diff > 0.5 
-                                                ? 'text-amber-600' 
-                                                : diff > 0 
-                                                    ? 'text-emerald-750' 
-                                                    : diff < 0 
-                                                        ? 'text-rose-600' 
-                                                        : 'text-slate-400'
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payable</span>
+                                    <span className="text-sm font-semibold text-emerald-600 tabular-nums">{payableHours.toFixed(2)}h</span>
+                                    <span className={`text-xs ${
+                                        !ts.approvedShiftStart ? 'text-gray-400'
+                                        : diff > 0.5 ? 'text-amber-500'
+                                        : diff > 0 ? 'text-emerald-500'
+                                        : diff < 0 ? 'text-red-400'
+                                        : 'text-gray-400'
                                     }`}>
-                                        {!ts.approvedShiftStart 
-                                            ? 'Unscheduled shift' 
-                                            : diff === 0 
-                                                ? 'Match' 
-                                                : `Variance: ${diff > 0 ? '+' : ''}${diff.toFixed(2)}h`}
+                                        {!ts.approvedShiftStart ? 'Unscheduled'
+                                            : diff === 0 ? 'On time'
+                                            : `${diff > 0 ? '+' : ''}${diff.toFixed(2)}h variance`}
                                     </span>
                                 </div>
 
-                                {/* Column 4: System Audit */}
-                                <div className="flex flex-col gap-1 md:pl-6 md:border-l border-slate-100">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                        Audit Trail
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Flags</span>
+                                    {automation.classification.flags.length > 0
+                                        ? <TimesheetFlagChips flags={automation.classification.flags} />
+                                        : <span className="text-xs text-gray-400">None</span>
+                                    }
+                                    <span className="text-xs text-gray-400">
+                                        {ts.clockOutDistanceMetres != null ? `${ts.clockOutDistanceMetres}m from site` : 'GPS verified'}
                                     </span>
-                                    <span className="text-sm font-semibold text-slate-800 capitalize">
-                                        {ts.source.toLowerCase().replace(/_/g, ' ')}
-                                    </span>
-                                    <div className="flex flex-col gap-1 items-start">
-                                        <span className="text-xs text-slate-500 font-medium">
-                                            {ts.clockOutDistanceMetres != null 
-                                                ? `${ts.clockOutDistanceMetres}m from shop` 
-                                                : 'GPS verified'}
-                                        </span>
-                                        {automation.classification.flags.length > 0 && (
-                                            <div className="mt-1">
-                                                <TimesheetFlagChips flags={automation.classification.flags} />
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
                             </div>
 
-                            {/* Column 5: Notes Callout */}
+                            {/* Admin note */}
                             {ts.adminNote && (
-                                <div className="pt-4 border-t border-slate-100">
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                                        Admin Resolution Note
-                                    </span>
-                                    <div className="bg-slate-50/50 border border-slate-200/50 p-3 rounded-lg text-xs text-slate-650 leading-relaxed max-w-4xl border-l-2 border-l-slate-400 font-medium">
-                                        {ts.adminNote}
-                                    </div>
+                                <div className="pt-3 border-t border-gray-100/80">
+                                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Admin note</p>
+                                    <p className="text-xs text-gray-600 leading-relaxed">{ts.adminNote}</p>
                                 </div>
                             )}
                         </div>

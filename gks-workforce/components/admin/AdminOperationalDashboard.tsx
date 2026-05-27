@@ -126,8 +126,12 @@ export default function AdminOperationalDashboard() {
         });
         const unsubActive = onSnapshot(qActiveClocks, (snapshot) => {
             const list: TimeRecord[] = [];
+            const todayStartMs = startOfToday.getTime();
             snapshot.forEach((doc) => {
-                list.push({ id: doc.id, ...doc.data() } as TimeRecord);
+                const rec = { id: doc.id, ...doc.data() } as TimeRecord;
+                if (rec.clockInTime && rec.clockInTime.toDate().getTime() >= todayStartMs) {
+                    list.push(rec);
+                }
             });
             setActiveRecords(list);
         });
@@ -257,12 +261,12 @@ export default function AdminOperationalDashboard() {
                 
                 <div className="relative z-10">
 
-                    <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight mt-3 text-slate-900">
+                    <h1 className="text-xl sm:text-3xl font-semibold tracking-tight mt-3 text-slate-900">
                         Good Evening, Tony
                     </h1>
                     <p className="text-sm sm:text-base text-slate-600 mt-1.5 max-w-md">
                         Today is {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}. 
-                        There are currently <strong className="text-blue-700 font-bold">{activeWorkingCount} staff</strong> clocked in.
+                        There are currently <strong className="text-blue-700 font-semibold">{activeWorkingCount} staff</strong> clocked in.
                     </p>
                 </div>
             </div>
@@ -303,7 +307,7 @@ export default function AdminOperationalDashboard() {
                     <Card className="p-5 shadow-sm border border-slate-200 h-full">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
                             <div>
-                                <h2 className="text-base font-bold text-slate-800">Live Shop Crew</h2>
+                                <h2 className="text-base font-semibold text-slate-800">Live Shop Crew</h2>
                                 <p className="text-xs text-slate-400 mt-0.5">Real-time attendance & schedule mapping</p>
                             </div>
                             <span className="flex h-2 w-2 relative">
@@ -320,10 +324,10 @@ export default function AdminOperationalDashboard() {
                                 </div>
                             ) : crewStatusList.filter(c => c.status !== 'off').length === 0 ? (
                                 <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                                    <p className="text-sm font-bold text-slate-500">No shifts scheduled for today.</p>
+                                    <p className="text-sm font-semibold text-slate-500">No shifts scheduled for today.</p>
                                     <button 
                                         onClick={() => router.push('/admin/roster')}
-                                        className="text-xs font-bold text-blue-600 hover:text-blue-700 mt-2 block mx-auto underline"
+                                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 mt-2 block mx-auto underline"
                                     >
                                         Go schedule shifts
                                     </button>
@@ -334,7 +338,7 @@ export default function AdminOperationalDashboard() {
                                     .map((member) => (
                                         <div key={member.staffId} className="flex items-center justify-between py-3">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 shadow-xs border ${
+                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 shadow-xs border ${
                                                     member.status === 'working' || member.status === 'unscheduled_working'
                                                         ? 'bg-emerald-100 border-emerald-200 text-emerald-700'
                                                         : member.status === 'late'
@@ -346,7 +350,7 @@ export default function AdminOperationalDashboard() {
                                                     {member.initials}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-bold text-slate-800 truncate">{member.name}</p>
+                                                    <p className="text-sm font-semibold text-slate-800 truncate">{member.name}</p>
                                                     <p className="text-xs text-slate-400 font-medium">
                                                         {member.status === 'working' && `Clocked in: ${member.clockInTime}`}
                                                         {member.status === 'unscheduled_working' && `Unscheduled · Clocked in: ${member.clockInTime}`}
@@ -386,13 +390,13 @@ export default function AdminOperationalDashboard() {
                 <div className="lg:col-span-1">
                     <Card className="p-5 shadow-sm border border-slate-200 h-full flex flex-col justify-between">
                         <div>
-                            <h2 className="text-base font-bold text-slate-800">Labor Hours Progress</h2>
+                            <h2 className="text-base font-semibold text-slate-800">Labor Hours Progress</h2>
                             <p className="text-xs text-slate-400 mt-0.5 mb-6">Comparison of rostered budget vs. actual hours today</p>
                             
                             <div className="space-y-4">
-                                <div className="flex justify-between text-xs font-bold text-slate-600">
+                                <div className="flex justify-between text-xs font-semibold text-slate-600">
                                     <span>Rostered Budget: {scheduledHoursTotal.toFixed(1)} hrs</span>
-                                    <span className="text-blue-600 font-extrabold">Actual: {workedHoursTotal.toFixed(1)} hrs</span>
+                                    <span className="text-blue-600 font-semibold">Actual: {workedHoursTotal.toFixed(1)} hrs</span>
                                 </div>
                                 <div className="w-full h-3.5 bg-slate-100 rounded-full overflow-hidden flex">
                                     <div 
@@ -412,7 +416,7 @@ export default function AdminOperationalDashboard() {
                             <span>Last updated: just now</span>
                             <button 
                                 onClick={() => router.push('/admin/hours')}
-                                className="text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1 transition-colors"
+                                className="text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1 transition-colors"
                             >
                                 View summary <ArrowRight size={12} />
                             </button>

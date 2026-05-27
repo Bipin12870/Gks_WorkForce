@@ -55,7 +55,7 @@ export default function TimePicker({ value, onChange, disabled, className = '' }
                     ))}
                 </select>
             </div>
-            <span className="text-gray-400 font-bold">:</span>
+            <span className="text-gray-400 font-semibold">:</span>
             <div className="flex-1">
                 <select
                     value={minutes}

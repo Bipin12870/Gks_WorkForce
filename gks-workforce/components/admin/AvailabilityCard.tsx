@@ -43,7 +43,7 @@ export default function AvailabilityCard({
                 {timeRanges.map((range, idx) => (
                     <span
                         key={idx}
-                        className="text-xs font-medium text-gray-700 bg-gray-50 px-2 py-1 rounded-md border border-gray-100 tabular-nums"
+                        className="text-[11px] font-medium text-gray-600 bg-gray-50/60 px-2.5 py-0.5 rounded-full border border-gray-200/50 tabular-nums"
                     >
                         {range.start} – {range.end}
                     </span>

@@ -157,7 +157,7 @@ function DashboardCard({ title, description, icon, onClick, badgeCount, isWarnin
                 }`}
         >
             {badgeCount && badgeCount > 0 ? (
-                <div className={`absolute top-4 right-4 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 text-white text-[10px] font-black rounded-full shadow-sm ring-2 ring-white animate-in zoom-in duration-300 ${isWarning ? 'bg-amber-600' : 'bg-red-600'
+                <div className={`absolute top-4 right-4 flex items-center justify-center min-w-[20px] h-[20px] px-1.5 text-white text-[10px] font-semibold rounded-full shadow-sm ring-2 ring-white animate-in zoom-in duration-300 ${isWarning ? 'bg-amber-600' : 'bg-red-600'
                     }`}>
                     {badgeCount}
                 </div>
@@ -166,7 +166,7 @@ function DashboardCard({ title, description, icon, onClick, badgeCount, isWarnin
                 }`}>
                 <Icon icon={icon} size="md" />
             </div>
-            <h3 className={`text-base font-bold mb-1.5 transition-colors ${isWarning ? 'text-amber-900 group-hover:text-amber-700' : 'text-gray-900 group-hover:text-blue-600'
+            <h3 className={`text-base font-semibold mb-1.5 transition-colors ${isWarning ? 'text-amber-900 group-hover:text-amber-700' : 'text-gray-900 group-hover:text-blue-600'
                 }`}>
                 {title}
             </h3>

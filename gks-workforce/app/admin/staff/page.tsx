@@ -216,7 +216,7 @@ export default function AdminStaffPage() {
                             <form onSubmit={handleCreateStaff} className="space-y-6 pt-2">
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                     <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                                             Full Name
                                         </label>
                                         <input
@@ -229,7 +229,7 @@ export default function AdminStaffPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Username</label>
+                                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Username</label>
                                         <input
                                             type="text"
                                             value={formData.username}
@@ -240,7 +240,7 @@ export default function AdminStaffPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                                             Initial Password
                                         </label>
                                         <div className="relative">
@@ -272,7 +272,7 @@ export default function AdminStaffPage() {
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                                             Hourly Rate ($)
                                         </label>
                                         <input
@@ -393,7 +393,7 @@ export default function AdminStaffPage() {
                 {editingStaff && (
                             <form id="staff-edit-form" onSubmit={handleUpdateStaff} className="space-y-6">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                                         Full Name
                                     </label>
                                     <input
@@ -405,7 +405,7 @@ export default function AdminStaffPage() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
                                         Hourly Rate ($)
                                     </label>
                                     <input
@@ -420,7 +420,7 @@ export default function AdminStaffPage() {
                                 </div>
 
                                 <div className="bg-amber-50/50 p-4 rounded-lg border border-amber-100">
-                                    <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                    <h3 className="text-xs font-semibold text-amber-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
                                             <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                                         </svg>

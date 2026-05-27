@@ -33,7 +33,7 @@ export function TimesheetSourceBadge({ source, distanceMetres }: { source?: Time
     const label =
         source === 'GPS_OUTSIDE' && distanceMetres != null ? `${cfg.label} (${distanceMetres}m)` : cfg.label;
     return (
-        <Badge variant={cfg.variant} className="text-[10px] font-medium tracking-tight rounded-sm px-1.5 py-0.5 shadow-3xs">
+        <Badge variant={cfg.variant} className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 shadow-3xs border border-current/10">
             <Icon icon={cfg.icon} size="sm" className="opacity-80" />
             {label}
         </Badge>
@@ -43,11 +43,11 @@ export function TimesheetSourceBadge({ source, distanceMetres }: { source?: Time
 export function TimesheetStatusBadge({ status }: { status: TimesheetStatus }) {
     switch (status) {
         case 'PENDING':
-            return <Badge variant="warning" className="text-[10px] font-medium tracking-tight rounded-sm px-1.5 py-0.5">Pending</Badge>;
+            return <Badge variant="warning" className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 border border-current/10">Pending</Badge>;
         case 'APPROVED':
-            return <Badge variant="success" className="text-[10px] font-medium tracking-tight rounded-sm px-1.5 py-0.5">Approved</Badge>;
+            return <Badge variant="success" className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 border border-current/10">Approved</Badge>;
         case 'REJECTED':
-            return <Badge variant="danger" className="text-[10px] font-medium tracking-tight rounded-sm px-1.5 py-0.5">Rejected</Badge>;
+            return <Badge variant="danger" className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 border border-current/10">Rejected</Badge>;
         default:
             return null;
     }
@@ -60,13 +60,13 @@ export function AutomationStatusBadge({
 }) {
     switch (status) {
         case 'AUTO_APPROVED':
-            return <Badge variant="success" className="text-[10px] font-medium tracking-tight rounded-sm px-1.5 py-0.5">Auto-approved</Badge>;
+            return <Badge variant="success" className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 border border-current/10">Auto-approved</Badge>;
         case 'FLAGGED':
-            return <Badge variant="warning" className="text-[10px] font-medium tracking-tight rounded-sm px-1.5 py-0.5">Flagged</Badge>;
+            return <Badge variant="warning" className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 border border-current/10">Flagged</Badge>;
         case 'NEEDS_REVIEW':
-            return <Badge variant="warning" className="text-[10px] font-medium tracking-tight rounded-sm px-1.5 py-0.5">Needs review</Badge>;
+            return <Badge variant="warning" className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 border border-current/10">Needs review</Badge>;
         case 'REJECTED':
-            return <Badge variant="danger" className="text-[10px] font-medium tracking-tight rounded-sm px-1.5 py-0.5">Rejected</Badge>;
+            return <Badge variant="danger" className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 border border-current/10">Rejected</Badge>;
         default:
             return null;
     }
@@ -79,7 +79,7 @@ export function TimesheetFlagChips({ flags }: { flags: string[] }) {
             {flags.map((flag) => (
                 <span 
                     key={flag} 
-                    className="text-[9px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-50 border border-slate-200/50 px-1.5 py-0.5 rounded-sm"
+                    className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full"
                 >
                     {flag.replace(/_/g, ' ')}
                 </span>

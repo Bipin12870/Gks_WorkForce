@@ -39,7 +39,7 @@ export default function AdminFilterBar({
     const days = [1, 2, 3, 4, 5, 6, 0];
 
     return (
-        <div className="admin-toolbar mb-6">
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4 mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
                 <AdminWeekPicker weekStart={weekStart} onPrev={onWeekPrev} onNext={onWeekNext} />
                 <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">

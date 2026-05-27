@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
 import { Shift, Timesheet, TimesheetStatus, User } from '@/types';
-import { getWeekStart, getDayName } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
 import { updateTimesheetStatus, correctTimesheet } from '@/app/actions/timesheets';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
@@ -13,14 +13,15 @@ import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminFilterBar from '@/components/admin/AdminFilterBar';
 import AdminTabs from '@/components/admin/AdminTabs';
 import AdminFormModal, { AdminModalFooter } from '@/components/admin/AdminFormModal';
-import TimesheetApprovalCard from '@/components/admin/TimesheetApprovalCard';
-import RosterShiftCard from '@/components/admin/RosterShiftCard';
+import TimesheetTableRow from '@/components/admin/TimesheetTableRow';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
-import { AlertTriangle, Calendar } from 'lucide-react';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import { AlertTriangle, Calendar, CheckSquare, Clock } from 'lucide-react';
 import { Suspense } from 'react';
 
 export default function AdminTimesheetsPage() {
@@ -36,29 +37,28 @@ function AdminTimesheetsContent() {
     const router = useRouter();
     const { showNotification } = useNotification();
     const [selectedWeek, setSelectedWeek] = useState<Date>(getWeekStart(new Date()));
-    const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
+    const [selectedDay, setSelectedDay] = useState<number>(-1); // Default to all week for clean grid/table
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [staffMap, setStaffMap] = useState<Record<string, User>>({});
     const [loading, setLoading] = useState(true);
     const searchParams = useSearchParams();
     const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('ALL');
-    const [filterMode, setFilterMode] = useState<'HARD' | 'HIGHLIGHT'>('HARD');
-    const [activeMobileTab, setActiveMobileTab] = useState<'roster' | 'timesheets'>('roster');
     const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
-    const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+    const [statusFilter, setStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING');
+
+    // Bulk selection state
+    const [selectedTimesheetIds, setSelectedTimesheetIds] = useState<string[]>([]);
 
     useEffect(() => {
         const filter = searchParams.get('filter');
         if (filter === 'flagged') {
             setShowFlaggedOnly(true);
             setStatusFilter('PENDING');
-            setSelectedDay(-1); // Show all days for the week
-            setActiveMobileTab('timesheets');
+            setSelectedDay(-1);
         } else if (filter === 'pending') {
             setStatusFilter('PENDING');
-            setSelectedDay(-1); // Show all days for the week
-            setActiveMobileTab('timesheets');
+            setSelectedDay(-1);
         }
     }, [searchParams]);
 
@@ -68,6 +68,7 @@ function AdminTimesheetsContent() {
     const [adjustStart, setAdjustStart] = useState('');
     const [adjustEnd, setAdjustEnd] = useState('');
     const [adminNote, setAdminNote] = useState('');
+    const [voidTimesheet, setVoidTimesheet] = useState(false);
 
     useEffect(() => {
         if (userData?.role === 'ADMIN') {
@@ -75,6 +76,7 @@ function AdminTimesheetsContent() {
         }
     }, [userData]);
 
+    // Real-time shifts & timesheets loader
     useEffect(() => {
         if (!userData || userData.role !== 'ADMIN') return;
 
@@ -162,6 +164,7 @@ function AdminTimesheetsContent() {
         const newWeek = new Date(selectedWeek);
         newWeek.setDate(newWeek.getDate() + (direction === 'next' ? 7 : -7));
         setSelectedWeek(getWeekStart(newWeek));
+        setSelectedTimesheetIds([]); // Reset selection on week change
     };
 
     const handleUpdateStatus = async (
@@ -183,119 +186,103 @@ function AdminTimesheetsContent() {
 
     const openAdjustModal = (ts: Timesheet) => {
         setSelectedTimesheet(ts);
-        setAdjustStart(ts.workedStart);
-        setAdjustEnd(ts.workedEnd);
+        setAdjustStart(ts.workedStart || ts.approvedShiftStart || '09:00');
+        setAdjustEnd(ts.workedEnd || ts.approvedShiftEnd || '17:00');
         setAdminNote(ts.adminNote || '');
+        setVoidTimesheet(false);
         setShowAdjustModal(true);
     };
 
     const staffOptions = Object.values(staffMap).map((s) => ({ id: s.id, name: s.name }));
 
-    const getFilteredTimesheets = () => {
-        let list = selectedStaffFilter === 'ALL' ? timesheets : timesheets.filter((t) => t.staffId === selectedStaffFilter);
-        if (statusFilter !== 'ALL') list = list.filter((t) => t.status === statusFilter);
-        if (showFlaggedOnly) list = list.filter((t) => t.requiresAdminNote && t.status === 'PENDING');
-        return list;
+    // Re-aggregate and map Timesheets
+    const unifiedTimesheets = useMemo(() => {
+        // Filter raw timesheets by staff and flagging constraints
+        let filteredTs = selectedStaffFilter === 'ALL'
+            ? timesheets
+            : timesheets.filter((t) => t.staffId === selectedStaffFilter);
+
+        if (showFlaggedOnly) {
+            filteredTs = filteredTs.filter((t) => t.requiresAdminNote && t.status === 'PENDING');
+        }
+
+        // 1. Map actual timesheet submissions
+        const resultList = filteredTs.map(ts => ({
+            id: ts.id!,
+            timesheet: ts,
+            staffId: ts.staffId,
+            date: ts.date.toDate(),
+            status: ts.status,
+            isMissed: false,
+        }));
+
+        // Filter by tab status
+        let finalFiltered = resultList;
+        if (statusFilter !== 'ALL') {
+            finalFiltered = finalFiltered.filter(item => item.status === statusFilter);
+        }
+
+        // Sort by date then roster time
+        return finalFiltered.sort((a, b) => {
+            const dateDiff = a.date.getTime() - b.date.getTime();
+            if (dateDiff !== 0) return dateDiff;
+            return a.timesheet.approvedShiftStart.localeCompare(b.timesheet.approvedShiftStart);
+        });
+    }, [timesheets, selectedStaffFilter, statusFilter, showFlaggedOnly]);
+
+    // Bulk approval actions
+    const handleBulkApprove = async () => {
+        if (selectedTimesheetIds.length === 0) return;
+
+        // Collect timesheets matching selection that do NOT require admin notes
+        const toApprove = unifiedTimesheets.filter(
+            item => selectedTimesheetIds.includes(item.id) && !item.isMissed && !item.timesheet.requiresAdminNote
+        );
+
+        if (toApprove.length === 0) {
+            showNotification('Only clean timesheets (no geofence/overtime flags) can be approved in bulk.', 'error');
+            return;
+        }
+
+        try {
+            await Promise.all(
+                toApprove.map(item => updateTimesheetStatus(item.id, 'APPROVED'))
+            );
+            showNotification(`Bulk approved ${toApprove.length} timesheets successfully!`, 'success');
+            setSelectedTimesheetIds([]);
+        } catch (error) {
+            console.error('Error in bulk approval:', error);
+            showNotification('Failed to bulk approve timesheets.', 'error');
+        }
     };
 
-    const renderRosteredShifts = () => (
-        <div className="space-y-3">
-            <div className="flex items-center justify-between">
-                <h3 className="text-section-title">
-                    Roster · {selectedDay === -1 ? 'Full week' : getDayName(selectedDay)}
-                </h3>
-                <span className="text-label">Read-only</span>
-            </div>
-            {loading ? (
-                <Spinner className="py-10" />
-            ) : (() => {
-                // If All Week is selected (-1), we force hard filter for clarity
-                const shouldHardFilter = filterMode === 'HARD' || selectedDay === -1;
-                const rosterShifts = shouldHardFilter && selectedStaffFilter !== 'ALL'
-                    ? shifts.filter(s => s.staffId === selectedStaffFilter)
-                    : shifts;
-
-                return rosterShifts.length === 0 ? (
-                    <EmptyState title="No shifts" description="No approved shifts match these filters." icon={Calendar} />
-                ) : (
-                    rosterShifts.map((shift) => (
-                        <RosterShiftCard
-                            key={shift.id}
-                            shift={shift}
-                            staffName={staffMap[shift.staffId]?.name || 'Unknown'}
-                            showDayBadge={selectedDay === -1}
-                            highlighted={selectedStaffFilter === shift.staffId}
-                            onSelect={
-                                selectedDay === -1
-                                    ? () => {
-                                          if (selectedStaffFilter === 'ALL') {
-                                              setSelectedStaffFilter(shift.staffId);
-                                              setFilterMode('HIGHLIGHT');
-                                          } else if (filterMode === 'HIGHLIGHT' && selectedStaffFilter === shift.staffId) {
-                                              setSelectedStaffFilter('ALL');
-                                          }
-                                      }
-                                    : undefined
-                            }
-                        />
-                    ))
-                );
-            })()}
-        </div>
-    );
-
-    const renderSubmittedTimesheets = () => {
-        const filteredTimesheets = getFilteredTimesheets();
-        return (
-        <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-100">
-                <div>
-                    <h3 className="text-section-title text-blue-700">
-                        {statusFilter === 'ALL' ? 'Timesheets' : statusFilter.charAt(0) + statusFilter.slice(1).toLowerCase()}
-                    </h3>
-                    <p className="text-label">{statusFilter === 'PENDING' ? 'Action required' : 'Review & archive'}</p>
-                </div>
-                <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                    className="input-base py-2 min-h-10 w-full sm:w-40"
-                >
-                    <option value="ALL">All statuses</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="APPROVED">Approved</option>
-                    <option value="REJECTED">Rejected</option>
-                </select>
-            </div>
-            {loading ? (
-                <Spinner className="py-10" />
-            ) : filteredTimesheets.length === 0 ? (
-                <EmptyState title="No timesheets" description="Nothing submitted for these filters." icon={AlertTriangle} />
-            ) : (
-                filteredTimesheets.map((ts) => (
-                    <TimesheetApprovalCard
-                        key={ts.id}
-                        timesheet={ts}
-                        staffName={staffMap[ts.staffId]?.name || 'Staff'}
-                        onQuickApprove={() => handleUpdateStatus(ts.id!, 'APPROVED')}
-                        onReview={() => openAdjustModal(ts)}
-                        onAdjust={() => openAdjustModal(ts)}
-                        onReject={() => handleUpdateStatus(ts.id!, 'REJECTED')}
-                    />
-                ))
-            )}
-        </div>
+    const handleSelectToggle = (id: string) => {
+        setSelectedTimesheetIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
         );
+    };
+
+    const handleSelectAll = (isChecked: boolean) => {
+        if (isChecked) {
+            // Select all PENDING timesheets that do NOT require admin notes
+            const selectable = unifiedTimesheets
+                .filter(item => !item.isMissed && !item.timesheet.requiresAdminNote)
+                .map(item => item.id);
+            setSelectedTimesheetIds(selectable);
+        } else {
+            setSelectedTimesheetIds([]);
+        }
     };
 
     return (
         <>
             <AdminPageHeader
-                title="Timesheet approval"
-                description="Review worked hours, automation flags, and approve or adjust before payroll."
+                title="Timesheet Approvals"
+                description="Review worked hours, geofence status, and approve or adjust timesheets before payroll."
             />
 
             {showFlaggedOnly && (
-                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
                     <div className="flex items-start gap-3">
                         <Icon icon={AlertTriangle} size="md" className="text-amber-600 shrink-0 mt-0.5" />
                         <div>
@@ -310,7 +297,6 @@ function AdminTimesheetsContent() {
                         size="sm"
                         onClick={() => {
                             setShowFlaggedOnly(false);
-                            setSelectedDay(new Date().getDay());
                             router.replace('/admin/timesheets');
                         }}
                     >
@@ -328,30 +314,156 @@ function AdminTimesheetsContent() {
                 staffValue={selectedStaffFilter}
                 onStaffChange={(id) => {
                     setSelectedStaffFilter(id);
-                    setFilterMode('HARD');
+                    setSelectedTimesheetIds([]);
                 }}
                 staffOptions={staffOptions}
             />
 
-            <div className="hidden lg:grid lg:grid-cols-2 gap-8">
-                        {renderRosteredShifts()}
-                        {renderSubmittedTimesheets()}
-                    </div>
-
-            <div className="lg:hidden admin-section-card">
+            {/* ── Status Tab Filter ── */}
+            <div className="mb-4">
                 <AdminTabs
                     tabs={[
-                        { id: 'roster', label: 'Roster', count: shifts.length },
-                        { id: 'timesheets', label: 'Timesheets', count: getFilteredTimesheets().length },
+                        { id: 'PENDING', label: 'Pending', count: timesheets.filter(t => t.status === 'PENDING').length },
+                        { id: 'APPROVED', label: 'Approved', count: timesheets.filter(t => t.status === 'APPROVED').length },
+                        { id: 'REJECTED', label: 'Rejected', count: timesheets.filter(t => t.status === 'REJECTED').length },
+                        { id: 'ALL', label: 'All Records', count: timesheets.length },
                     ]}
-                    activeId={activeMobileTab}
-                    onChange={(id) => setActiveMobileTab(id as 'roster' | 'timesheets')}
+                    activeId={statusFilter}
+                    onChange={(id) => {
+                        setStatusFilter(id as any);
+                        setSelectedTimesheetIds([]);
+                    }}
                 />
-                <div className="p-4 min-h-[320px]">
-                    {activeMobileTab === 'roster' ? renderRosteredShifts() : renderSubmittedTimesheets()}
-                </div>
             </div>
 
+            {/* ── Floating Sticky Bulk Action Bar (Stripe/Linear style) ── */}
+            {statusFilter === 'PENDING' && selectedTimesheetIds.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-white rounded-full px-5 py-2.5 shadow-2xl flex items-center gap-5 z-50 animate-in fade-in slide-in-from-bottom-4">
+                    <span className="text-xs font-medium text-slate-350 whitespace-nowrap">
+                        <strong className="text-white font-semibold">{selectedTimesheetIds.length}</strong> timesheets selected
+                    </span>
+                    <div className="w-px h-4 bg-slate-800" />
+                    <button
+                        onClick={handleBulkApprove}
+                        className="inline-flex items-center justify-center bg-white hover:bg-slate-100 text-slate-900 text-xs font-semibold px-3 py-1.5 rounded-full transition-all cursor-pointer shadow-sm hover:shadow-md"
+                    >
+                        Approve Selected
+                    </button>
+                </div>
+            )}
+
+            {/* ── Desktop Table Layout ── */}
+            <div className="hidden lg:block w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
+                {loading ? (
+                    <Spinner className="py-24" />
+                ) : unifiedTimesheets.length === 0 ? (
+                    <div className="py-24 text-center">
+                        <EmptyState title="No timesheets" description="No timesheets match the active filters." icon={Clock} />
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50/50 border-b border-slate-200/60 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <th className="px-4 py-3 w-12">
+                                        {statusFilter === 'PENDING' && (
+                                            <input
+                                                type="checkbox"
+                                                onChange={(e) => handleSelectAll(e.target.checked)}
+                                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                                            />
+                                        )}
+                                    </th>
+                                    <th className="px-4 py-3">Employee</th>
+                                    <th className="px-4 py-3">Date</th>
+                                    <th className="px-4 py-3">Rostered Shift</th>
+                                    <th className="px-4 py-3">Clocked Time</th>
+                                    <th className="px-4 py-3">Variance</th>
+                                    <th className="px-4 py-3">Integrity & Source</th>
+                                    <th className="px-4 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {unifiedTimesheets.map((item) => (
+                                    <TimesheetTableRow
+                                        key={item.id}
+                                        timesheet={item.timesheet}
+                                        staffName={staffMap[item.staffId]?.name || 'Staff member'}
+                                        isSelected={selectedTimesheetIds.includes(item.id)}
+                                        onSelectToggle={() => handleSelectToggle(item.id)}
+                                        onQuickApprove={() => handleUpdateStatus(item.id, 'APPROVED')}
+                                        onReview={() => openAdjustModal(item.timesheet)}
+                                        onReject={() => handleUpdateStatus(item.id, 'REJECTED')}
+                                    />
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* ── Mobile/Tablet List Layout (Clean SaaS List) ── */}
+            <div className="lg:hidden">
+                {loading ? (
+                    <Spinner className="py-16" />
+                ) : unifiedTimesheets.length === 0 ? (
+                    <EmptyState title="No timesheets" description="No timesheets match the active filters." icon={Clock} />
+                ) : (
+                    <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100 shadow-xs overflow-hidden">
+                        {unifiedTimesheets.map((item) => (
+                            <div key={item.id} className="p-4 flex flex-col gap-3.5 hover:bg-slate-50/30 transition-colors">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-sm font-semibold text-slate-900">
+                                            {staffMap[item.staffId]?.name || 'Staff member'}
+                                        </span>
+                                        <span className="text-xs text-slate-400 font-medium">
+                                            {formatDate(item.date)}
+                                        </span>
+                                    </div>
+                                    <Badge variant={item.status === 'PENDING' ? 'warning' : item.status === 'APPROVED' ? 'success' : 'danger'}>
+                                        {item.status}
+                                    </Badge>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 text-xs">
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Roster</span>
+                                        <span className="font-medium text-slate-600">
+                                            {item.timesheet.approvedShiftStart ? `${item.timesheet.approvedShiftStart}–${item.timesheet.approvedShiftEnd}` : 'Unscheduled'}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Clocked</span>
+                                        <span className={`font-semibold ${item.isMissed ? 'text-red-500 font-medium' : 'text-slate-800'}`}>
+                                            {item.timesheet.workedStart ? `${item.timesheet.workedStart}–${item.timesheet.workedEnd}` : 'No clock-in'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100/60">
+                                    <button 
+                                        onClick={() => openAdjustModal(item.timesheet)}
+                                        className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-md hover:bg-slate-50 text-slate-700 transition-all cursor-pointer"
+                                    >
+                                        Review
+                                    </button>
+                                    {item.status === 'PENDING' && (
+                                        <button 
+                                            onClick={() => handleUpdateStatus(item.id, 'APPROVED')}
+                                            className="px-3 py-1.5 text-xs font-semibold bg-slate-900 hover:bg-slate-855 text-white rounded-md transition-all shadow-xs cursor-pointer"
+                                        >
+                                            Approve
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* ── Adjustment Modal ── */}
             <AdminFormModal
                 open={showAdjustModal && !!selectedTimesheet}
                 onClose={() => setShowAdjustModal(false)}
@@ -372,16 +484,20 @@ function AdminTimesheetsContent() {
                             onPrimary={async () => {
                                 if (selectedTimesheet.status === 'APPROVED') {
                                     if (!adminNote.trim()) {
-                                        showNotification('Admin note is required for corrections', 'error');
+                                        showNotification('Admin note is required to explain this correction', 'error');
                                         return;
                                     }
                                     try {
-                                        await correctTimesheet(selectedTimesheet.id!, adjustStart, adjustEnd, adminNote);
-                                        showNotification('Timesheet corrected successfully', 'success');
+                                        const finalStatus = voidTimesheet ? 'REJECTED' : 'APPROVED';
+                                        await correctTimesheet(selectedTimesheet.id!, adjustStart, adjustEnd, adminNote, finalStatus);
+                                        showNotification(
+                                            voidTimesheet ? 'Timesheet voided and rejected successfully' : 'Timesheet corrected successfully', 
+                                            'success'
+                                        );
                                         setShowAdjustModal(false);
                                     } catch (error) {
                                         console.error('Error correcting timesheet:', error);
-                                        showNotification((error as Error).message || 'Failed to correct timesheet', 'error');
+                                        showNotification((error as Error).message || 'Failed to update timesheet', 'error');
                                     }
                                 } else {
                                     if (selectedTimesheet.requiresAdminNote && !adminNote.trim()) {
@@ -392,9 +508,9 @@ function AdminTimesheetsContent() {
                                 }
                             }}
                             primaryLabel={
-                                selectedTimesheet.requiresAdminNote && selectedTimesheet.status === 'PENDING'
-                                    ? 'Resolve & approve'
-                                    : 'Approve adjusted'
+                                selectedTimesheet.status === 'APPROVED'
+                                    ? (voidTimesheet ? 'Void & Reject' : 'Apply Correction')
+                                    : (selectedTimesheet.requiresAdminNote ? 'Resolve & approve' : 'Approve adjusted')
                             }
                         />
                     ) : undefined
@@ -402,43 +518,63 @@ function AdminTimesheetsContent() {
             >
                 {selectedTimesheet && (
                     <>
+                        {selectedTimesheet.status === 'APPROVED' && (
+                            <div className="mb-4">
+                                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-red-700 bg-red-50/50 border border-red-200/30 p-3 rounded-lg select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={voidTimesheet}
+                                        onChange={(e) => setVoidTimesheet(e.target.checked)}
+                                        className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 focus:ring-offset-0 cursor-pointer"
+                                    />
+                                    <span>Void / Reject this approved timesheet (will mark it as REJECTED)</span>
+                                </label>
+                            </div>
+                        )}
+
                         <div className="mb-4 p-4 bg-gray-50 border border-gray-100 rounded-xl grid grid-cols-2 gap-4 text-sm">
                             <div>
                                 <p className="text-label">Roster</p>
                                 <p className="font-semibold tabular-nums mt-0.5">
-                                    {selectedTimesheet.approvedShiftStart} – {selectedTimesheet.approvedShiftEnd}
+                                    {selectedTimesheet.approvedShiftStart ? `${selectedTimesheet.approvedShiftStart} – ${selectedTimesheet.approvedShiftEnd}` : 'Unscheduled'}
                                 </p>
                             </div>
                             <div>
                                 <p className="text-label">Submitted</p>
                                 <p className="font-semibold tabular-nums mt-0.5">
-                                    {selectedTimesheet.workedStart} – {selectedTimesheet.workedEnd}
+                                    {selectedTimesheet.workedStart ? `${selectedTimesheet.workedStart} – ${selectedTimesheet.workedEnd}` : 'No clock-in'}
                                 </p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label className="text-label block mb-1">Adjusted start</label>
-                                <Input type="time" value={adjustStart} onChange={(e) => setAdjustStart(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="text-label block mb-1">Adjusted end</label>
-                                <Input type="time" value={adjustEnd} onChange={(e) => setAdjustEnd(e.target.value)} />
-                            </div>
-                        </div>
-                        {(selectedTimesheet.requiresAdminNote || adminNote) && (
-                            <div>
-                                <label className="text-label block mb-1">
-                                    Admin note {selectedTimesheet.requiresAdminNote && <span className="text-red-600">*</span>}
-                                </label>
-                                <textarea
-                                    value={adminNote}
-                                    onChange={(e) => setAdminNote(e.target.value)}
-                                    placeholder="Reason for approval…"
-                                    className="input-base min-h-[88px] resize-none w-full"
-                                />
+
+                        {!voidTimesheet && (
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="text-label block mb-1">Adjusted start</label>
+                                    <Input type="time" value={adjustStart} onChange={(e) => setAdjustStart(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="text-label block mb-1">Adjusted end</label>
+                                    <Input type="time" value={adjustEnd} onChange={(e) => setAdjustEnd(e.target.value)} />
+                                </div>
                             </div>
                         )}
+
+                        <div>
+                            <label className="text-label block mb-1">
+                                Admin note {(selectedTimesheet.requiresAdminNote || selectedTimesheet.status === 'APPROVED') && <span className="text-red-650">*</span>}
+                            </label>
+                            <textarea
+                                value={adminNote}
+                                onChange={(e) => setAdminNote(e.target.value)}
+                                placeholder={
+                                    selectedTimesheet.status === 'APPROVED'
+                                        ? (voidTimesheet ? "Reason for voiding/rejecting this approved timesheet..." : "Reason for correcting this approved timesheet...")
+                                        : "Reason for approval or adjustment..."
+                                }
+                                className="input-base min-h-[88px] resize-none w-full text-sm"
+                            />
+                        </div>
                     </>
                 )}
             </AdminFormModal>

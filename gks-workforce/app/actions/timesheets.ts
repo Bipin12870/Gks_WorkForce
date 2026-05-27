@@ -231,7 +231,8 @@ export async function correctTimesheet(
     timesheetId: string,
     newWorkedStart: string,
     newWorkedEnd: string,
-    reason: string
+    reason: string,
+    status: 'APPROVED' | 'REJECTED' = 'APPROVED'
 ) {
     try {
         const adminUser = await requireAdmin();
@@ -253,38 +254,40 @@ export async function correctTimesheet(
             throw new Error('Only approved timesheets can be corrected. Use standard adjustments for pending records.');
         }
 
-        // 3. Validate new times
-        if (!isWithinShopHours(newWorkedStart) || !isWithinShopHours(newWorkedEnd)) {
-            throw new Error('Times must be within shop hours (09:00 - 23:59).');
-        }
+        // 3. Validate new times (only if remaining APPROVED)
+        if (status === 'APPROVED') {
+            if (!isWithinShopHours(newWorkedStart) || !isWithinShopHours(newWorkedEnd)) {
+                throw new Error('Times must be within shop hours (09:00 - 23:59).');
+            }
 
-        const start = parseTime(newWorkedStart);
-        const end = parseTime(newWorkedEnd);
-        const startTotal = start.hours * 60 + start.minutes;
-        const endTotal = end.hours * 60 + end.minutes;
-        if (endTotal <= startTotal) {
-            throw new Error('Invalid duration. Worked end must be after start time.');
-        }
+            const start = parseTime(newWorkedStart);
+            const end = parseTime(newWorkedEnd);
+            const startTotal = start.hours * 60 + start.minutes;
+            const endTotal = end.hours * 60 + end.minutes;
+            if (endTotal <= startTotal) {
+                throw new Error('Invalid duration. Worked end must be after start time.');
+            }
 
-        // 4. Overlap Check (excluding current timesheet ID)
-        const approvedTimesheets = await db.collection('timesheets')
-            .where('staffId', '==', timesheetData.staffId)
-            .where('status', '==', 'APPROVED')
-            .get();
+            // 4. Overlap Check (excluding current timesheet ID)
+            const approvedTimesheets = await db.collection('timesheets')
+                .where('staffId', '==', timesheetData.staffId)
+                .where('status', '==', 'APPROVED')
+                .get();
 
-        const targetDateStr = timesheetData.date.toDate().toDateString();
-        const overlapsApproved = approvedTimesheets.docs.some(doc => {
-            if (doc.id === timesheetId) return false;
-            const t = doc.data();
-            return t.date.toDate().toDateString() === targetDateStr &&
-                hasOverlap(
-                    { start: newWorkedStart, end: newWorkedEnd },
-                    [{ start: t.workedStart, end: t.workedEnd }]
-                );
-        });
+            const targetDateStr = timesheetData.date.toDate().toDateString();
+            const overlapsApproved = approvedTimesheets.docs.some(doc => {
+                if (doc.id === timesheetId) return false;
+                const t = doc.data();
+                return t.date.toDate().toDateString() === targetDateStr &&
+                    hasOverlap(
+                        { start: newWorkedStart, end: newWorkedEnd },
+                        [{ start: t.workedStart, end: t.workedEnd }]
+                    );
+            });
 
-        if (overlapsApproved) {
-            throw new Error('This correction overlaps with another approved timesheet for this staff member on the same day.');
+            if (overlapsApproved) {
+                throw new Error('This correction overlaps with another approved timesheet for this staff member on the same day.');
+            }
         }
 
         // 5. Create Correction Document
@@ -293,28 +296,43 @@ export async function correctTimesheet(
             correctedBy: adminUser.id,
             previousWorkedStart: timesheetData.workedStart,
             previousWorkedEnd: timesheetData.workedEnd,
-            newWorkedStart,
-            newWorkedEnd,
+            newWorkedStart: status === 'REJECTED' ? timesheetData.workedStart : newWorkedStart,
+            newWorkedEnd: status === 'REJECTED' ? timesheetData.workedEnd : newWorkedEnd,
             reason,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         };
 
         const correctionDocRef = await db.collection('timesheetCorrections').add(correctionPayload);
 
+        // Update the original timesheet document with corrected status/times and reason as adminNote
+        const updates: Record<string, any> = {
+            status,
+            adminNote: reason,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        if (status === 'APPROVED') {
+            updates.workedStart = newWorkedStart;
+            updates.workedEnd = newWorkedEnd;
+        }
+
+        await db.collection('timesheets').doc(timesheetId).update(updates);
+
         // 6. Audit Log
         await logAuditEvent({
             actorId: adminUser.id,
             actorRole: adminUser.role,
-            action: 'TIMESHEET_CORRECT',
+            action: status === 'REJECTED' ? 'TIMESHEET_VOID_REJECT' : 'TIMESHEET_CORRECT',
             targetCollection: 'timesheets',
             targetDocumentId: timesheetId,
             previousValues: {
+                status: timesheetData.status,
                 workedStart: timesheetData.workedStart,
                 workedEnd: timesheetData.workedEnd,
             },
             newValues: {
-                workedStart: newWorkedStart,
-                workedEnd: newWorkedEnd,
+                status,
+                workedStart: status === 'REJECTED' ? timesheetData.workedStart : newWorkedStart,
+                workedEnd: status === 'REJECTED' ? timesheetData.workedEnd : newWorkedEnd,
                 reason,
                 correctionId: correctionDocRef.id,
             },

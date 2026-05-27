@@ -10,6 +10,8 @@ import AdminOperationalDashboard from '@/components/admin/AdminOperationalDashbo
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
+import Icon from '@/components/ui/Icon';
+import { MapPin, Calendar, ClipboardList, Clock, DollarSign } from 'lucide-react';
 
 export default function DashboardPage() {
     const { userData, user, logout, loading } = useAuth();
@@ -99,32 +101,32 @@ export default function DashboardPage() {
                                 <DashboardCard
                                     title="Time Clock"
                                     description="Clock in and out of your shift (GPS Required)"
-                                    icon="📍"
+                                    icon={MapPin}
                                     badgeCount={todayShifts}
                                     onClick={() => handleNavigation('/staff/clock')}
                                 />
                                 <DashboardCard
                                     title="My Availability"
                                     description="Set your weekly working hours"
-                                    icon="📅"
+                                    icon={Calendar}
                                     onClick={() => handleNavigation('/staff/profile/availability')}
                                 />
                                 <DashboardCard
                                     title="My Roster"
                                     description="View your approved shifts and schedule"
-                                    icon="📋"
+                                    icon={ClipboardList}
                                     onClick={() => handleNavigation('/staff/roster')}
                                 />
                                 <DashboardCard
                                     title="My Timesheets"
                                     description="Submit work hours for your shifts"
-                                    icon="⏱️"
+                                    icon={Clock}
                                     onClick={() => handleNavigation('/staff/timesheets')}
                                 />
                                 <DashboardCard
                                     title="Hours & Pay"
                                     description="Review your worked hours and estimated pay"
-                                    icon="💰"
+                                    icon={DollarSign}
                                     onClick={() => handleNavigation('/staff/profile')}
                                 />
                             </>
@@ -139,7 +141,7 @@ export default function DashboardPage() {
 interface DashboardCardProps {
     title: string;
     description: string;
-    icon: string;
+    icon: any;
     onClick: () => void;
     badgeCount?: number;
     isWarning?: boolean;
@@ -160,9 +162,9 @@ function DashboardCard({ title, description, icon, onClick, badgeCount, isWarnin
                     {badgeCount}
                 </div>
             ) : null}
-            <div className={`flex items-center justify-center w-12 h-12 mb-5 text-2xl rounded-lg transition-colors ${isWarning ? 'bg-amber-100 group-hover:bg-amber-200' : 'bg-gray-50 group-hover:bg-blue-50'
+            <div className={`flex items-center justify-center w-12 h-12 mb-5 rounded-lg transition-colors ${isWarning ? 'bg-amber-100 text-amber-600 group-hover:bg-amber-200' : 'bg-gray-50 text-blue-600 group-hover:bg-blue-50'
                 }`}>
-                {icon}
+                <Icon icon={icon} size="md" />
             </div>
             <h3 className={`text-base font-bold mb-1.5 transition-colors ${isWarning ? 'text-amber-900 group-hover:text-amber-700' : 'text-gray-900 group-hover:text-blue-600'
                 }`}>

@@ -10,6 +10,8 @@ interface StaffListRowProps {
     meta?: ReactNode;
     trailing?: ReactNode;
     banner?: ReactNode;
+    onClick?: () => void;
+    className?: string;
 }
 
 export default function StaffListRow({
@@ -20,9 +22,20 @@ export default function StaffListRow({
     meta,
     trailing,
     banner,
+    onClick,
+    className = '',
 }: StaffListRowProps) {
     return (
-        <div className="card-base overflow-hidden">
+        <div
+            className={`card-base overflow-hidden transition-all ${
+                onClick ? 'cursor-pointer hover:border-gray-300 hover:shadow-sm active:bg-gray-50' : ''
+            } ${className}`}
+            onClick={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('button, input, select, a')) return;
+                onClick?.();
+            }}
+        >
             {banner}
             <div className="p-4 sm:p-5 flex items-start sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-3 min-w-0 flex-1">

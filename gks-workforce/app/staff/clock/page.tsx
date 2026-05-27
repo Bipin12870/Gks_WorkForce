@@ -517,7 +517,7 @@ export default function ClockInOutPage() {
 
                 {activeRecord ? (
                     <div className="text-center space-y-6">
-                        <div className="p-6 border border-blue-200 bg-blue-50/50 rounded-xl">
+                        <div className="p-6 border border-blue-200 bg-blue-50/50 rounded-xl animate-session-pulse">
                             <p className="text-label text-blue-800 mb-1">Active session</p>
                             <p className="text-stat">{formatDuration(shiftDurationSeconds)}</p>
                             <div className="flex justify-center items-center gap-1.5 mt-2 text-xs text-blue-700 font-medium">

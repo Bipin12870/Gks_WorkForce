@@ -40,7 +40,7 @@ export default function StaffNavRow({
         </>
     );
 
-    const className = `flex items-center gap-3 w-full min-h-[52px] px-4 py-3 transition-colors ${
+    const className = `flex items-center gap-3 w-full min-h-[52px] px-4 py-3 transition-all active:scale-[0.98] duration-150 ${
         disabled
             ? 'cursor-not-allowed opacity-70'
             : 'hover:bg-gray-50 active:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500'

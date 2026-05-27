@@ -86,7 +86,7 @@ export default function StaffTabBar() {
                             key={tab.href}
                             href={href}
                             aria-current={isActive ? 'page' : undefined}
-                            className={`relative flex-1 flex flex-col items-center justify-center gap-1 min-h-14 py-2 px-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
+                            className={`relative flex-1 flex flex-col items-center justify-center gap-1 min-h-14 py-2 px-1 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
                                 isActive ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
                             }`}
                         >
@@ -108,7 +108,7 @@ export default function StaffTabBar() {
                             </span>
                             {isActive && (
                                 <span
-                                    className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full motion-reduce:hidden"
+                                    className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full motion-reduce:hidden animate-in fade-in zoom-in-75 duration-200"
                                     aria-hidden
                                 />
                             )}

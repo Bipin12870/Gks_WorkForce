@@ -29,7 +29,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         return (
             <button
                 ref={ref}
-                className={`${variantClass[variant]} ${sizeClass[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
+                className={`${variantClass[variant]} ${sizeClass[size]} ${fullWidth ? 'w-full' : ''} enabled:active:scale-[0.98] transition-transform duration-100 ${className}`}
                 {...props}
             >
                 {children}

@@ -26,6 +26,23 @@ export default function StaffRosterPage() {
     const [loading, setLoading] = useState(true);
     const [expandedDays, setExpandedDays] = useState<Set<number>>(() => new Set([new Date().getDay()]));
 
+    const getDayDate = (dayIndex: number) => {
+        const d = new Date(selectedWeek);
+        const currentMondayDay = 1; 
+        let offset = dayIndex - currentMondayDay;
+        if (offset < 0) offset += 7;
+        d.setDate(d.getDate() + offset);
+        return d;
+    };
+
+    const isToday = (dayIndex: number) => {
+        const dayDate = getDayDate(dayIndex);
+        const today = new Date();
+        return dayDate.getDate() === today.getDate() &&
+            dayDate.getMonth() === today.getMonth() &&
+            dayDate.getFullYear() === today.getFullYear();
+    };
+
     useEffect(() => {
         if (!userData || userData.role !== 'STAFF') return;
 
@@ -56,10 +73,9 @@ export default function StaffRosterPage() {
         const today = new Date().getDay();
         const withShifts = new Set<number>();
         shifts.forEach((s) => withShifts.add(s.date.toDate().getDay()));
+        
+        // Auto-expand today and any days with scheduled shifts
         const next = new Set<number>([today, ...withShifts]);
-        WEEK_DAYS.forEach((d) => {
-            if (d >= today || withShifts.has(d)) next.add(d);
-        });
         setExpandedDays(next);
     }, [shifts, selectedWeek]);
 
@@ -88,7 +104,7 @@ export default function StaffRosterPage() {
 
     return (
         <StaffPageShell title="My roster" description="Approved shifts for the selected week">
-            <Card className="mb-6">
+            <Card padding={false} className="mb-6 p-4.5">
                 <StaffWeekPicker
                     weekStart={selectedWeek}
                     onPrev={() => changeWeek('prev')}
@@ -132,6 +148,7 @@ export default function StaffRosterPage() {
                                 const dayShifts = getShiftsForDay(dayOfWeek);
                                 const isExpanded = expandedDays.has(dayOfWeek);
                                 const isEmpty = dayShifts.length === 0;
+                                const todayState = isToday(dayOfWeek);
 
                                 if (isEmpty && !isExpanded) {
                                     return (
@@ -139,23 +156,35 @@ export default function StaffRosterPage() {
                                             key={dayOfWeek}
                                             type="button"
                                             onClick={() => toggleDay(dayOfWeek)}
-                                            className="w-full card-base px-4 py-3 flex items-center justify-between text-left min-h-11 focus-visible:ring-2 focus-visible:ring-blue-500"
+                                            className={`w-full card-base px-4 py-3 flex items-center justify-between text-left min-h-11 focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                                                todayState ? 'border-l-4 border-l-blue-600 pl-3.5 bg-blue-50/10' : ''
+                                            }`}
                                         >
-                                            <span className="text-section-title">{getDayName(dayOfWeek)}</span>
+                                            <span className="text-section-title">
+                                                {getDayName(dayOfWeek)}
+                                                {todayState && <span className="text-xs text-blue-600 font-semibold ml-1.5">(Today)</span>}
+                                            </span>
                                             <span className="text-label">No shifts</span>
                                         </button>
                                     );
                                 }
 
                                 return (
-                                    <div key={dayOfWeek} className="card-base overflow-hidden">
+                                    <div key={dayOfWeek} className={`card-base overflow-hidden ${
+                                        todayState ? 'border-l-4 border-l-blue-600 bg-blue-50/5' : ''
+                                    }`}>
                                         <button
                                             type="button"
                                             onClick={() => toggleDay(dayOfWeek)}
-                                            className="w-full px-4 py-3 flex items-center justify-between border-b border-gray-100 min-h-11 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+                                            className={`w-full px-4 py-3 flex items-center justify-between border-b border-gray-100 min-h-11 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
+                                                todayState ? 'pl-3.5' : ''
+                                            }`}
                                             aria-expanded={isExpanded}
                                         >
-                                            <span className="text-section-title">{getDayName(dayOfWeek)}</span>
+                                            <span className="text-section-title">
+                                                {getDayName(dayOfWeek)}
+                                                {todayState && <span className="text-xs text-blue-600 font-semibold ml-1.5">(Today)</span>}
+                                            </span>
                                             <div className="flex items-center gap-2">
                                                 {dayShifts.length > 0 && (
                                                     <Badge variant="neutral">{dayShifts.length} shift{dayShifts.length !== 1 ? 's' : ''}</Badge>
@@ -168,26 +197,32 @@ export default function StaffRosterPage() {
                                             </div>
                                         </button>
                                         {isExpanded && (
-                                            <div className="p-3 space-y-2">
+                                            <div className={`p-3 space-y-2 ${todayState ? 'pl-3.5' : ''}`}>
                                                 {isEmpty ? (
                                                     <p className="text-label text-center py-4">No shifts scheduled</p>
                                                 ) : (
-                                                    dayShifts.map((shift) => (
-                                                        <StaffListRow
-                                                            key={shift.id}
-                                                            icon={Clock}
-                                                            iconClassName="text-blue-600"
-                                                            title={
-                                                                <p className="text-section-title">
-                                                                    {shift.startTime} – {shift.endTime}
-                                                                </p>
-                                                            }
-                                                            subtitle={
-                                                                <p className="text-label">{formatDate(shift.date.toDate())}</p>
-                                                            }
-                                                            trailing={<Badge variant="success">Confirmed</Badge>}
-                                                        />
-                                                    ))
+                                                    dayShifts.map((shift) => {
+                                                        const durationHours = calculateHours(shift.startTime, shift.endTime);
+                                                        return (
+                                                            <StaffListRow
+                                                                key={shift.id}
+                                                                icon={Clock}
+                                                                iconClassName="text-blue-600"
+                                                                title={
+                                                                    <p className="text-section-title">
+                                                                        {shift.startTime} – {shift.endTime}
+                                                                        <span className="text-xs text-gray-500 font-medium ml-1.5">
+                                                                            ({durationHours.toFixed(2)} hrs)
+                                                                        </span>
+                                                                    </p>
+                                                                }
+                                                                subtitle={
+                                                                    <p className="text-label">{formatDate(shift.date.toDate())}</p>
+                                                                }
+                                                                trailing={<Badge variant="success">Confirmed</Badge>}
+                                                            />
+                                                        );
+                                                    })
                                                 )}
                                             </div>
                                         )}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, signOut, getIdToken } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User } from '@/types';
@@ -39,8 +39,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (userDoc.exists()) {
                     setUserData({ id: userDoc.id, ...userDoc.data() } as User);
                 }
+
+                // Set session cookie for server-side auth
+                try {
+                    const idToken = await getIdToken(firebaseUser);
+                    await fetch('/api/auth/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idToken }),
+                    });
+                } catch (error) {
+                    console.error('Failed to set session cookie:', error);
+                }
             } else {
                 setUserData(null);
+                // Clear session cookie on logout
+                try {
+                    await fetch('/api/auth/session', { method: 'DELETE' });
+                } catch (error) {
+                    console.error('Failed to clear session cookie:', error);
+                }
             }
 
             setLoading(false);

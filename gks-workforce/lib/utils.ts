@@ -155,6 +155,11 @@ export function processTimesheetAutomation(
             result.payroll.overtimeMinutes = endTotal - rEndTotal;
         }
 
+        // Early Clock-in (> 10 min before roster)
+        if (startTotal < rStartTotal - 10) {
+            flags.push('EARLY_CLOCK_IN');
+        }
+
         // Late Clock-in (> 15 min past roster)
         if (startTotal > rStartTotal + 15) {
             flags.push('LATE_CLOCK_IN');
@@ -180,6 +185,8 @@ export function processTimesheetAutomation(
         result.approval = { status: 'FLAGGED', reason: 'Policy violation detected (After-hours or GPS mismatch)' };
     } else if (flags.includes('OVERTIME') && result.payroll.overtimeMinutes > 15) {
         result.approval = { status: 'FLAGGED', reason: 'Significant overtime detected (>15 min)' };
+    } else if (flags.includes('EARLY_CLOCK_IN')) {
+        result.approval = { status: 'FLAGGED', reason: 'Early arrival detected (>10 min before roster)' };
     } else if (flags.includes('LATE_CLOCK_IN')) {
         result.approval = { status: 'FLAGGED', reason: 'Late arrival detected' };
     } else {

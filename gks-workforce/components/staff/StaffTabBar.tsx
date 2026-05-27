@@ -20,6 +20,29 @@ export default function StaffTabBar() {
     const pathname = usePathname();
     const { user } = useAuth();
     const [todayShifts, setTodayShifts] = useState(0);
+    const [profileHref, setProfileHref] = useState('/staff/profile');
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem('last_staff_profile_path');
+            if (saved && saved.startsWith('/staff/profile')) {
+                setProfileHref(saved);
+            }
+        } catch (e) {
+            // Ignore
+        }
+    }, []);
+
+    useEffect(() => {
+        if (pathname.startsWith('/staff/profile')) {
+            setProfileHref(pathname);
+            try {
+                localStorage.setItem('last_staff_profile_path', pathname);
+            } catch (e) {
+                // Ignore
+            }
+        }
+    }, [pathname]);
 
     useEffect(() => {
         if (!user) return;
@@ -54,10 +77,14 @@ export default function StaffTabBar() {
                         pathname === tab.href ||
                         (tab.href === '/staff/profile' && pathname.startsWith('/staff/profile'));
 
+                    const href = tab.href === '/staff/profile'
+                        ? (isActive ? '/staff/profile' : profileHref)
+                        : tab.href;
+
                     return (
                         <Link
                             key={tab.href}
-                            href={tab.href}
+                            href={href}
                             aria-current={isActive ? 'page' : undefined}
                             className={`relative flex-1 flex flex-col items-center justify-center gap-1 min-h-14 py-2 px-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
                                 isActive ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'

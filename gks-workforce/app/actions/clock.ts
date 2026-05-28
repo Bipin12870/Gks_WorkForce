@@ -84,7 +84,7 @@ export async function clockIn(
             throw new Error('You are already clocked in.');
         }
 
-        // 4. Verify clock-in cooling period (5 mins)
+        // 4. Verify clock-in cooling period (10 seconds)
         const lastRecords = await db.collection('timeRecords')
             .where('staffId', '==', user.id)
             .orderBy('clockInTime', 'desc')
@@ -95,8 +95,8 @@ export async function clockIn(
             if (lastRecord.clockOutTime) {
                 const clockOutMs = lastRecord.clockOutTime.toDate().getTime();
                 const elapsedSecs = Math.floor((serverNow - clockOutMs) / 1000);
-                if (elapsedSecs < 300) {
-                    throw new Error('Please wait for the cooling period to expire before clocking in again.');
+                if (elapsedSecs < 10) {
+                    throw new Error('Please wait at least 10 seconds before clocking in again.');
                 }
             }
         }
@@ -221,12 +221,12 @@ export async function clockOut(
             return { success: true, timesheetId: recordData.timesheetId || '' };
         }
 
-        // 4. Verify clock-out cooling lock (60 seconds) if not auto-closing
+        // 4. Verify clock-out cooling lock (10 seconds) if not auto-closing
         if (!isAutoClose) {
             const clockInMs = recordData.clockInTime.toDate().getTime();
             const elapsedSecs = Math.floor((serverNow - clockInMs) / 1000);
-            if (elapsedSecs < 60) {
-                throw new Error('Please wait at least 60 seconds before clocking out.');
+            if (elapsedSecs < 10) {
+                throw new Error('Please wait at least 10 seconds before clocking out.');
             }
         }
 

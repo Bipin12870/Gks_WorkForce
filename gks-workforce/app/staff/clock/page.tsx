@@ -109,7 +109,7 @@ export default function ClockInOutPage() {
                 } else {
                     const clockOutRounded = roundToNearest5Minutes(now);
                     showNotification(`Clocked out. Timesheet generated (${clockOutRounded}).`, 'success');
-                    setClockInCoolingRemaining(300);
+                    setClockInCoolingRemaining(10);
                 }
             }
         } catch (error: unknown) {
@@ -126,7 +126,7 @@ export default function ClockInOutPage() {
         if (!userData) return;
 
         if (!activeRecord) {
-            // Fetch last completed record to check clock-in cooling lock (5 mins / 300 seconds)
+            // Fetch last completed record to check clock-in cooling lock (10 seconds)
             const checkCooling = async () => {
                 const lastQ = query(
                     collection(db, 'timeRecords'),
@@ -140,7 +140,7 @@ export default function ClockInOutPage() {
                     if (lastRecord.clockOutTime) {
                         const clockOutMs = lastRecord.clockOutTime.toMillis();
                         const elapsedSecs = Math.floor((Date.now() - clockOutMs) / 1000);
-                        const remaining = 300 - elapsedSecs;
+                        const remaining = 10 - elapsedSecs;
                         if (remaining > 0) {
                             setClockInCoolingRemaining(remaining);
                         } else {
@@ -152,10 +152,10 @@ export default function ClockInOutPage() {
             checkCooling();
             setClockOutCoolingRemaining(0);
         } else {
-            // Calculate active clock-out cooling lock (60s since clock-in)
+            // Calculate active clock-out cooling lock (10s since clock-in)
             const clockInMs = activeRecord.clockInTime.toMillis();
             const elapsedSecs = Math.floor((Date.now() - clockInMs) / 1000);
-            const remaining = 60 - elapsedSecs;
+            const remaining = 10 - elapsedSecs;
             if (remaining > 0) {
                 setClockOutCoolingRemaining(remaining);
             } else {
@@ -325,7 +325,7 @@ export default function ClockInOutPage() {
 
             if (result.success) {
                 showNotification('Clocked in successfully!', 'success');
-                setClockOutCoolingRemaining(60); // 1 minute safety clock-out lock
+                setClockOutCoolingRemaining(10); // 10 seconds safety clock-out lock
             }
         } catch (error: unknown) {
             console.error('Error clocking in:', error);
@@ -513,8 +513,7 @@ export default function ClockInOutPage() {
                         )}
                         {clockInCoolingRemaining > 0 && (
                             <StaffAlert variant="info" icon={Loader2} title="Cooling period active">
-                                Please wait {Math.floor(clockInCoolingRemaining / 60)}m{' '}
-                                {clockInCoolingRemaining % 60}s before clocking in again.
+                                Please wait {clockInCoolingRemaining}s before clocking in again.
                             </StaffAlert>
                         )}
                         {(!geo || geo.accuracy <= 150) && clockInCoolingRemaining === 0 && (

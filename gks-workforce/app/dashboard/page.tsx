@@ -77,7 +77,7 @@ export default function DashboardPage() {
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-6">
                                 <Link href="/dashboard">
-                                    <Logo width={110} height={36} />
+                                    <Logo size={36} />
                                 </Link>
                                 <div className="border-l border-gray-200 pl-4 sm:pl-6">
                                     <h1 className="text-page-title">Workforce</h1>

@@ -46,8 +46,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             {/* Desktop sidebar */}
             <aside className="hidden lg:flex lg:w-60 xl:w-64 flex-col border-r border-gray-200 bg-white shrink-0 sticky top-0 h-screen">
                 <div className="px-4 py-5 border-b border-gray-100">
-                    <Link href="/dashboard" className="flex items-center gap-3">
-                        <Logo width={96} height={32} />
+                    <Link href="/dashboard" className="flex items-center gap-2.5">
+                        <Logo size={36} />
+                        <span className="font-semibold text-gray-900 tracking-tight text-sm">GKS Workforce</span>
                     </Link>
                     <p className="admin-kicker mt-3 truncate">{userData?.name ?? 'Admin'}</p>
                 </div>
@@ -75,8 +76,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 }`}
             >
                 <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-                    <Link href="/dashboard">
-                        <Logo width={88} height={28} />
+                    <Link href="/dashboard" className="flex items-center gap-2.5">
+                        <Logo size={32} />
+                        <span className="font-semibold text-gray-900 tracking-tight text-sm">GKS Workforce</span>
                     </Link>
                     <button
                         type="button"

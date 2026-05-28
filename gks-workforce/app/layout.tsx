@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   title: "GKS Workforce Management",
   description: "Staff availability, shift rostering, and time tracking for GKS",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

@@ -43,6 +43,23 @@ export default function StaffRosterPage() {
             dayDate.getFullYear() === today.getFullYear();
     };
 
+    const isPastWeek = () => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const weekEnd = new Date(selectedWeek);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        weekEnd.setHours(0, 0, 0, 0);
+        return weekEnd.getTime() <= today.getTime();
+    };
+
+    const isPastDay = (dayIndex: number) => {
+        const dayDate = getDayDate(dayIndex);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        dayDate.setHours(0, 0, 0, 0);
+        return dayDate.getTime() < today.getTime();
+    };
+
     useEffect(() => {
         if (!userData || userData.role !== 'STAFF') return;
 
@@ -63,21 +80,19 @@ export default function StaffRosterPage() {
                 loadedShifts.push({ id: doc.id, ...doc.data() } as Shift);
             });
             setShifts(loadedShifts);
+
+            // Auto-expand today and any days with scheduled shifts
+            const today = new Date().getDay();
+            const withShifts = new Set<number>();
+            loadedShifts.forEach((s) => withShifts.add(s.date.toDate().getDay()));
+            const next = new Set<number>([today, ...withShifts]);
+            setExpandedDays(next);
+
             setLoading(false);
         });
 
         return () => unsubscribe();
     }, [selectedWeek, userData]);
-
-    useEffect(() => {
-        const today = new Date().getDay();
-        const withShifts = new Set<number>();
-        shifts.forEach((s) => withShifts.add(s.date.toDate().getDay()));
-        
-        // Auto-expand today and any days with scheduled shifts
-        const next = new Set<number>([today, ...withShifts]);
-        setExpandedDays(next);
-    }, [shifts, selectedWeek]);
 
     const changeWeek = (direction: 'prev' | 'next') => {
         const newWeek = new Date(selectedWeek);
@@ -120,12 +135,12 @@ export default function StaffRosterPage() {
                 </div>
             ) : (
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                    <div className="grid grid-cols-2 gap-3 mb-5 shrink-0">
+                    <div className="grid grid-cols-2 gap-3 mb-10 shrink-0">
                         <StaffStatCard
                             label="Scheduled hours"
                             value={totalHours.toFixed(2)}
                             suffix="hrs"
-                            accent="blue"
+                            accent={isPastWeek() ? 'gray' : 'blue'}
                         />
                         <StaffStatCard
                             label="Projected pay"
@@ -134,8 +149,15 @@ export default function StaffRosterPage() {
                                 maximumFractionDigits: 2,
                             })}
                             prefix="$"
-                            accent="green"
+                            accent={isPastWeek() ? 'gray' : 'green'}
                         />
+                    </div>
+
+                    <div className="flex items-center gap-3 mb-4 shrink-0">
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                            Weekly Schedule
+                        </span>
+                        <div className="h-px bg-gray-200 flex-1" />
                     </div>
 
                     {!hasAnyShifts ? (
@@ -155,6 +177,7 @@ export default function StaffRosterPage() {
                                 const isExpanded = expandedDays.has(dayOfWeek);
                                 const isEmpty = dayShifts.length === 0;
                                 const todayState = isToday(dayOfWeek);
+                                const pastState = isPastDay(dayOfWeek);
 
                                 if (isEmpty && !isExpanded) {
                                     return (
@@ -162,8 +185,9 @@ export default function StaffRosterPage() {
                                             key={dayOfWeek}
                                             type="button"
                                             onClick={() => toggleDay(dayOfWeek)}
-                                            className={`w-full card-base px-4 py-3 flex items-center justify-between text-left min-h-11 focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                                                todayState ? 'border-l-4 border-l-blue-600 pl-3.5 bg-blue-50/10' : ''
+                                            className={`w-full card-base px-4 py-3 flex items-center justify-between text-left min-h-11 focus-visible:ring-2 focus-visible:ring-blue-500 transition-all ${
+                                                todayState ? 'border-l-4 border-l-blue-600 pl-3.5 bg-blue-50/10' :
+                                                pastState ? 'border-l-4 border-l-gray-300 pl-3.5 bg-gray-50/40 opacity-75' : ''
                                             }`}
                                         >
                                             <span className="text-section-title">
@@ -176,14 +200,15 @@ export default function StaffRosterPage() {
                                 }
 
                                 return (
-                                    <div key={dayOfWeek} className={`card-base overflow-hidden ${
-                                        todayState ? 'border-l-4 border-l-blue-600 bg-blue-50/5' : ''
+                                    <div key={dayOfWeek} className={`card-base overflow-hidden transition-all ${
+                                        todayState ? 'border-l-4 border-l-blue-600 bg-blue-50/5' :
+                                        pastState ? 'border-l-4 border-l-gray-300 bg-gray-50/20 opacity-80' : ''
                                     }`}>
                                         <button
                                             type="button"
                                             onClick={() => toggleDay(dayOfWeek)}
                                             className={`w-full px-4 py-3 flex items-center justify-between border-b border-gray-100 min-h-11 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
-                                                todayState ? 'pl-3.5' : ''
+                                                todayState || pastState ? 'pl-3.5' : ''
                                             }`}
                                             aria-expanded={isExpanded}
                                         >

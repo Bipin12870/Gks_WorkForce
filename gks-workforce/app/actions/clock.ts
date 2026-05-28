@@ -5,7 +5,7 @@ import * as admin from 'firebase-admin';
 import { requireStaff } from './shared/auth';
 import { logAuditEvent } from '@/lib/audit-logger';
 import { calculatePayrollServer } from '@/lib/payroll-engine';
-import { getWeekStart, parseTime, isWithinShopHours } from '@/lib/utils';
+import { getWeekStart, isWithinShopHours, getClientLocalDate } from '@/lib/utils';
 
 /**
  * Pure Haversine distance calculator.
@@ -25,14 +25,6 @@ function getDistanceMetres(lat1: number, lng1: number, lat2: number, lng2: numbe
 /**
  * Timezone helpers to translate server time (network time) to client's local day/time.
  */
-function getClientLocalDate(serverTimeMs: number, timezoneOffset: number): Date {
-    const shifted = new Date(serverTimeMs - (timezoneOffset * 60 * 1000));
-    const year = shifted.getUTCFullYear();
-    const month = shifted.getUTCMonth();
-    const day = shifted.getUTCDate();
-    const utcMidnight = Date.UTC(year, month, day, 0, 0, 0, 0);
-    return new Date(utcMidnight + (timezoneOffset * 60 * 1000));
-}
 
 function getClientLocalTimeRounded(serverTimeMs: number, timezoneOffset: number): string {
     const shifted = new Date(serverTimeMs - (timezoneOffset * 60 * 1000));
@@ -237,10 +229,16 @@ export async function clockOut(
 
         // 7. Calculate clock-out times
         let clockOutRounded: string;
+        let clockOutTimestamp: admin.firestore.Timestamp;
         if (isAutoClose && shift) {
             clockOutRounded = shift.endTime;
+            const [eh, em] = shift.endTime.split(':').map(Number);
+            const shiftEndDate = new Date(clientLocalMidnight);
+            shiftEndDate.setHours(eh, em, 0, 0);
+            clockOutTimestamp = admin.firestore.Timestamp.fromDate(shiftEndDate);
         } else {
             clockOutRounded = getClientLocalTimeRounded(serverNow, timezoneOffset);
+            clockOutTimestamp = admin.firestore.Timestamp.fromMillis(serverNow);
         }
 
         // 8. Distance calculation
@@ -358,7 +356,7 @@ export async function clockOut(
 
             // Update timeRecord with clockout info and generated timesheetId
             transaction.update(recordRef, {
-                clockOutTime: isAutoClose ? null : admin.firestore.Timestamp.fromMillis(serverNow),
+                clockOutTime: clockOutTimestamp,
                 clockOutRounded,
                 clockOutLat: isAutoClose ? null : lat,
                 clockOutLng: isAutoClose ? null : lng,

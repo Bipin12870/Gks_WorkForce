@@ -38,7 +38,7 @@ export default function StaffSubpageShell({
                 </div>
             </header>
             <main
-                className={`flex-1 min-h-0 flex flex-col max-w-lg mx-auto w-full px-4 pt-4 overflow-hidden ${withActionFooter ? 'pb-14' : hasFooter ? 'pb-32' : ''}`}
+                className={`flex-1 min-h-0 flex flex-col max-w-lg mx-auto w-full px-4 pt-4 overflow-hidden ${withActionFooter ? 'pb-[calc(4.25rem+env(safe-area-inset-bottom))]' : hasFooter ? 'pb-32' : ''}`}
             >
                 {children}
             </main>

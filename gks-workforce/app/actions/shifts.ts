@@ -4,7 +4,7 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { requireAdmin } from './shared/auth';
 import { logAuditEvent } from '@/lib/audit-logger';
-import { getWeekStart, parseTime, isWithinShopHours, hasOverlap, isWithinAvailability } from '@/lib/utils';
+import { getWeekStart, parseTime, isWithinShopHours, hasOverlap, isWithinAvailability, getClientLocalDate, getWeekStartForOffset, getDayOfWeekForOffset } from '@/lib/utils';
 
 /**
  * Creates a new rostered shift (Admin only).
@@ -17,12 +17,13 @@ export async function createShift(shiftData: {
     startTime: string;
     endTime: string;
     forceOverride?: boolean;
+    timezoneOffset?: number;
 }) {
     try {
         const adminUser = await requireAdmin();
         const db = getAdminDb();
 
-        const { staffId, dateMs, startTime, endTime, forceOverride } = shiftData;
+        const { staffId, dateMs, startTime, endTime, forceOverride, timezoneOffset } = shiftData;
 
         // 1. Validate shop hours & duration
         if (!isWithinShopHours(startTime) || !isWithinShopHours(endTime)) {
@@ -37,11 +38,11 @@ export async function createShift(shiftData: {
             throw new Error('Invalid shift duration. End time must be after start time.');
         }
 
-        // Determine target day and week start
-        const targetDate = new Date(dateMs);
-        targetDate.setHours(0, 0, 0, 0);
-        const dayOfWeek = targetDate.getDay();
-        const weekStartDate = getWeekStart(targetDate);
+        // Determine target day and week start (timezone-aware)
+        const offset = timezoneOffset ?? 0;
+        const targetDate = getClientLocalDate(dateMs, offset);
+        const dayOfWeek = getDayOfWeekForOffset(dateMs, offset);
+        const weekStartDate = getWeekStartForOffset(dateMs, offset);
 
         const dateTimestamp = admin.firestore.Timestamp.fromDate(targetDate);
         const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStartDate);

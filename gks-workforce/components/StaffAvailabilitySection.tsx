@@ -361,7 +361,7 @@ export default function StaffAvailabilitySection() {
             }
 
             // Submit via server action (handles day-lock enforcement, auth, and audit logging)
-            await submitAvailability(selectedWeek.getTime(), cleanedAvailability, isRecurring);
+            await submitAvailability(selectedWeek.getTime(), cleanedAvailability, isRecurring, new Date().getTimezoneOffset());
 
             showNotification('Availability submitted successfully!', 'success');
             _clearDraft(userData.id, selectedWeek);
@@ -451,7 +451,7 @@ export default function StaffAvailabilitySection() {
                 )}
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-0.5 pb-20 space-y-2">
+            <div className="flex-1 overflow-y-auto pr-0.5 pb-[calc(6rem+env(safe-area-inset-bottom))] space-y-2">
                 {WEEK_DAYS.map((dayOfWeek) => {
                     const ranges = availability[dayOfWeek] || [];
                     const isOpen = openDay === dayOfWeek;

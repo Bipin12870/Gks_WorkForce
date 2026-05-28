@@ -24,6 +24,39 @@ export function formatLocalDateKey(date: Date): string {
     return `${y}-${m}-${d}`;
 }
 
+/**
+ * Shift epoch milliseconds to represent client local calendar date at midnight, 
+ * returning a Date object representing that local midnight in server storage.
+ */
+export function getClientLocalDate(serverTimeMs: number, timezoneOffset: number): Date {
+    const shifted = new Date(serverTimeMs - (timezoneOffset * 60 * 1000));
+    const year = shifted.getUTCFullYear();
+    const month = shifted.getUTCMonth();
+    const day = shifted.getUTCDate();
+    const utcMidnight = Date.UTC(year, month, day, 0, 0, 0, 0);
+    return new Date(utcMidnight + (timezoneOffset * 60 * 1000));
+}
+
+/**
+ * Returns the Monday (local midnight) of the week containing the given timestamp,
+ * adjusted for the client's timezone offset.
+ */
+export function getWeekStartForOffset(dateMs: number, timezoneOffset: number): Date {
+    const shifted = new Date(dateMs - (timezoneOffset * 60 * 1000));
+    const day = shifted.getUTCDay();
+    const diff = shifted.getUTCDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), diff, 0, 0, 0, 0));
+    return new Date(monday.getTime() + (timezoneOffset * 60 * 1000));
+}
+
+/**
+ * Returns the local day of the week (0 = Sunday, 1 = Monday, etc.) for the timestamp and offset.
+ */
+export function getDayOfWeekForOffset(dateMs: number, timezoneOffset: number): number {
+    const shifted = new Date(dateMs - (timezoneOffset * 60 * 1000));
+    return shifted.getUTCDay();
+}
+
 
 /**
  * Parse HH:mm time string to hours and minutes
@@ -89,7 +122,6 @@ export function processTimesheetAutomation(
     isManualEdit: boolean = false
 ): PayrollEngineResult {
     const flags: string[] = [];
-    const validationIssues: string[] = [];
     
     // 1. RAW DATA CAPTURE
     const result: PayrollEngineResult = {

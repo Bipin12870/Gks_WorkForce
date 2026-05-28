@@ -4,15 +4,16 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { requireStaff } from './shared/auth';
 import { logAuditEvent } from '@/lib/audit-logger';
-import { getWeekStart, parseTime, isWithinShopHours, isTimeBefore } from '@/lib/utils';
+import { isWithinShopHours, isTimeBefore, getWeekStartForOffset } from '@/lib/utils';
 
 /**
  * Format date as YYYY-MM-DD without timezone offset drift.
  */
-function formatLocalDateKeyServer(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
+function formatLocalDateKeyServer(date: Date, timezoneOffset: number): string {
+    const shifted = new Date(date.getTime() - (timezoneOffset * 60 * 1000));
+    const y = shifted.getUTCFullYear();
+    const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(shifted.getUTCDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
 }
 
@@ -28,15 +29,16 @@ interface TimeRangeInput {
 export async function submitAvailability(
     weekStartDateMs: number,
     availabilityData: Record<number, TimeRangeInput[]>,
-    isRecurring: boolean
+    isRecurring: boolean,
+    timezoneOffset?: number
 ) {
     try {
         const user = await requireStaff();
         const db = getAdminDb();
 
-        const selectedWeek = new Date(weekStartDateMs);
-        const weekStart = getWeekStart(selectedWeek);
-        const weekStartStr = formatLocalDateKeyServer(weekStart);
+        const offset = timezoneOffset ?? 0;
+        const weekStart = getWeekStartForOffset(weekStartDateMs, offset);
+        const weekStartStr = formatLocalDateKeyServer(weekStart, offset);
         const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStart);
 
         // 1. Enforce day-locks: Get all approved shifts for this user in this week
@@ -110,7 +112,7 @@ export async function submitAvailability(
                 // Compare ranges (length and start/end times)
                 const isDifferent =
                     existingRanges.length !== dayRanges.length ||
-                    existingRanges.some((r: any, idx: number) => r.start !== dayRanges[idx].start || r.end !== dayRanges[idx].end);
+                    existingRanges.some((r: TimeRangeInput, idx: number) => r.start !== dayRanges[idx].start || r.end !== dayRanges[idx].end);
 
                 if (isDifferent) {
                     throw new Error(`Cannot modify availability on day ${dayOfWeek} because you have a rostered shift.`);

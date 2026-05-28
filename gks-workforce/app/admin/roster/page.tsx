@@ -211,6 +211,7 @@ export default function AdminRosterPage() {
                     startTime: shiftForm.startTime,
                     endTime: shiftForm.endTime,
                     forceOverride,
+                    timezoneOffset: new Date().getTimezoneOffset(),
                 });
                 showNotification('Shift approved successfully!', 'success');
             }

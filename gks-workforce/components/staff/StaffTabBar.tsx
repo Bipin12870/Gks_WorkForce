@@ -26,19 +26,21 @@ export default function StaffTabBar() {
         try {
             const saved = localStorage.getItem('last_staff_profile_path');
             if (saved && saved.startsWith('/staff/profile')) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setProfileHref(saved);
             }
-        } catch (e) {
+        } catch {
             // Ignore
         }
     }, []);
 
     useEffect(() => {
         if (pathname.startsWith('/staff/profile')) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setProfileHref(pathname);
             try {
                 localStorage.setItem('last_staff_profile_path', pathname);
-            } catch (e) {
+            } catch {
                 // Ignore
             }
         }
@@ -68,7 +70,7 @@ export default function StaffTabBar() {
 
     return (
         <nav
-            className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 pb-[env(safe-area-inset-bottom)]"
+            className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 pt-2 pb-[calc(18px+env(safe-area-inset-bottom))]"
             aria-label="Staff navigation"
         >
             <div className="max-w-lg mx-auto flex">
@@ -86,32 +88,34 @@ export default function StaffTabBar() {
                             key={tab.href}
                             href={href}
                             aria-current={isActive ? 'page' : undefined}
-                            className={`relative flex-1 flex flex-col items-center justify-center gap-1 min-h-14 py-2 px-1 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
-                                isActive ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
-                            }`}
+                            className="relative flex-1 flex flex-col items-center justify-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
                         >
-                            <span className="relative">
-                                <Icon
-                                    icon={tab.icon}
-                                    size="md"
-                                    className={isActive ? 'text-blue-600' : 'text-gray-400'}
-                                />
-                                {tab.href === '/staff/clock' && todayShifts > 0 && (
+                            <div className={`flex flex-col items-center gap-0.5 relative pb-1 px-1 transition-all active:scale-95 ${
+                                isActive ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
+                            }`}>
+                                <span className="relative">
+                                    <Icon
+                                        icon={tab.icon}
+                                        size="md"
+                                        className={isActive ? 'text-blue-600' : 'text-gray-400'}
+                                    />
+                                    {tab.href === '/staff/clock' && todayShifts > 0 && (
+                                        <span
+                                            className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-600 rounded-full"
+                                            aria-hidden
+                                        />
+                                    )}
+                                </span>
+                                <span className={`text-[10px] sm:text-xs font-semibold ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                                    {tab.label}
+                                </span>
+                                {isActive && (
                                     <span
-                                        className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-600 rounded-full"
+                                        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full motion-reduce:hidden animate-in fade-in zoom-in-75 duration-200"
                                         aria-hidden
                                     />
                                 )}
-                            </span>
-                            <span className={`text-xs font-medium ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
-                                {tab.label}
-                            </span>
-                            {isActive && (
-                                <span
-                                    className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full motion-reduce:hidden animate-in fade-in zoom-in-75 duration-200"
-                                    aria-hidden
-                                />
-                            )}
+                            </div>
                         </Link>
                     );
                 })}

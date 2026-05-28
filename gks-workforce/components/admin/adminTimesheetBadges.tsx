@@ -2,7 +2,7 @@
 
 import Badge from '@/components/ui/Badge';
 import Icon from '@/components/ui/Icon';
-import { Timesheet, TimesheetStatus, TimesheetSource } from '@/types';
+import { TimesheetStatus, TimesheetSource } from '@/types';
 import {
     PenLine,
     MapPin,

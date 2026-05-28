@@ -187,7 +187,20 @@ export default function StaffAvailabilitySection() {
         loadAvailability();
     }, [loadAvailability]);
 
-    const isDayLocked = (dayOfWeek: number) => lockedDays.has(dayOfWeek);
+    const isPastDay = useCallback((dayOfWeek: number) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const dayDate = new Date(selectedWeek);
+        dayDate.setDate(dayDate.getDate() + (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+        dayDate.setHours(0, 0, 0, 0);
+
+        return dayDate.getTime() < today.getTime();
+    }, [selectedWeek]);
+
+    const isDayLocked = useCallback((dayOfWeek: number) => {
+        return lockedDays.has(dayOfWeek) || isPastDay(dayOfWeek);
+    }, [lockedDays, isPastDay]);
 
     const addTimeRange = (dayOfWeek: number) => {
         if (isDayLocked(dayOfWeek)) return;
@@ -298,13 +311,13 @@ export default function StaffAvailabilitySection() {
                 const next = { ...prev };
                 // Reset all unlocked days first to ensure we overwrite/clear them correctly
                 for (let day = 0; day < 7; day++) {
-                    if (!lockedDays.has(day)) {
+                    if (!isDayLocked(day)) {
                         next[day] = [];
                     }
                 }
                 for (const [dayStr, ranges] of Object.entries(copiedAvailability)) {
                     const day = parseInt(dayStr, 10);
-                    if (!isNaN(day) && !lockedDays.has(day)) {
+                    if (!isNaN(day) && !isDayLocked(day)) {
                         next[day] = ranges;
                     }
                 }
@@ -386,6 +399,7 @@ export default function StaffAvailabilitySection() {
         _saveDraft(userData.id, selectedWeek, availability, isRecurring);
     }, [availability, isRecurring, selectedWeek, userData]);
 
+    const allDaysLocked = WEEK_DAYS.every((day) => isDayLocked(day));
     const canSubmit = WEEK_DAYS.some((day) => !isDayLocked(day));
 
     return (
@@ -405,7 +419,7 @@ export default function StaffAvailabilitySection() {
                         variant="secondary"
                         size="md"
                         onClick={copyFromLastWeek}
-                        disabled={lockedDays.size >= 7 || loading}
+                        disabled={allDaysLocked || loading}
                         className="flex-1 sm:flex-initial"
                     >
                         <Icon icon={Copy} size="sm" className="text-gray-500" />
@@ -413,7 +427,7 @@ export default function StaffAvailabilitySection() {
                     </Button>
                     <label
                         className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-all select-none min-h-11 flex-1 sm:flex-initial ${
-                            lockedDays.size >= 7
+                            allDaysLocked
                                 ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200 text-gray-400'
                                 : isRecurring
                                 ? 'bg-blue-50/60 border-blue-200 text-blue-700 cursor-pointer shadow-xs'
@@ -421,10 +435,10 @@ export default function StaffAvailabilitySection() {
                         }`}
                     >
                         <input
-                            type="checkbox"
-                            checked={isRecurring}
-                            onChange={(e) => setIsRecurring(e.target.checked)}
-                            disabled={lockedDays.size >= 7}
+                             type="checkbox"
+                             checked={isRecurring}
+                             onChange={(e) => setIsRecurring(e.target.checked)}
+                             disabled={allDaysLocked}
                             className="sr-only"
                         />
                         <div className={`w-4 h-4 rounded-sm border flex items-center justify-center transition-colors ${isRecurring ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white'}`}>
@@ -471,8 +485,12 @@ export default function StaffAvailabilitySection() {
                                 <span className={`text-sm font-semibold ${dayLocked ? 'text-gray-500' : 'text-gray-900'}`}>
                                     {getDayName(dayOfWeek)}
                                     {dayLocked && (
-                                        <span className="ml-2 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/50 rounded-sm px-1.5 py-0.5 uppercase tracking-wider select-none">
-                                            Rostered
+                                        <span className={`ml-2 text-[10px] font-semibold rounded-sm px-1.5 py-0.5 uppercase tracking-wider select-none ${
+                                            lockedDays.has(dayOfWeek)
+                                                ? 'text-amber-700 bg-amber-50 border border-amber-200/50'
+                                                : 'text-slate-600 bg-slate-50 border border-slate-200/50'
+                                        }`}>
+                                            {lockedDays.has(dayOfWeek) ? 'Rostered' : 'Past'}
                                         </span>
                                     )}
                                 </span>

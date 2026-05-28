@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
-import { Shift, Timesheet, TimesheetStatus, User } from '@/types';
-import { getWeekStart, getDayName, formatDate } from '@/lib/utils';
+import { Timesheet, TimesheetStatus, User } from '@/types';
+import { getWeekStart, formatDate } from '@/lib/utils';
 import { updateTimesheetStatus, correctTimesheet } from '@/app/actions/timesheets';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
@@ -19,9 +19,8 @@ import Input from '@/components/ui/Input';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
-import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
-import { AlertTriangle, Calendar, CheckSquare, Clock } from 'lucide-react';
+import { AlertTriangle, Clock } from 'lucide-react';
 import { Suspense } from 'react';
 
 export default function AdminTimesheetsPage() {
@@ -38,7 +37,6 @@ function AdminTimesheetsContent() {
     const { showNotification } = useNotification();
     const [selectedWeek, setSelectedWeek] = useState<Date>(getWeekStart(new Date()));
     const [selectedDay, setSelectedDay] = useState<number>(-1); // Default to all week for clean grid/table
-    const [shifts, setShifts] = useState<Shift[]>([]);
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [staffMap, setStaffMap] = useState<Record<string, User>>({});
     const [loading, setLoading] = useState(true);
@@ -70,13 +68,23 @@ function AdminTimesheetsContent() {
     const [adminNote, setAdminNote] = useState('');
     const [voidTimesheet, setVoidTimesheet] = useState(false);
 
+    const loadStaff = async () => {
+        if (!userData || userData.role !== 'ADMIN') return;
+        const snapshot = await getDocs(collection(db, 'users'));
+        const map: Record<string, User> = {};
+        snapshot.forEach((doc) => {
+            map[doc.id] = { id: doc.id, ...doc.data() } as User;
+        });
+        setStaffMap(map);
+    };
+
     useEffect(() => {
         if (userData?.role === 'ADMIN') {
             loadStaff();
         }
     }, [userData]);
 
-    // Real-time shifts & timesheets loader
+    // Real-time timesheets loader
     useEffect(() => {
         if (!userData || userData.role !== 'ADMIN') return;
 
@@ -99,28 +107,6 @@ function AdminTimesheetsContent() {
             startDate = dayDate;
             endDate = nextDay;
         }
-
-        const shiftsQuery = query(
-            collection(db, 'shifts'),
-            where('status', '==', 'APPROVED'),
-            where('date', '>=', Timestamp.fromDate(startDate)),
-            where('date', '<', Timestamp.fromDate(endDate))
-        );
-
-        const unsubscribeShifts = onSnapshot(shiftsQuery,
-            (snapshot) => {
-                const loadedShifts: Shift[] = [];
-                snapshot.forEach((doc) => {
-                    loadedShifts.push({ id: doc.id, ...doc.data() } as Shift);
-                });
-                loadedShifts.sort((a, b) => a.startTime.localeCompare(b.startTime));
-                setShifts(loadedShifts);
-            },
-            (error) => {
-                console.error('Error fetching shifts:', error);
-                showNotification('Failed to load rostered shifts.', 'error');
-            }
-        );
 
         const timesheetsQuery = query(
             collection(db, 'timesheets'),
@@ -145,20 +131,11 @@ function AdminTimesheetsContent() {
         );
 
         return () => {
-            unsubscribeShifts();
             unsubscribeTimesheets();
         };
     }, [selectedWeek, selectedDay, userData]);
 
-    const loadStaff = async () => {
-        if (!userData || userData.role !== 'ADMIN') return;
-        const snapshot = await getDocs(collection(db, 'users'));
-        const map: Record<string, User> = {};
-        snapshot.forEach((doc) => {
-            map[doc.id] = { id: doc.id, ...doc.data() } as User;
-        });
-        setStaffMap(map);
-    };
+
 
     const changeWeek = (direction: 'prev' | 'next') => {
         const newWeek = new Date(selectedWeek);

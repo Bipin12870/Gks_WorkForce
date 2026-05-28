@@ -121,7 +121,21 @@ export async function clockIn(
 
         // 7. Find matching shift
         const clientLocalMidnight = getClientLocalDate(serverNow, timezoneOffset);
-        const shift = await getMatchingShiftServer(db, user.id, clientLocalMidnight);
+        let shift = await getMatchingShiftServer(db, user.id, clientLocalMidnight);
+
+        // Check if this shift has already been completed (has a completed timeRecord)
+        if (shift) {
+            const completedRecords = await db.collection('timeRecords')
+                .where('staffId', '==', user.id)
+                .where('shiftId', '==', shift.id)
+                .get();
+
+            const hasCompleted = completedRecords.docs.some(doc => doc.data().clockOutTime !== null);
+            if (hasCompleted) {
+                // Roster shift was already completed/auto-closed today. Treat this clock-in as unscheduled.
+                shift = null;
+            }
+        }
 
         // 8. Create time record
         const recordPayload = {
@@ -195,6 +209,7 @@ export async function clockOut(
             throw new Error('Active time record not found.');
         }
         const recordData = recordDoc.data()!;
+        const clientLocalMidnight = getClientLocalDate(recordData.clockInTime.toDate().getTime(), timezoneOffset);
 
         // 3. Auth validation
         if (recordData.staffId !== user.id && user.role !== 'ADMIN') {
@@ -223,10 +238,12 @@ export async function clockOut(
         const shop = shopDoc.data()!;
 
         // 6. Find shift
-        const clientLocalMidnight = getClientLocalDate(recordData.clockInTime.toDate().getTime(), timezoneOffset);
-        const shiftDoc = await getMatchingShiftServer(db, recordData.staffId, clientLocalMidnight);
-        const shift = shiftDoc ? shiftDoc.data() : null;
-        const shiftId = shiftDoc ? shiftDoc.id : null;
+        let shift = null;
+        const shiftId = recordData.shiftId || null;
+        if (shiftId) {
+            const shiftDoc = await db.collection('shifts').doc(shiftId).get();
+            shift = shiftDoc.exists ? shiftDoc.data() : null;
+        }
 
         // 7. Calculate clock-out times
         let clockOutRounded: string;

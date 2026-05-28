@@ -41,6 +41,17 @@ export async function submitAvailability(
         const weekStartStr = formatLocalDateKeyServer(weekStart, offset);
         const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStart);
 
+        const weekStartLocalCalendar = new Date(weekStart.getTime() - (offset * 60 * 1000));
+        const todayLocalCalendar = new Date(Date.now() - (offset * 60 * 1000));
+        todayLocalCalendar.setUTCHours(0, 0, 0, 0);
+
+        const isPastDayServer = (day: number) => {
+            const dayDate = new Date(weekStartLocalCalendar.getTime());
+            dayDate.setUTCDate(dayDate.getUTCDate() + (day === 0 ? 6 : day - 1));
+            dayDate.setUTCHours(0, 0, 0, 0);
+            return dayDate.getTime() < todayLocalCalendar.getTime();
+        };
+
         // 1. Enforce day-locks: Get all approved shifts for this user in this week
         const nextWeek = new Date(weekStart);
         nextWeek.setDate(nextWeek.getDate() + 7);
@@ -102,8 +113,9 @@ export async function submitAvailability(
             const docRef = db.collection('availability').doc(dayId);
             const dayRanges = cleanedAvailability[dayOfWeek] || [];
 
-            // If day is locked, block any changes
-            if (lockedDays.has(dayOfWeek)) {
+            // If day is locked or in the past, block any changes
+            const isPast = isPastDayServer(dayOfWeek);
+            if (lockedDays.has(dayOfWeek) || isPast) {
                 // Fetch the existing document to compare
                 const existingDoc = await docRef.get();
                 const existingData = existingDoc.exists ? existingDoc.data() : null;
@@ -115,9 +127,12 @@ export async function submitAvailability(
                     existingRanges.some((r: TimeRangeInput, idx: number) => r.start !== dayRanges[idx].start || r.end !== dayRanges[idx].end);
 
                 if (isDifferent) {
-                    throw new Error(`Cannot modify availability on day ${dayOfWeek} because you have a rostered shift.`);
+                    const reason = lockedDays.has(dayOfWeek)
+                        ? 'because you have a rostered shift'
+                        : 'because it is in the past';
+                    throw new Error(`Cannot modify availability on day ${dayOfWeek} ${reason}.`);
                 }
-                // Skip writing since it's identical and locked
+                // Skip writing since it's identical and locked/past
                 continue;
             }
 

@@ -6,16 +6,13 @@ import { saveShopLocation } from '@/app/actions/settings';
 import { getShopLocation } from '@/lib/geofence';
 import { ShopLocation } from '@/types';
 import { useNotification } from '@/contexts/NotificationContext';
-import { useRouter } from 'next/navigation';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import Button from '@/components/ui/Button';
-import Spinner from '@/components/ui/Spinner';
 import Icon from '@/components/ui/Icon';
 import { MapPin, AlertTriangle, LocateFixed } from 'lucide-react';
 
 export default function AdminSettingsPage() {
     const { userData } = useAuth();
-    const router = useRouter();
     const { showNotification } = useNotification();
 
     const [current, setCurrent] = useState<ShopLocation | null>(null);

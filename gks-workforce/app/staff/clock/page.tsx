@@ -4,10 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, Timestamp, orderBy, limit } from 'firebase/firestore';
-import { TimeRecord, Timesheet, Shift, ShopLocation, TimesheetSource, TimesheetStatus } from '@/types';
+import { collection, query, where, getDocs, Timestamp, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { TimeRecord, Shift, ShopLocation } from '@/types';
 import { getShopLocation, formatTimeToHHmm, roundToNearest5Minutes, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
-import { getWeekStart, processTimesheetAutomation, isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
+import { isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
 import { clockIn, clockOut } from '@/app/actions/clock';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffAlert from '@/components/staff/StaffAlert';
@@ -44,7 +44,6 @@ export default function ClockInOutPage() {
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
     const [todayShift, setTodayShift] = useState<Shift | null>(null);
-    const [hasCheckedShift, setHasCheckedShift] = useState(false);
     const [clockInCoolingRemaining, setClockInCoolingRemaining] = useState<number>(0);
     const [clockOutCoolingRemaining, setClockOutCoolingRemaining] = useState<number>(0);
     const [shiftDurationSeconds, setShiftDurationSeconds] = useState(0);
@@ -134,7 +133,6 @@ export default function ClockInOutPage() {
                 // Fetch today's rostered shift to show warning if not rostered
                 const shift = await getMatchingShift(Date.now());
                 setTodayShift(shift);
-                setHasCheckedShift(true);
             } catch (err) {
                 console.error(err);
                 showNotification('Failed to load configuration.', 'error');
@@ -196,7 +194,13 @@ export default function ClockInOutPage() {
             const record = { id: docSnap.id, ...docSnap.data() } as TimeRecord;
             
             // CHECK AUTO-CLOSE
-            const shift = await getMatchingShift(record.clockInTime.toMillis());
+            let shift: Shift | null = null;
+            if (record.shiftId) {
+                const shiftDoc = await getDoc(doc(db, 'shifts', record.shiftId));
+                if (shiftDoc.exists()) {
+                    shift = { id: shiftDoc.id, ...shiftDoc.data() } as Shift;
+                }
+            }
             if (shift) {
                 const shiftEnd = new Date(shift.date.toDate());
                 const [eh, em] = shift.endTime.split(':').map(Number);
@@ -286,9 +290,10 @@ export default function ClockInOutPage() {
                     setClockInCoolingRemaining(300);
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error clocking out:', error);
-            showNotification(error.message || 'Failed to clock out.', 'error');
+            const errMsg = error instanceof Error ? error.message : 'Failed to clock out.';
+            showNotification(errMsg, 'error');
         }
     };
 
@@ -319,9 +324,25 @@ export default function ClockInOutPage() {
                 setConfirmModalData({
                     action: 'clock-in',
                     title: 'Unscheduled Shift',
-                    message:
-                        'You are not rostered for a shift today. Clocking in will record this as an Emergency / Unscheduled shift and will require Admin approval.' +
-                        roundingNote,
+                    message: 'You are not rostered for a shift today. Clocking in will record this as an Emergency / Unscheduled shift and will require Admin approval.' + roundingNote,
+                    type: 'unscheduled',
+                });
+                return;
+            }
+
+            // Check if this shift has already been completed today
+            const completedQ = query(
+                collection(db, 'timeRecords'),
+                where('staffId', '==', userData.id),
+                where('shiftId', '==', todayShift.id)
+            );
+            const completedSnap = await getDocs(completedQ);
+            const hasCompleted = completedSnap.docs.some(doc => doc.data().clockOutTime !== null);
+            if (hasCompleted) {
+                setConfirmModalData({
+                    action: 'clock-in',
+                    title: 'Unscheduled Shift',
+                    message: 'You have already completed your rostered shift for today. Clocking in again will record this as an Emergency / Unscheduled shift and will require Admin approval.' + roundingNote,
                     type: 'unscheduled',
                 });
                 return;
@@ -376,9 +397,10 @@ export default function ClockInOutPage() {
                 setClockOutCoolingRemaining(60); // 1 minute safety clock-out lock
                 await checkActiveClockIn();
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error clocking in:', error);
-            showNotification(error.message || 'Failed to clock in.', 'error');
+            const errMsg = error instanceof Error ? error.message : 'Failed to clock in.';
+            showNotification(errMsg, 'error');
         } finally {
             setProcessing(false);
         }
@@ -391,6 +413,15 @@ export default function ClockInOutPage() {
             return;
         }
 
+        // Fetch shift details once by ID (if associated with a rostered shift)
+        let shift: Shift | null = null;
+        if (activeRecord.shiftId) {
+            const shiftDoc = await getDoc(doc(db, 'shifts', activeRecord.shiftId));
+            if (shiftDoc.exists()) {
+                shift = { id: shiftDoc.id, ...shiftDoc.data() } as Shift;
+            }
+        }
+
         if (!force) {
             const now = new Date();
             const roundedOut = roundToNearest5Minutes(now);
@@ -399,8 +430,6 @@ export default function ClockInOutPage() {
                 roundedOut !== actualOut
                     ? ` Recorded time will be ${roundedOut} (rounded to the nearest 5 minutes from ${actualOut}).`
                     : ` Recorded time will be ${roundedOut}.`;
-
-            const shift = await getMatchingShift(activeRecord.clockInTime.toMillis());
 
             if (geo && shop && geo.distanceMetres !== null && !geo.withinRange) {
                 setConfirmModalData({
@@ -457,7 +486,6 @@ export default function ClockInOutPage() {
         setConfirmModalData(null);
         setProcessing(true);
         try {
-            const shift = await getMatchingShift(activeRecord.clockInTime.toMillis());
             await processClockOut(activeRecord, shift, false);
         } catch (error) {
             console.error('Error clocking out:', error);

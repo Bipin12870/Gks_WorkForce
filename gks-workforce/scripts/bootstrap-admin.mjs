@@ -19,7 +19,7 @@ async function bootstrap() {
     let envContent = '';
     try {
         envContent = readFileSync(envPath, 'utf8');
-    } catch (e) {
+    } catch {
         console.error('❌ Could not find .env.local file. Please ensure it exists in the root directory.');
         process.exit(1);
     }

@@ -4,13 +4,10 @@ import { useState } from 'react';
 import { Timesheet } from '@/types';
 import { formatDate, processTimesheetAutomation, calculatePayrollRecord } from '@/lib/utils';
 import {
-    AutomationStatusBadge,
     TimesheetFlagChips,
     TimesheetSourceBadge,
-    TimesheetStatusBadge,
 } from '@/components/admin/adminTimesheetBadges';
-import Icon from '@/components/ui/Icon';
-import { Check, X, Edit2, AlertCircle, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import { Check, X, Edit2, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface TimesheetTableRowProps {
     timesheet: Timesheet;

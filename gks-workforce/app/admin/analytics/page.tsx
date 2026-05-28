@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { User, Timesheet, Shift } from '@/types';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminWeekPicker from '@/components/admin/AdminWeekPicker';
@@ -11,7 +10,7 @@ import AdminStatCard from '@/components/admin/AdminStatCard';
 import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
 import { DollarSign, Clock, TrendingUp } from 'lucide-react';
-import { getWeekStart, formatDate, calculatePayrollRecord } from '@/lib/utils';
+import { getWeekStart, calculatePayrollRecord } from '@/lib/utils';
 import {
     BarChart,
     Bar,
@@ -26,7 +25,7 @@ import {
 } from 'recharts';
 
 export default function AnalyticsPage() {
-    const { userData } = useAuth();
+
     const [staffList, setStaffList] = useState<User[]>([]);
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [shifts, setShifts] = useState<Shift[]>([]);

@@ -12,20 +12,19 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { Availability, Shift, User } from '@/types';
-import { getWeekStart, getDayName, formatDate, isWithinAvailability } from '@/lib/utils';
+import { getWeekStart, getDayName, isWithinAvailability } from '@/lib/utils';
 import { createShift, updateShift, deleteShift } from '@/app/actions/shifts';
 import { useNotification } from '@/contexts/NotificationContext';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminFilterBar from '@/components/admin/AdminFilterBar';
 import AdminTabs from '@/components/admin/AdminTabs';
-import AdminFormModal, { AdminModalFooter } from '@/components/admin/AdminFormModal';
+import AdminFormModal from '@/components/admin/AdminFormModal';
 import RosterShiftCard from '@/components/admin/RosterShiftCard';
 import AvailabilityCard from '@/components/admin/AvailabilityCard';
 import RosterWeeklyGrid from '@/components/admin/RosterWeeklyGrid';
 import Badge from '@/components/ui/Badge';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-import EmptyState from '@/components/ui/EmptyState';
 import { CalendarDays, LayoutList, AlertTriangle, Calendar } from 'lucide-react';
 
 export default function AdminRosterPage() {
@@ -47,6 +46,22 @@ export default function AdminRosterPage() {
     const [filterMode, setFilterMode] = useState<'HARD' | 'HIGHLIGHT'>('HARD');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [forceOverride, setForceOverride] = useState(false);
+
+    const loadStaff = async () => {
+        if (!userData || userData.role !== 'ADMIN') return;
+        const snapshot = await getDocs(collection(db, 'users'));
+        const map: Record<string, User> = {};
+        const list: User[] = [];
+        snapshot.forEach((doc) => {
+            const u = { id: doc.id, ...doc.data() } as User;
+            if (u.isActive !== false) {
+                map[doc.id] = u;
+                list.push(u);
+            }
+        });
+        setStaffMap(map);
+        setStaffList(list.sort((a, b) => a.name.localeCompare(b.name)));
+    };
 
     // Load staff data
     useEffect(() => {
@@ -117,21 +132,7 @@ export default function AdminRosterPage() {
         return () => unsubscribe();
     }, [selectedWeek, selectedDay, userData, viewMode]);
 
-    const loadStaff = async () => {
-        if (!userData || userData.role !== 'ADMIN') return;
-        const snapshot = await getDocs(collection(db, 'users'));
-        const map: Record<string, User> = {};
-        const list: User[] = [];
-        snapshot.forEach((doc) => {
-            const u = { id: doc.id, ...doc.data() } as User;
-            if (u.isActive !== false) {
-                map[doc.id] = u;
-                list.push(u);
-            }
-        });
-        setStaffMap(map);
-        setStaffList(list.sort((a, b) => a.name.localeCompare(b.name)));
-    };
+
 
     const changeWeek = (direction: 'prev' | 'next') => {
         const newWeek = new Date(selectedWeek);
@@ -252,7 +253,6 @@ export default function AdminRosterPage() {
 
     const dayAvailability = getAvailabilityForDay();
     const staffOptions = Object.values(staffMap).map((s) => ({ id: s.id, name: s.name }));
-    const selectedDate = getSelectedDate();
 
     return (
         <>

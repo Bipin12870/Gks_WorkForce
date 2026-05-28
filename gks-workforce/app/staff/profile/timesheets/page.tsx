@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
-import { Shift, Timesheet, TimesheetStatus, TimeRecord } from '@/types';
+import { Shift, Timesheet, TimeRecord } from '@/types';
 import { getWeekStart, getDayName, formatDate, calculateHours } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import { createManualTimesheet } from '@/app/actions/timesheets';
@@ -17,14 +17,9 @@ import Input from '@/components/ui/Input';
 import Card from '@/components/ui/Card';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
-import Icon from '@/components/ui/Icon';
 import {
-    AlertTriangle,
     Clock,
     FileText,
-    MapPin,
-    PenLine,
-    ChevronDown,
 } from 'lucide-react';
 
 export default function StaffProfileTimesheetsPage() {
@@ -480,7 +475,7 @@ export default function StaffProfileTimesheetsPage() {
                                                 <div className="pt-3 border-t border-slate-100 flex flex-col gap-1">
                                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Manager Note</span>
                                                     <p className="text-xs text-slate-600 leading-relaxed italic bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                                                        "{timesheet.adminNote}"
+                                                        &ldquo;{timesheet.adminNote}&rdquo;
                                                     </p>
                                                 </div>
                                             )}

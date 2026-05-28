@@ -7,32 +7,16 @@ import { db } from '@/lib/firebase';
 import AdminStatCard from '@/components/admin/AdminStatCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
-import Icon from '@/components/ui/Icon';
 import {
     AlertTriangle,
-    CalendarRange,
     ClipboardCheck,
     Clock,
-    DollarSign,
-    Settings,
-    Users,
-    BarChart3,
     ArrowRight,
-    Play,
-    UserCheck,
-    HelpCircle,
 } from 'lucide-react';
 import { Shift, User, TimeRecord } from '@/types';
-import { getDayName, parseTime } from '@/lib/utils';
+import { parseTime } from '@/lib/utils';
 
-interface QuickLink {
-    title: string;
-    description: string;
-    href: string;
-    icon: any;
-    badge?: number;
-    priority?: 'default' | 'warning' | 'danger';
-}
+
 
 interface CrewStatus {
     staffId: string;
@@ -243,14 +227,6 @@ export default function AdminOperationalDashboard() {
         return total;
     }, [activeRecords, completedRecordsToday, nowTime]);
 
-
-
-    const modules: QuickLink[] = [
-        { title: 'Staff', description: 'Profiles, rates, access', href: '/admin/staff', icon: Users },
-        { title: 'Hours & Pay', description: 'Weekly labor summary', href: '/admin/hours', icon: DollarSign },
-        { title: 'Analytics', description: 'Trends and labor metrics', href: '/admin/analytics', icon: BarChart3 },
-        { title: 'Settings', description: 'Shop location & geofence', href: '/admin/settings', icon: Settings },
-    ];
 
     return (
         <div className="space-y-6">

@@ -3,10 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { useNotification } from '@/contexts/NotificationContext';
 import { User } from '@/types';
-import { useRouter } from 'next/navigation';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import Accordion from '@/components/ui/Accordion';
 import Button from '@/components/ui/Button';
@@ -19,7 +18,6 @@ import { createStaffAccount, updateStaffProfile, toggleStaffActive, resetStaffPa
 
 export default function AdminStaffPage() {
     const { userData } = useAuth();
-    const router = useRouter();
     const [staff, setStaff] = useState<User[]>([]);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [loading, setLoading] = useState(true);

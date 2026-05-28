@@ -374,11 +374,15 @@ export default function StaffAvailabilitySection() {
             }
 
             // Submit via server action (handles day-lock enforcement, auth, and audit logging)
-            await submitAvailability(selectedWeek.getTime(), cleanedAvailability, isRecurring, new Date().getTimezoneOffset());
+            const result = await submitAvailability(selectedWeek.getTime(), cleanedAvailability, isRecurring, new Date().getTimezoneOffset());
 
-            showNotification('Availability submitted successfully!', 'success');
-            _clearDraft(userData.id, selectedWeek);
-            await loadAvailability();
+            if (result.success) {
+                showNotification('Availability submitted successfully!', 'success');
+                _clearDraft(userData.id, selectedWeek);
+                await loadAvailability();
+            } else {
+                showNotification(result.error || 'Failed to submit availability. Please try again.', 'error');
+            }
         } catch (error) {
             console.error('Error submitting availability:', error);
             showNotification((error as Error).message || 'Failed to submit availability. Please try again.', 'error');

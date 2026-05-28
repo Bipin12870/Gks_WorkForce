@@ -179,6 +179,6 @@ export async function submitAvailability(
         return { success: true };
     } catch (error) {
         console.error('Error in submitAvailability server action:', error);
-        throw new Error((error as Error).message);
+        return { success: false, error: (error as Error).message };
     }
 }

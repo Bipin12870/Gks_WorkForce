@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
@@ -30,6 +30,59 @@ import { AlertTriangle, ChevronDown, Info, Lock, Plus, Trash2, Copy } from 'luci
 
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
+// ─── Draft persistence ────────────────────────────────────────────────────────
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function _formatWeekKey(date: Date): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function _draftKey(userId: string, weekStart: Date): string {
+    return `avail_draft_${userId}_${_formatWeekKey(weekStart)}`;
+}
+
+interface _AvailDraft {
+    weekStartMs: number;
+    availability: Record<number, TimeRange[]>;
+    isRecurring: boolean;
+    savedAt: number;
+}
+
+function _saveDraft(userId: string, weekStart: Date, availability: Record<number, TimeRange[]>, isRecurring: boolean): void {
+    try {
+        const draft: _AvailDraft = {
+            weekStartMs: weekStart.getTime(),
+            availability,
+            isRecurring,
+            savedAt: Date.now(),
+        };
+        localStorage.setItem(_draftKey(userId, weekStart), JSON.stringify(draft));
+    } catch { /* localStorage unavailable — fail silently */ }
+}
+
+function _loadDraft(userId: string, weekStart: Date): _AvailDraft | null {
+    try {
+        const raw = localStorage.getItem(_draftKey(userId, weekStart));
+        if (!raw) return null;
+        const draft = JSON.parse(raw) as _AvailDraft;
+        if (Date.now() - draft.savedAt > DRAFT_TTL_MS) {
+            localStorage.removeItem(_draftKey(userId, weekStart));
+            return null;
+        }
+        return draft;
+    } catch {
+        return null;
+    }
+}
+
+function _clearDraft(userId: string, weekStart: Date): void {
+    try { localStorage.removeItem(_draftKey(userId, weekStart)); } catch { /* fail silently */ }
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 function rangeHasIssue(range: TimeRange): string | null {
     if (!range.start || !range.end) return null;
     if (!isWithinShopHours(range.start) || !isWithinShopHours(range.end)) {
@@ -53,14 +106,12 @@ export default function StaffAvailabilitySection() {
     const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
     const [openDay, setOpenDay] = useState<number | null>(new Date().getDay());
     const { showNotification } = useNotification();
+    // Prevents saving draft during initial Firestore load
+    const draftReady = useRef(false);
 
     const hasLockedDays = lockedDays.size > 0;
 
-    useEffect(() => {
-        loadAvailability();
-    }, [selectedWeek, userData]);
-
-    const loadAvailability = async () => {
+    const loadAvailability = useCallback(async () => {
         if (!userData) return;
         setLoading(true);
 
@@ -105,16 +156,36 @@ export default function StaffAvailabilitySection() {
                 daysWithShifts.add(shift.date.toDate().getDay());
             });
 
-            setAvailability(loadedAvailability);
-            setIsRecurring(recurring);
+            // Merge draft for days that have no submitted Firestore record and aren't locked
+            const draft = _loadDraft(userData.id, selectedWeek);
+            const finalAvailability = { ...loadedAvailability };
+            let finalRecurring = recurring;
+            if (draft) {
+                for (const [dayStr, ranges] of Object.entries(draft.availability)) {
+                    const day = parseInt(dayStr, 10);
+                    if (!isNaN(day) && !daysWithShifts.has(day) && !(day in loadedAvailability)) {
+                        finalAvailability[day] = ranges;
+                    }
+                }
+                if (!recurring && draft.isRecurring) finalRecurring = draft.isRecurring;
+            }
+
+            setAvailability(finalAvailability);
+            setIsRecurring(finalRecurring);
             setLockedDays(daysWithShifts);
         } catch (error) {
-            console.error('Error loading data:', error);
-            showNotification('Failed to load availability', 'error');
+            console.error('Error loading availability:', error);
+            showNotification('Failed to load your availability. Please set it again.', 'error');
         } finally {
             setLoading(false);
+            draftReady.current = true;
         }
-    };
+    }, [selectedWeek, userData, showNotification]);
+
+    useEffect(() => {
+        draftReady.current = false; // block saves during reload
+        loadAvailability();
+    }, [loadAvailability]);
 
     const isDayLocked = (dayOfWeek: number) => lockedDays.has(dayOfWeek);
 
@@ -293,6 +364,7 @@ export default function StaffAvailabilitySection() {
             await submitAvailability(selectedWeek.getTime(), cleanedAvailability, isRecurring);
 
             showNotification('Availability submitted successfully!', 'success');
+            _clearDraft(userData.id, selectedWeek);
             await loadAvailability();
         } catch (error) {
             console.error('Error submitting availability:', error);
@@ -307,6 +379,12 @@ export default function StaffAvailabilitySection() {
         newWeek.setDate(newWeek.getDate() + (direction === 'next' ? 7 : -7));
         setSelectedWeek(getWeekStart(newWeek));
     };
+
+    // Persist draft on every form change — silently, after initial load
+    useEffect(() => {
+        if (!draftReady.current || !userData) return;
+        _saveDraft(userData.id, selectedWeek, availability, isRecurring);
+    }, [availability, isRecurring, selectedWeek, userData]);
 
     const canSubmit = WEEK_DAYS.some((day) => !isDayLocked(day));
 

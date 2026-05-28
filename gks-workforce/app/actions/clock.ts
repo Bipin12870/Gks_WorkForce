@@ -312,33 +312,40 @@ export async function clockOut(
         // 11. Transaction: Update TimeRecord and Timesheet
         const recordRef = db.collection('timeRecords').doc(activeRecordId);
         let timesheetId = '';
+        let existingTsRef: admin.firestore.DocumentReference | null = null;
+        let queryTimesheetId = '';
+        if (shiftId) {
+            const tsSnap = await db.collection('timesheets')
+                .where('staffId', '==', recordData.staffId)
+                .where('shiftId', '==', shiftId)
+                .get();
+
+            if (!tsSnap.empty) {
+                const tsDoc = tsSnap.docs[0];
+                queryTimesheetId = tsDoc.id;
+                existingTsRef = tsDoc.ref;
+            }
+        }
 
         await db.runTransaction(async (transaction) => {
-            // Check if there is an existing timesheet for this shift to overwrite (duplicate clock cases)
-            if (shiftId) {
-                const tsSnap = await db.collection('timesheets')
-                    .where('staffId', '==', recordData.staffId)
-                    .where('shiftId', '==', shiftId)
-                    .get();
+            timesheetId = queryTimesheetId;
 
-                if (!tsSnap.empty) {
-                    const tsDoc = tsSnap.docs[0];
-                    timesheetId = tsDoc.id;
-                    transaction.update(tsDoc.ref, {
-                        workedStart: recordData.clockInRounded,
-                        workedEnd: clockOutRounded,
-                        source,
-                        timeRecordId: activeRecordId,
-                        clockInLat: recordData.clockInLat,
-                        clockInLng: recordData.clockInLng,
-                        clockOutLat: isAutoClose ? null : lat,
-                        clockOutLng: isAutoClose ? null : lng,
-                        clockOutDistanceMetres: distanceMetres,
-                        requiresAdminNote: requiresNote,
-                        status: finalStatus,
-                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    });
-                }
+            // Check if there is an existing timesheet for this shift to overwrite (duplicate clock cases)
+            if (existingTsRef) {
+                transaction.update(existingTsRef, {
+                    workedStart: recordData.clockInRounded,
+                    workedEnd: clockOutRounded,
+                    source,
+                    timeRecordId: activeRecordId,
+                    clockInLat: recordData.clockInLat,
+                    clockInLng: recordData.clockInLng,
+                    clockOutLat: isAutoClose ? null : lat,
+                    clockOutLng: isAutoClose ? null : lng,
+                    clockOutDistanceMetres: distanceMetres,
+                    requiresAdminNote: requiresNote,
+                    status: finalStatus,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
             }
 
             // Create a new timesheet if none existed/matched

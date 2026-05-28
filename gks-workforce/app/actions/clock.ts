@@ -177,7 +177,7 @@ export async function clockIn(
         return { success: true, id: docRef.id };
     } catch (error) {
         console.error('Error in clockIn action:', error);
-        throw new Error((error as Error).message);
+        return { success: false, id: null, error: (error as Error).message };
     }
 }
 
@@ -407,6 +407,6 @@ export async function clockOut(
         return { success: true, timesheetId };
     } catch (error) {
         console.error('Error in clockOut action:', error);
-        throw new Error((error as Error).message);
+        return { success: false, timesheetId: '', error: (error as Error).message };
     }
 }

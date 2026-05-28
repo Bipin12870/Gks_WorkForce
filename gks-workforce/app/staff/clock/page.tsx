@@ -111,6 +111,8 @@ export default function ClockInOutPage() {
                     showNotification(`Clocked out. Timesheet generated (${clockOutRounded}).`, 'success');
                     setClockInCoolingRemaining(10);
                 }
+            } else {
+                showNotification(result.error || 'Failed to clock out.', 'error');
             }
         } catch (error: unknown) {
             console.error('Error clocking out:', error);
@@ -326,6 +328,8 @@ export default function ClockInOutPage() {
             if (result.success) {
                 showNotification('Clocked in successfully!', 'success');
                 setClockOutCoolingRemaining(10); // 10 seconds safety clock-out lock
+            } else {
+                showNotification(result.error || 'Failed to clock in.', 'error');
             }
         } catch (error: unknown) {
             console.error('Error clocking in:', error);

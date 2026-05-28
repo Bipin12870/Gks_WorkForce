@@ -26,7 +26,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Icon from '@/components/ui/Icon';
 import StaffActionFooter from '@/components/staff/StaffActionFooter';
-import { AlertTriangle, ChevronDown, Info, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Info, Lock, Plus, Trash2, Copy } from 'lucide-react';
 
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
@@ -201,38 +201,51 @@ export default function StaffAvailabilitySection() {
     };
 
     const copyFromLastWeek = async () => {
-        if (!userData) return;
+        if (!userData || loading) return;
+        setLoading(true);
+        try {
+            const lastWeek = new Date(selectedWeek);
+            lastWeek.setDate(lastWeek.getDate() - 7);
+            const lastWeekStart = Timestamp.fromDate(getWeekStart(lastWeek));
 
-        const lastWeek = new Date(selectedWeek);
-        lastWeek.setDate(lastWeek.getDate() - 7);
-        const lastWeekStart = Timestamp.fromDate(getWeekStart(lastWeek));
+            const q = query(
+                collection(db, 'availability'),
+                where('staffId', '==', userData.id),
+                where('weekStartDate', '==', lastWeekStart)
+            );
 
-        const q = query(
-            collection(db, 'availability'),
-            where('staffId', '==', userData.id),
-            where('weekStartDate', '==', lastWeekStart)
-        );
+            const snapshot = await getDocs(q);
+            const copiedAvailability: Record<number, TimeRange[]> = {};
 
-        const snapshot = await getDocs(q);
-        const copiedAvailability: Record<number, TimeRange[]> = {};
+            snapshot.forEach((d) => {
+                const data = d.data() as Availability;
+                if (data.status !== 'SUBMITTED') return;
+                copiedAvailability[data.dayOfWeek] = data.timeRanges;
+            });
 
-        snapshot.forEach((d) => {
-            const data = d.data() as Availability;
-            if (data.status !== 'SUBMITTED') return;
-            copiedAvailability[data.dayOfWeek] = data.timeRanges;
-        });
-
-        setAvailability((prev) => {
-            const next = { ...prev };
-            for (const [dayStr, ranges] of Object.entries(copiedAvailability)) {
-                const day = parseInt(dayStr, 10);
-                if (!isNaN(day) && !lockedDays.has(day)) {
-                    next[day] = ranges;
+            setAvailability((prev) => {
+                const next = { ...prev };
+                // Reset all unlocked days first to ensure we overwrite/clear them correctly
+                for (let day = 0; day < 7; day++) {
+                    if (!lockedDays.has(day)) {
+                        next[day] = [];
+                    }
                 }
-            }
-            return next;
-        });
-        showNotification('Copied availability from last week (rostered days unchanged)', 'success');
+                for (const [dayStr, ranges] of Object.entries(copiedAvailability)) {
+                    const day = parseInt(dayStr, 10);
+                    if (!isNaN(day) && !lockedDays.has(day)) {
+                        next[day] = ranges;
+                    }
+                }
+                return next;
+            });
+            showNotification('Copied availability from last week (rostered days unchanged)', 'success');
+        } catch (error) {
+            console.error('Error copying availability:', error);
+            showNotification('Failed to copy past week availability', 'error');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSubmit = async () => {
@@ -298,8 +311,8 @@ export default function StaffAvailabilitySection() {
     const canSubmit = WEEK_DAYS.some((day) => !isDayLocked(day));
 
     return (
-        <section>
-            <div className="space-y-4 mb-4">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="shrink-0 space-y-4 mb-4">
                 <div className="flex justify-center">
                     <div className="w-full max-w-xs">
                         <StaffWeekPicker
@@ -309,18 +322,24 @@ export default function StaffAvailabilitySection() {
                         />
                     </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2 w-full">
                     <Button
                         variant="secondary"
-                        size="sm"
+                        size="md"
                         onClick={copyFromLastWeek}
-                        disabled={lockedDays.size >= 7}
+                        disabled={lockedDays.size >= 7 || loading}
+                        className="flex-1 sm:flex-initial"
                     >
+                        <Icon icon={Copy} size="sm" className="text-gray-500" />
                         Copy past week
                     </Button>
                     <label
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm min-h-11 ${
-                            hasLockedDays ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'
+                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-all select-none min-h-11 flex-1 sm:flex-initial ${
+                            lockedDays.size >= 7
+                                ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200 text-gray-400'
+                                : isRecurring
+                                ? 'bg-blue-50/60 border-blue-200 text-blue-700 cursor-pointer shadow-xs'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer shadow-sm'
                         }`}
                     >
                         <input
@@ -328,56 +347,76 @@ export default function StaffAvailabilitySection() {
                             checked={isRecurring}
                             onChange={(e) => setIsRecurring(e.target.checked)}
                             disabled={lockedDays.size >= 7}
-                            className="w-4 h-4 text-blue-600 rounded"
+                            className="sr-only"
                         />
-                        <span className="text-label text-gray-700">Recurring (saved for admin reference)</span>
+                        <div className={`w-4 h-4 rounded-sm border flex items-center justify-center transition-colors ${isRecurring ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white'}`}>
+                            {isRecurring && (
+                                <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 20 20">
+                                    <path d="M0 11l2-2 5 5L18 3l2 2L7 18z" />
+                                </svg>
+                            )}
+                        </div>
+                        <span>Recurring</span>
                     </label>
                 </div>
             </div>
 
-            {hasLockedDays ? (
-                <StaffAlert variant="danger" icon={AlertTriangle} title="Roster published">
-                    Days with approved shifts are locked. You can still edit other days in this week.
-                </StaffAlert>
-            ) : (
-                <StaffAlert variant="info" icon={Info} title="Shop hours">
-                    Set times between {SHOP_OPEN_TIME} and {SHOP_CLOSE_TIME}. Times snap to the nearest 15 minutes
-                    (e.g. 9:03 → 9:00). Fix any warnings before confirming.
-                </StaffAlert>
-            )}
+            <div className="shrink-0 mb-4">
+                {hasLockedDays ? (
+                    <StaffAlert variant="danger" icon={AlertTriangle} title="Roster published" compact>
+                        Approved days are locked.
+                    </StaffAlert>
+                ) : (
+                    <StaffAlert variant="info" icon={Info} title="Shop hours" compact>
+                        Set times between {SHOP_OPEN_TIME}–{SHOP_CLOSE_TIME} (snaps to 15m).
+                    </StaffAlert>
+                )}
+            </div>
 
-            <div className="space-y-2 mt-4">
+            <div className="flex-1 overflow-y-auto pr-0.5 pb-20 space-y-2">
                 {WEEK_DAYS.map((dayOfWeek) => {
                     const ranges = availability[dayOfWeek] || [];
                     const isOpen = openDay === dayOfWeek;
                     const dayLocked = isDayLocked(dayOfWeek);
                     return (
-                        <div key={dayOfWeek} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div key={dayOfWeek} className={`border border-gray-200 rounded-lg overflow-hidden ${dayLocked ? 'bg-gray-50/30' : 'bg-white'}`}>
                             <button
                                 type="button"
                                 onClick={() => setOpenDay(isOpen ? null : dayOfWeek)}
-                                className="w-full flex items-center justify-between px-4 py-3 min-h-11 bg-gray-50/80 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+                                className={`w-full flex items-center justify-between px-4 py-3 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
+                                    dayLocked
+                                        ? 'bg-gray-100/70 text-gray-500'
+                                        : 'bg-gray-50/80 hover:bg-gray-100/80 text-gray-900'
+                                }`}
                                 aria-expanded={isOpen}
                             >
-                                <span className="text-section-title">
+                                <span className={`text-sm font-semibold ${dayLocked ? 'text-gray-500' : 'text-gray-900'}`}>
                                     {getDayName(dayOfWeek)}
                                     {dayLocked && (
-                                        <span className="ml-2 text-[10px] font-semibold text-amber-700 uppercase">
+                                        <span className="ml-2 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/50 rounded-sm px-1.5 py-0.5 uppercase tracking-wider select-none">
                                             Rostered
                                         </span>
                                     )}
                                 </span>
                                 <div className="flex items-center gap-2">
                                     {ranges.length > 0 && (
-                                        <span className="text-label">
+                                        <span className={`text-xs ${dayLocked ? 'text-gray-400' : 'text-gray-500'}`}>
                                             {ranges.length} range{ranges.length !== 1 ? 's' : ''}
                                         </span>
                                     )}
-                                    <Icon
-                                        icon={ChevronDown}
-                                        size="sm"
-                                        className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                                    />
+                                    {dayLocked ? (
+                                        <Icon
+                                            icon={Lock}
+                                            size="sm"
+                                            className="text-gray-400 shrink-0"
+                                        />
+                                    ) : (
+                                        <Icon
+                                            icon={ChevronDown}
+                                            size="sm"
+                                            className={`text-gray-500 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+                                        />
+                                    )}
                                 </div>
                             </button>
                             {isOpen && (
@@ -390,16 +429,18 @@ export default function StaffAvailabilitySection() {
                                     {ranges.length === 0 ? (
                                         <p className="text-label text-center py-2">No availability set</p>
                                     ) : (
-                                        ranges.map((range, index) => {
-                                            const issue = !dayLocked ? rangeHasIssue(range) : null;
-                                            return (
-                                                <div
-                                                    key={index}
-                                                    className="flex gap-2.5 sm:gap-3 p-3.5 bg-white border border-gray-100 rounded-xl min-w-0"
-                                                >
-                                                    <div className="flex-1 min-w-0 space-y-3">
-                                                        <div className="min-w-0">
-                                                            <label className="text-label block mb-1">From</label>
+                                        <div className="space-y-2">
+                                            {ranges.map((range, index) => {
+                                                const issue = !dayLocked ? rangeHasIssue(range) : null;
+                                                return (
+                                                    <div key={index} className="space-y-1.5 min-w-0 w-full">
+                                                        <div
+                                                            className={`flex items-center gap-2 p-2 border rounded-xl min-w-0 w-full ${
+                                                                dayLocked
+                                                                    ? 'bg-gray-100/30 border-gray-200'
+                                                                    : 'bg-white border-gray-100 shadow-xs'
+                                                            }`}
+                                                        >
                                                             <Input
                                                                 type="time"
                                                                 value={range.start}
@@ -408,11 +449,9 @@ export default function StaffAvailabilitySection() {
                                                                     updateTimeRange(dayOfWeek, index, 'start', e.target.value)
                                                                 }
                                                                 disabled={dayLocked}
-                                                                className="w-full min-w-0 px-2"
+                                                                className="flex-1 min-w-0 text-center px-2 py-1.5 h-10 min-h-0 text-sm bg-transparent"
                                                             />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <label className="text-label block mb-1">To</label>
+                                                            <span className="text-sm text-gray-400 shrink-0 select-none font-medium">to</span>
                                                             <Input
                                                                 type="time"
                                                                 value={range.end}
@@ -421,8 +460,19 @@ export default function StaffAvailabilitySection() {
                                                                     updateTimeRange(dayOfWeek, index, 'end', e.target.value)
                                                                 }
                                                                 disabled={dayLocked}
-                                                                className="w-full min-w-0 px-2"
+                                                                className="flex-1 min-w-0 text-center px-2 py-1.5 h-10 min-h-0 text-sm bg-transparent"
                                                             />
+                                                            {!dayLocked && (
+                                                                <Button
+                                                                    variant="ghost-danger"
+                                                                    size="sm"
+                                                                    onClick={() => removeTimeRange(dayOfWeek, index)}
+                                                                    aria-label="Remove range"
+                                                                    className="shrink-0 h-10 w-10 flex items-center justify-center p-0 min-w-0 min-h-0"
+                                                                >
+                                                                    <Icon icon={Trash2} size="sm" className="text-red-500" />
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                         {issue && (
                                                             <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
@@ -430,22 +480,9 @@ export default function StaffAvailabilitySection() {
                                                             </p>
                                                         )}
                                                     </div>
-                                                    {!dayLocked && (
-                                                        <div className="shrink-0 w-11 flex items-center justify-center self-center">
-                                                            <Button
-                                                                variant="ghost-danger"
-                                                                size="sm"
-                                                                onClick={() => removeTimeRange(dayOfWeek, index)}
-                                                                aria-label="Remove range"
-                                                                className="min-w-11 min-h-11"
-                                                            >
-                                                                <Icon icon={Trash2} size="sm" />
-                                                            </Button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })
+                                                );
+                                            })}
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -456,11 +493,11 @@ export default function StaffAvailabilitySection() {
 
             {canSubmit && (
                 <StaffActionFooter>
-                    <Button variant="primary" size="lg" fullWidth onClick={handleSubmit} disabled={loading}>
-                        {loading ? 'Submitting...' : 'Confirm availability'}
+                    <Button variant="primary" size="md" fullWidth onClick={handleSubmit} disabled={loading}>
+                        {loading ? 'Submitting...' : 'Submit'}
                     </Button>
                 </StaffActionFooter>
             )}
-        </section>
+        </div>
     );
 }

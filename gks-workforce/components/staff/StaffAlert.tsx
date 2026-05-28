@@ -9,6 +9,7 @@ interface StaffAlertProps {
     icon: LucideIcon;
     title: string;
     children?: ReactNode;
+    compact?: boolean;
 }
 
 const variantStyles: Record<AlertVariant, { box: string; title: string }> = {
@@ -18,14 +19,14 @@ const variantStyles: Record<AlertVariant, { box: string; title: string }> = {
     info: { box: 'bg-blue-50 border-blue-200', title: 'text-blue-800' },
 };
 
-export default function StaffAlert({ variant, icon, title, children }: StaffAlertProps) {
+export default function StaffAlert({ variant, icon, title, children, compact = false }: StaffAlertProps) {
     const styles = variantStyles[variant];
     return (
-        <div className={`p-4 rounded-xl border flex gap-3 ${styles.box}`} role="status">
-            <Icon icon={icon} size="md" className={`shrink-0 mt-0.5 ${styles.title}`} />
+        <div className={`${compact ? 'p-2.5 rounded-lg gap-2' : 'p-4 rounded-xl gap-3'} border flex ${styles.box}`} role="status">
+            <Icon icon={icon} size={compact ? "sm" : "md"} className={`shrink-0 ${compact ? 'mt-0' : 'mt-0.5'} ${styles.title}`} />
             <div className="min-w-0">
-                <p className={`text-sm font-semibold ${styles.title}`}>{title}</p>
-                {children && <div className="text-sm text-gray-600 mt-1 leading-relaxed">{children}</div>}
+                <p className={`${compact ? 'text-xs' : 'text-sm'} font-semibold ${styles.title}`}>{title}</p>
+                {children && <div className={`${compact ? 'text-[11px] mt-0.5' : 'text-sm mt-1'} text-gray-600 leading-normal`}>{children}</div>}
             </div>
         </div>
     );

@@ -4,8 +4,8 @@
     "description": "Staff Roster & Time Tracking for Gks Workforce",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#2563eb",
+    "background_color": "#f9fafb",
+    "theme_color": "#f9fafb",
     "icons": [
         {
             "src": "/web-app-manifest-192x192.png",

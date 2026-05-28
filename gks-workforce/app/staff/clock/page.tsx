@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp, orderBy, limit, doc, getDoc } from 'firebase/firestore';
-import { TimeRecord, Shift, ShopLocation } from '@/types';
-import { getShopLocation, formatTimeToHHmm, roundToNearest5Minutes, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { TimeRecord, Shift } from '@/types';
+import { formatTimeToHHmm, roundToNearest5Minutes, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
 import { isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
 import { clockIn, clockOut } from '@/app/actions/clock';
 import StaffPageShell from '@/components/staff/StaffPageShell';
@@ -14,7 +14,6 @@ import StaffAlert from '@/components/staff/StaffAlert';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Modal from '@/components/ui/Modal';
-import Spinner from '@/components/ui/Spinner';
 import Icon from '@/components/ui/Icon';
 import {
     AlertTriangle,
@@ -34,16 +33,13 @@ interface GeoState {
 }
 
 export default function ClockInOutPage() {
-    const { userData } = useAuth();
+    const { userData, activeRecord, todayShift, shopLocation } = useAuth();
     const { showNotification } = useNotification();
 
-    const [activeRecord, setActiveRecord] = useState<TimeRecord | null>(null);
-    const [shop, setShop] = useState<ShopLocation | null>(null);
+    const shop = shopLocation;
     const [geo, setGeo] = useState<GeoState | null>(null);
     const [geoError, setGeoError] = useState<string | null>('Waiting for location...');
-    const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
-    const [todayShift, setTodayShift] = useState<Shift | null>(null);
     const [clockInCoolingRemaining, setClockInCoolingRemaining] = useState<number>(0);
     const [clockOutCoolingRemaining, setClockOutCoolingRemaining] = useState<number>(0);
     const [shiftDurationSeconds, setShiftDurationSeconds] = useState(0);
@@ -72,7 +68,7 @@ export default function ClockInOutPage() {
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [activeRecord, todayShift]);
+    }, [activeRecord]);
 
     const formatDuration = (totalSeconds: number) => {
         const hrs = Math.floor(totalSeconds / 3600);
@@ -86,68 +82,113 @@ export default function ClockInOutPage() {
     };
 
     // ─────────────────────────────────────────────────────────
-    // Helper to find rostered shift
+    // 3. PROCESS CLOCK OUT (Manual or Auto-close)
     // ─────────────────────────────────────────────────────────
-    const getMatchingShift = async (clockInTimeMs: number): Promise<Shift | null> => {
-        if (!userData) return null;
-        
-        // Find 00:00 of the day the staff clocked in
-        const clockInDate = new Date(clockInTimeMs);
-        clockInDate.setHours(0, 0, 0, 0);
-        const dateTimestamp = Timestamp.fromDate(clockInDate);
+    const processClockOut = useCallback(async (
+        record: TimeRecord, 
+        shift: Shift | null, 
+        isAutoClose: boolean
+    ) => {
+        if (!userData) return;
 
-        const q = query(
-            collection(db, 'shifts'),
-            where('staffId', '==', userData.id),
-            where('date', '==', dateTimestamp),
-            where('status', '==', 'APPROVED')
-        );
-        const snap = await getDocs(q);
-        if (snap.empty) return null;
-        
-        // If there are multiple shifts, we should pick the most relevant one.
-        // For now, we assume one shift per person per day.
-        const shift = { id: snap.docs[0].id, ...snap.docs[0].data() } as Shift;
-        
-        // RELAXED MATCHING LOGIC:
-        // As long as the staff clocks in on the SAME DAY as the rostered shift, 
-        // we attach it to that shift. This handles extreme lateness correctly.
-        return shift;
-    };
+        try {
+            const now = new Date();
+            const result = await clockOut(
+                record.id!,
+                geo?.lat ?? 0,
+                geo?.lng ?? 0,
+                geo?.accuracy ?? 0,
+                isAutoClose,
+                now.getTime(),
+                now.getTimezoneOffset()
+            );
+
+            if (result.success) {
+                if (isAutoClose) {
+                    showNotification('Your previous open shift was auto-closed.', 'error');
+                } else {
+                    const clockOutRounded = roundToNearest5Minutes(now);
+                    showNotification(`Clocked out. Timesheet generated (${clockOutRounded}).`, 'success');
+                    setClockInCoolingRemaining(300);
+                }
+            }
+        } catch (error: unknown) {
+            console.error('Error clocking out:', error);
+            const errMsg = error instanceof Error ? error.message : 'Failed to clock out.';
+            showNotification(errMsg, 'error');
+        }
+    }, [userData, geo, showNotification]);
 
     // ─────────────────────────────────────────────────────────
-    // 1. INIT: Load shop config & active records
+    // 1. Reactive cooling period calculations and auto-close validations
     // ─────────────────────────────────────────────────────────
     useEffect(() => {
         if (!userData) return;
 
-        const init = async () => {
-            try {
-                const shopLoc = await getShopLocation();
-                setShop(shopLoc);
-                if (!shopLoc) {
-                    setGeoError('No shop location configured by Admin. Cannot use GPS clock.');
+        if (!activeRecord) {
+            // Fetch last completed record to check clock-in cooling lock (5 mins / 300 seconds)
+            const checkCooling = async () => {
+                const lastQ = query(
+                    collection(db, 'timeRecords'),
+                    where('staffId', '==', userData.id),
+                    orderBy('clockInTime', 'desc'),
+                    limit(1)
+                );
+                const lastSnap = await getDocs(lastQ);
+                if (!lastSnap.empty) {
+                    const lastRecord = lastSnap.docs[0].data() as TimeRecord;
+                    if (lastRecord.clockOutTime) {
+                        const clockOutMs = lastRecord.clockOutTime.toMillis();
+                        const elapsedSecs = Math.floor((Date.now() - clockOutMs) / 1000);
+                        const remaining = 300 - elapsedSecs;
+                        if (remaining > 0) {
+                            setClockInCoolingRemaining(remaining);
+                        } else {
+                            setClockInCoolingRemaining(0);
+                        }
+                    }
                 }
-                await checkActiveClockIn();
-                
-                // Fetch today's rostered shift to show warning if not rostered
-                const shift = await getMatchingShift(Date.now());
-                setTodayShift(shift);
-            } catch (err) {
-                console.error(err);
-                showNotification('Failed to load configuration.', 'error');
-            } finally {
-                setLoading(false);
+            };
+            checkCooling();
+            setClockOutCoolingRemaining(0);
+        } else {
+            // Calculate active clock-out cooling lock (60s since clock-in)
+            const clockInMs = activeRecord.clockInTime.toMillis();
+            const elapsedSecs = Math.floor((Date.now() - clockInMs) / 1000);
+            const remaining = 60 - elapsedSecs;
+            if (remaining > 0) {
+                setClockOutCoolingRemaining(remaining);
+            } else {
+                setClockOutCoolingRemaining(0);
             }
-        };
-        init();
+            setClockInCoolingRemaining(0);
 
-        return () => {
-            if (watchIdRef.current !== null) {
-                navigator.geolocation.clearWatch(watchIdRef.current);
-            }
-        };
-    }, [userData]);
+            // Verify if active shift needs to be auto-closed
+            const checkAutoClose = async () => {
+                let shift: Shift | null = null;
+                if (activeRecord.shiftId) {
+                    const shiftDoc = await getDoc(doc(db, 'shifts', activeRecord.shiftId));
+                    if (shiftDoc.exists()) {
+                        shift = { id: shiftDoc.id, ...shiftDoc.data() } as Shift;
+                    }
+                }
+                if (shift) {
+                    const shiftEnd = new Date(shift.date.toDate());
+                    const [eh, em] = shift.endTime.split(':').map(Number);
+                    shiftEnd.setHours(eh, em, 0, 0);
+                    
+                    const autoCloseTimeMs = shiftEnd.getTime() + 1 * 60 * 1000;
+                    const nowMs = Date.now();
+
+                    if (nowMs > autoCloseTimeMs) {
+                        // Stale rostered shift — trigger auto close
+                        await processClockOut(activeRecord, shift, true);
+                    }
+                }
+            };
+            checkAutoClose();
+        }
+    }, [activeRecord, userData, processClockOut]);
 
     // ─────────────────────────────────────────────────────────
     // 2. GPS WATCHER
@@ -177,128 +218,18 @@ export default function ClockInOutPage() {
             },
             { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
+
+        return () => {
+            if (watchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+            }
+        };
     }, [shop]);
 
-    const checkActiveClockIn = async () => {
-        if (!userData) return;
 
-        const q = query(
-            collection(db, 'timeRecords'),
-            where('staffId', '==', userData.id),
-            where('clockOutTime', '==', null)
-        );
-
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-            const docSnap = snapshot.docs[0];
-            const record = { id: docSnap.id, ...docSnap.data() } as TimeRecord;
-            
-            // CHECK AUTO-CLOSE
-            let shift: Shift | null = null;
-            if (record.shiftId) {
-                const shiftDoc = await getDoc(doc(db, 'shifts', record.shiftId));
-                if (shiftDoc.exists()) {
-                    shift = { id: shiftDoc.id, ...shiftDoc.data() } as Shift;
-                }
-            }
-            if (shift) {
-                const shiftEnd = new Date(shift.date.toDate());
-                const [eh, em] = shift.endTime.split(':').map(Number);
-                shiftEnd.setHours(eh, em, 0, 0);
-                
-                // Auto close time = shift end + 30 mins
-                const autoCloseTimeMs = shiftEnd.getTime() + 1 * 60 * 1000;
-                const nowMs = Date.now();
-
-                if (nowMs > autoCloseTimeMs) {
-                    // IT'S STALE — AUTO CLOSE IT
-                    await processClockOut(record, shift, true);
-                    return;
-                }
-            }
-
-            setActiveRecord(record);
-
-            // Clock-out lock: Must wait 60s since clock-in
-            const clockInMs = record.clockInTime.toMillis();
-            const elapsedSecs = Math.floor((Date.now() - clockInMs) / 1000);
-            const remaining = 60 - elapsedSecs;
-            if (remaining > 0) {
-                setClockOutCoolingRemaining(remaining);
-            } else {
-                setClockOutCoolingRemaining(0);
-            }
-            return;
-        }
-
-        setActiveRecord(null);
-
-        // Fetch last completed record to check clock-in cooling lock (5 mins / 300 seconds)
-        const lastQ = query(
-            collection(db, 'timeRecords'),
-            where('staffId', '==', userData.id),
-            orderBy('clockInTime', 'desc'),
-            limit(1)
-        );
-        const lastSnap = await getDocs(lastQ);
-        if (!lastSnap.empty) {
-            const lastRecord = lastSnap.docs[0].data() as TimeRecord;
-            if (lastRecord.clockOutTime) {
-                const clockOutMs = lastRecord.clockOutTime.toMillis();
-                const elapsedSecs = Math.floor((Date.now() - clockOutMs) / 1000);
-                const remaining = 300 - elapsedSecs;
-                if (remaining > 0) {
-                    setClockInCoolingRemaining(remaining);
-                } else {
-                    setClockInCoolingRemaining(0);
-                }
-            }
-        }
-    };
 
     // ─────────────────────────────────────────────────────────
-    // 4. PROCESS CLOCK OUT (Manual or Auto-close)
-    // ─────────────────────────────────────────────────────────
-    const processClockOut = async (
-        record: TimeRecord, 
-        shift: Shift | null, 
-        isAutoClose: boolean
-    ) => {
-        if (!userData) return;
-
-        try {
-            const now = new Date();
-            const result = await clockOut(
-                record.id!,
-                geo?.lat ?? 0,
-                geo?.lng ?? 0,
-                geo?.accuracy ?? 0,
-                isAutoClose,
-                now.getTime(),
-                now.getTimezoneOffset()
-            );
-
-            if (result.success) {
-                if (isAutoClose) {
-                    showNotification('Your previous open shift was auto-closed.', 'error');
-                    setActiveRecord(null);
-                    setClockInCoolingRemaining(0);
-                } else {
-                    const clockOutRounded = roundToNearest5Minutes(now);
-                    showNotification(`Clocked out. Timesheet generated (${clockOutRounded}).`, 'success');
-                    setActiveRecord(null);
-                    setClockInCoolingRemaining(300);
-                }
-            }
-        } catch (error: unknown) {
-            console.error('Error clocking out:', error);
-            const errMsg = error instanceof Error ? error.message : 'Failed to clock out.';
-            showNotification(errMsg, 'error');
-        }
-    };
-
-    // ─────────────────────────────────────────────────────────
-    // 5. BUTTON HANDLERS
+    // 4. BUTTON HANDLERS
     // ─────────────────────────────────────────────────────────
     const handleClockIn = async (force: boolean = false) => {
         if (!userData || !geo || !geo.withinRange) return;
@@ -395,7 +326,6 @@ export default function ClockInOutPage() {
             if (result.success) {
                 showNotification('Clocked in successfully!', 'success');
                 setClockOutCoolingRemaining(60); // 1 minute safety clock-out lock
-                await checkActiveClockIn();
             }
         } catch (error: unknown) {
             console.error('Error clocking in:', error);
@@ -529,14 +459,6 @@ export default function ClockInOutPage() {
             </StaffAlert>
         );
     };
-
-    if (loading) {
-        return (
-            <StaffPageShell title="Time Clock" maxWidth="md" centered>
-                <Spinner className="py-24" />
-            </StaffPageShell>
-        );
-    }
 
     return (
         <StaffPageShell title="Time Clock" maxWidth="md" centered headerCentered>

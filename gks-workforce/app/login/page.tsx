@@ -18,9 +18,10 @@ export default function LoginPage() {
     const { showNotification } = useNotification();
     const router = useRouter();
 
-    const getAuthErrorMessage = (error: any) => {
-        const code = error?.code || '';
-        const message = error?.message || '';
+    const getAuthErrorMessage = (error: unknown) => {
+        const err = error as { code?: string; message?: string } | null | undefined;
+        const code = err?.code || '';
+        const message = err?.message || '';
         
         // Check for specific codes or substrings in the message
         if (code === 'auth/invalid-email' || message.includes('invalid-email')) {
@@ -60,7 +61,7 @@ export default function LoginPage() {
 
             await login(loginEmail, password);
             router.push('/dashboard');
-        } catch (err: any) {
+        } catch (err) {
             const friendlyMessage = getAuthErrorMessage(err);
             setLocalError(friendlyMessage);
         } finally {
@@ -78,7 +79,7 @@ export default function LoginPage() {
             const { sendPasswordResetEmail } = await import('firebase/auth');
             await sendPasswordResetEmail(auth, email.trim());
             showNotification('Success! A password reset link has been sent to your Gmail.', 'success');
-        } catch (err: any) {
+        } catch (err) {
             setLocalError(getAuthErrorMessage(err));
         } finally {
             setResettingPassword(false);
@@ -86,7 +87,7 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="min-h-screen flex items-center justify-center bg-background px-4 pb-16">
             <div className="max-w-md w-full card-base p-8">
                 <div className="text-center mb-10">
                     <Link href="/dashboard">

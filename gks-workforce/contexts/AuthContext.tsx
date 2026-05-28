@@ -127,27 +127,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     console.error('Error listening to today shift:', error);
                 });
 
-                // Set session cookie for server-side auth
-                try {
-                    const idToken = await getIdToken(firebaseUser);
-                    await fetch('/api/auth/session', {
+                // Set session cookie for server-side auth (non-blocking background task)
+                getIdToken(firebaseUser).then((idToken) => {
+                    fetch('/api/auth/session', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ idToken }),
+                    }).catch((error) => {
+                        console.error('Failed to set session cookie:', error);
                     });
-                } catch (error) {
-                    console.error('Failed to set session cookie:', error);
-                }
+                }).catch((error) => {
+                    console.error('Failed to get ID token:', error);
+                });
             } else {
                 setUserData(null);
                 setActiveRecord(null);
                 setTodayShift(null);
-                // Clear session cookie on logout
-                try {
-                    await fetch('/api/auth/session', { method: 'DELETE' });
-                } catch (error) {
+                // Clear session cookie on logout (non-blocking background task)
+                fetch('/api/auth/session', { method: 'DELETE' }).catch((error) => {
                     console.error('Failed to clear session cookie:', error);
-                }
+                });
             }
 
             if (!loadingTimedOut) {

@@ -451,7 +451,7 @@ export default function StaffAvailabilitySection() {
                 )}
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-0.5 pb-[calc(6rem+env(safe-area-inset-bottom))] space-y-2">
+            <div className="flex-1 overflow-y-auto pr-0.5 pb-[calc(6.75rem+env(safe-area-inset-bottom))] space-y-2">
                 {WEEK_DAYS.map((dayOfWeek) => {
                     const ranges = availability[dayOfWeek] || [];
                     const isOpen = openDay === dayOfWeek;

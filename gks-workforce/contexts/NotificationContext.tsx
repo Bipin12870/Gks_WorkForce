@@ -51,7 +51,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 <div
                     className={`fixed left-1/2 -translate-x-1/2 z-[9999] w-full max-w-[90%] md:max-w-md ${
                         isStaffRoute
-                            ? 'bottom-24 pb-[env(safe-area-inset-bottom)]'
+                            ? 'bottom-28 pb-[env(safe-area-inset-bottom)]'
                             : 'top-6 pt-[env(safe-area-inset-top)]'
                     }`}
                     role="status"

@@ -70,7 +70,7 @@ export default function StaffTabBar() {
 
     return (
         <nav
-            className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 pt-2 pb-[calc(18px+env(safe-area-inset-bottom))]"
+            className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 pt-2 pb-[calc(30px+env(safe-area-inset-bottom))]"
             aria-label="Staff navigation"
         >
             <div className="max-w-lg mx-auto flex">

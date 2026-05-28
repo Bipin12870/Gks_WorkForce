@@ -202,7 +202,8 @@ export async function clockOut(
         }
 
         if (recordData.clockOutTime !== null) {
-            throw new Error('This record is already clocked out.');
+            // Already clocked out — return success gracefully to handle multi-device synchronization
+            return { success: true, timesheetId: recordData.timesheetId || '' };
         }
 
         // 4. Verify clock-out cooling lock (60 seconds) if not auto-closing

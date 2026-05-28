@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
         response.cookies.set('__session', sessionCookie, {
             maxAge: expiresIn,
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: request.nextUrl.protocol === 'https:',
             path: '/',
             sameSite: 'lax',
         });

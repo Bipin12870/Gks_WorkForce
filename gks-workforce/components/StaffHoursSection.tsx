@@ -3,23 +3,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { Shift, Timesheet } from '@/types';
-import { getWeekStart, formatDate, calculatePayrollRecord } from '@/lib/utils';
+import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
+import { Timesheet } from '@/types';
+import { getWeekStart, calculatePayrollRecord } from '@/lib/utils';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
-import StaffStatCard from '@/components/staff/StaffStatCard';
-import StaffListRow from '@/components/staff/StaffListRow';
-import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
-import Icon from '@/components/ui/Icon';
 import { CalendarDays, Eye, EyeOff } from 'lucide-react';
 
 export default function StaffHoursSection() {
     const { userData } = useAuth();
     const [selectedWeek, setSelectedWeek] = useState<Date>(getWeekStart(new Date()));
-    const [shifts, setShifts] = useState<Shift[]>([]);
+
     const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
     const [loading, setLoading] = useState(true);
     const [showPayInfo, setShowPayInfo] = useState(true);
@@ -35,56 +30,31 @@ export default function StaffHoursSection() {
         localStorage.setItem('gks_show_pay_info', String(showPayInfo));
     }, [showPayInfo]);
 
+    // Real-time listeners instead of getDocs for instant cache-based week transitions
     useEffect(() => {
-        loadData();
-    }, [selectedWeek, userData]);
-
-    const loadData = async () => {
         if (!userData) return;
-
-        setLoading(true);
 
         const weekStart = new Date(selectedWeek);
         const weekEnd = new Date(selectedWeek);
         weekEnd.setDate(weekEnd.getDate() + 7);
 
-        try {
-            const shiftsQ = query(
-                collection(db, 'shifts'),
-                where('staffId', '==', userData.id),
-                where('date', '>=', Timestamp.fromDate(weekStart)),
-                where('date', '<', Timestamp.fromDate(weekEnd)),
-                where('status', '==', 'APPROVED')
-            );
-            const shiftsSnapshot = await getDocs(shiftsQ);
-            const loadedShifts: Shift[] = [];
-            shiftsSnapshot.forEach((d) => {
-                loadedShifts.push({ id: d.id, ...d.data() } as Shift);
-            });
-            loadedShifts.sort((a, b) => {
-                const dateDiff = a.date.toMillis() - b.date.toMillis();
-                if (dateDiff !== 0) return dateDiff;
-                return a.startTime.localeCompare(b.startTime);
-            });
-            setShifts(loadedShifts);
+        setLoading(true);
 
-            const timesheetsQ = query(
-                collection(db, 'timesheets'),
-                where('staffId', '==', userData.id),
-                where('weekStartDate', '==', Timestamp.fromDate(weekStart))
-            );
-            const timesheetsSnapshot = await getDocs(timesheetsQ);
-            const loadedTimesheets: Timesheet[] = [];
-            timesheetsSnapshot.forEach((d) => {
-                loadedTimesheets.push({ id: d.id, ...d.data() } as Timesheet);
-            });
-            setTimesheets(loadedTimesheets);
-        } catch (error) {
-            console.error('Error loading hours data:', error);
-        } finally {
+        const timesheetsQ = query(
+            collection(db, 'timesheets'),
+            where('staffId', '==', userData.id),
+            where('weekStartDate', '==', Timestamp.fromDate(weekStart))
+        );
+
+        const unsubTimesheets = onSnapshot(timesheetsQ, (snapshot) => {
+            const loaded: Timesheet[] = [];
+            snapshot.forEach((d) => loaded.push({ id: d.id, ...d.data() } as Timesheet));
+            setTimesheets(loaded);
             setLoading(false);
-        }
-    };
+        });
+
+        return () => unsubTimesheets();
+    }, [selectedWeek, userData]);
 
     const changeWeek = (direction: 'prev' | 'next') => {
         const newWeek = new Date(selectedWeek);
@@ -101,152 +71,137 @@ export default function StaffHoursSection() {
     const totalHours = totalPayableMinutes / 60;
     const grossPay = totalHours * (userData?.hourlyRate || 0);
 
-    const unifiedLog = useMemo(() => {
-        const log: Array<{
-            id: string;
-            date: Timestamp;
-            shift: Shift | null;
-            timesheet: Timesheet | undefined;
-            type: string;
-        }> = shifts.map((shift) => {
-            const ts = timesheets.find((t) => t.shiftId === shift.id);
-            return {
-                id: shift.id || `shift-${Math.random()}`,
-                date: shift.date,
-                shift,
-                timesheet: ts,
-                type: 'ROSTERED',
-            };
-        });
-
-        timesheets.forEach((ts) => {
-            const hasShiftInCurrentList = shifts.some((s) => s.id === ts.shiftId);
-            if (!ts.shiftId || !hasShiftInCurrentList) {
-                log.push({
-                    id: ts.id || `ts-${Math.random()}`,
-                    date: ts.date,
-                    shift: null,
-                    timesheet: ts,
-                    type: 'UNROSTERED',
-                });
-            }
-        });
-
-        return log.sort((a, b) => b.date.toMillis() - a.date.toMillis());
-    }, [shifts, timesheets]);
-
-    const statusVariant = (status: string) => {
-        if (status === 'APPROVED') return 'success' as const;
-        if (status === 'REJECTED') return 'danger' as const;
-        return 'warning' as const;
-    };
+    // Hours & Pay only shows approved timesheets — the Timesheets tab handles status tracking
+    const approvedTimesheets = useMemo(() => {
+        return timesheets
+            .filter((ts) => ts.status === 'APPROVED')
+            .sort((a, b) => b.date.toMillis() - a.date.toMillis());
+    }, [timesheets]);
 
     return (
-        <section>
-            <div className="mb-4">
-                <StaffWeekPicker
-                    weekStart={selectedWeek}
-                    onPrev={() => changeWeek('prev')}
-                    onNext={() => changeWeek('next')}
-                    trailing={
-                        <Button
-                            variant="ghost"
-                            size="sm"
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="flex justify-center mb-5 shrink-0">
+                <div className="w-full max-w-xs">
+                    <StaffWeekPicker
+                        weekStart={selectedWeek}
+                        onPrev={() => changeWeek('prev')}
+                        onNext={() => changeWeek('next')}
+                    />
+                </div>
+            </div>
+
+            {/* Hero Earnings Card */}
+            <div className="border border-slate-200 rounded-xl bg-white overflow-hidden shrink-0 mb-5">
+                <div className="p-5 pb-4">
+                    <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                            Estimated earnings
+                        </span>
+                        <button
+                            type="button"
                             onClick={() => setShowPayInfo(!showPayInfo)}
                             aria-label={showPayInfo ? 'Hide pay amounts' : 'Show pay amounts'}
-                            className="min-h-11 min-w-11 p-0"
+                            className="flex items-center justify-center w-8 h-8 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
                         >
-                            <Icon icon={showPayInfo ? EyeOff : Eye} size="md" />
-                        </Button>
-                    }
-                />
+                            {showPayInfo ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                    </div>
+                    <p className="text-3xl font-semibold text-slate-900 tabular-nums tracking-tight leading-tight">
+                        {showPayInfo ? (
+                            <>
+                                <span className="text-lg font-medium text-slate-400 mr-0.5">$</span>
+                                {grossPay.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                })}
+                            </>
+                        ) : (
+                            <span className="text-slate-300 select-none tracking-widest">$•••••</span>
+                        )}
+                    </p>
+                </div>
+                <div className="border-t border-slate-100 grid grid-cols-2 divide-x divide-slate-100">
+                    <div className="px-5 py-3.5">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Hours</span>
+                        <span className="text-base font-semibold text-slate-800 tabular-nums">
+                            {totalHours.toFixed(2)}
+                            <span className="text-xs font-medium text-slate-400 ml-1">hrs</span>
+                        </span>
+                    </div>
+                    <div className="px-5 py-3.5">
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Rate</span>
+                        <span className="text-base font-semibold text-slate-800 tabular-nums">
+                            {showPayInfo ? (
+                                <>
+                                    <span className="text-xs font-medium text-slate-400 mr-0.5">$</span>
+                                    {userData?.hourlyRate.toFixed(2)}
+                                    <span className="text-xs font-medium text-slate-400 ml-0.5">/hr</span>
+                                </>
+                            ) : (
+                                <span className="text-slate-300 select-none">•••••</span>
+                            )}
+                        </span>
+                    </div>
+                </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 mb-5">
-                <StaffStatCard label="Weekly hours" value={totalHours.toFixed(2)} suffix="hrs" accent="blue" />
-                <StaffStatCard
-                    label="Hourly rate"
-                    value={showPayInfo ? userData?.hourlyRate.toFixed(2) : '•••••'}
-                    prefix="$"
-                    accent="gray"
-                />
-                <StaffStatCard
-                    label="Estimated gross"
-                    value={
-                        showPayInfo
-                            ? grossPay.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                              })
-                            : '•••••'
-                    }
-                    prefix="$"
-                    accent="green"
-                />
-            </div>
-
+            {/* Daily Breakdown — approved only */}
             {loading ? (
-                <Spinner className="py-12" />
-            ) : unifiedLog.length === 0 ? (
-                <EmptyState icon={CalendarDays} title="No activity" description="Approved timesheets will appear here." />
+                <div className="flex-1 flex items-center justify-center">
+                    <Spinner />
+                </div>
+            ) : approvedTimesheets.length === 0 ? (
+                <EmptyState icon={CalendarDays} title="No approved hours" description="Hours will appear here once your timesheets are approved." />
             ) : (
-                <div className="space-y-2">
-                    {unifiedLog.map((item) => {
-                        const ts = item.timesheet;
-                        const shift = item.shift;
-                        const isApproved = ts?.status === 'APPROVED';
-                        const payroll = isApproved ? calculatePayrollRecord(ts!.workedStart, ts!.workedEnd) : null;
-                        const hours = payroll ? payroll.payableMinutes / 60 : 0;
-                        const rosterPayroll = shift ? calculatePayrollRecord(shift.startTime, shift.endTime) : null;
-                        const rosteredHours = rosterPayroll ? rosterPayroll.rawMinutes / 60 : 0;
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-2.5 shrink-0">Weekly Breakdown</h3>
+                    <div className="flex-1 overflow-y-auto pr-0.5 pb-4 space-y-3">
+                        {approvedTimesheets.map((ts) => {
+                            const payroll = calculatePayrollRecord(ts.workedStart, ts.workedEnd);
+                            const hours = payroll.payableMinutes / 60;
+                            const isUnrostered = !ts.shiftId;
 
-                        return (
-                            <StaffListRow
-                                key={item.id}
-                                icon={CalendarDays}
-                                iconClassName={isApproved ? 'text-green-600' : 'text-gray-400'}
-                                title={
-                                    <span className="text-section-title">{formatDate(item.date.toDate())}</span>
-                                }
-                                meta={
-                                    <>
-                                        {item.type === 'UNROSTERED' && <Badge variant="warning">Unrostered</Badge>}
-                                        {ts && <Badge variant={statusVariant(ts.status)}>{ts.status}</Badge>}
-                                    </>
-                                }
-                                subtitle={
-                                    <p className="text-label">
-                                        {isApproved
-                                            ? `${ts!.workedStart} – ${ts!.workedEnd}`
-                                            : shift
-                                              ? `${shift.startTime} – ${shift.endTime} (rostered)`
-                                              : 'Worked outside roster'}
-                                    </p>
-                                }
-                                trailing={
-                                    isApproved ? (
-                                        <>
-                                            <p className="text-section-title tabular-nums">{hours.toFixed(2)} hrs</p>
-                                            <p className="text-label text-green-700 tabular-nums">
+                            const dateObj = ts.date.toDate();
+                            const formattedDate = dateObj.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric'
+                            });
+
+                            return (
+                                <div
+                                    key={ts.id}
+                                    className="border-l-4 border-l-emerald-500 border border-slate-200 rounded-xl bg-white p-4 sm:p-5"
+                                >
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-semibold text-slate-800">{formattedDate}</span>
+                                                {isUnrostered && (
+                                                    <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0 leading-relaxed uppercase tracking-wider">
+                                                        Extra
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-slate-500 font-medium mt-1.5">
+                                                {ts.workedStart} – {ts.workedEnd}
+                                            </p>
+                                        </div>
+                                        <div className="shrink-0 text-right">
+                                            <p className="text-sm font-semibold text-slate-800 tabular-nums">{hours.toFixed(2)} hrs</p>
+                                            <p className="text-xs font-medium tabular-nums mt-1.5 text-emerald-600">
                                                 {showPayInfo
                                                     ? `$${(hours * (userData?.hourlyRate || 0)).toFixed(2)}`
-                                                    : 'Hidden'}
+                                                    : '•••'}
                                             </p>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <p className="text-sm text-gray-300 line-through tabular-nums">
-                                                {rosteredHours > 0 ? `${rosteredHours.toFixed(2)} hrs` : '—'}
-                                            </p>
-                                            <p className="text-label">{ts ? 'Pending approval' : 'No timesheet'}</p>
-                                        </>
-                                    )
-                                }
-                            />
-                        );
-                    })}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
-        </section>
+        </div>
     );
 }

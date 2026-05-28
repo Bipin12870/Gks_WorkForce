@@ -300,11 +300,15 @@ export default function StaffAvailabilitySection() {
     return (
         <section>
             <div className="space-y-4 mb-4">
-                <StaffWeekPicker
-                    weekStart={selectedWeek}
-                    onPrev={() => changeWeek('prev')}
-                    onNext={() => changeWeek('next')}
-                />
+                <div className="flex justify-center">
+                    <div className="w-full max-w-xs">
+                        <StaffWeekPicker
+                            weekStart={selectedWeek}
+                            onPrev={() => changeWeek('prev')}
+                            onNext={() => changeWeek('next')}
+                        />
+                    </div>
+                </div>
                 <div className="flex flex-wrap gap-2">
                     <Button
                         variant="secondary"

@@ -1,12 +1,5 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import StaffSubpageShell from '@/components/staff/StaffSubpageShell';
-import StaffHoursSection from '@/components/StaffHoursSection';
-
-export default function StaffProfileHoursPage() {
-    return (
-        <StaffSubpageShell title="Hours & pay">
-            <StaffHoursSection />
-        </StaffSubpageShell>
-    );
+export default function StaffProfileHoursRedirectPage() {
+    redirect('/staff/hours');
 }

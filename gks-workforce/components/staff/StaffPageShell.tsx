@@ -27,8 +27,8 @@ export default function StaffPageShell({
     children,
 }: StaffPageShellProps) {
     return (
-        <>
-            <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-30">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 shrink-0">
                 <div
                     className={`${widthClass[maxWidth]} mx-auto px-4 min-h-14 flex flex-col justify-center py-3 ${
                         headerCentered ? 'text-center' : ''
@@ -39,10 +39,12 @@ export default function StaffPageShell({
                 </div>
             </header>
             <main
-                className={`${widthClass[maxWidth]} mx-auto px-4 py-6 ${centered ? 'flex flex-col items-center' : ''}`}
+                className={`flex-1 min-h-0 flex flex-col ${widthClass[maxWidth]} w-full mx-auto px-4 py-5 ${
+                    centered ? 'items-center' : ''
+                } overflow-hidden`}
             >
                 {children}
             </main>
-        </>
+        </div>
     );
 }

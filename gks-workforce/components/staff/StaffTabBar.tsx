@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Clock, CalendarDays, FileText, User } from 'lucide-react';
+import { Clock, CalendarDays, Coins, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, Timestamp, where } from 'firebase/firestore';
@@ -12,7 +12,7 @@ import Icon from '@/components/ui/Icon';
 const TABS = [
     { href: '/staff/clock', label: 'Clock', icon: Clock },
     { href: '/staff/roster', label: 'Roster', icon: CalendarDays },
-    { href: '/staff/timesheets', label: 'Sheets', icon: FileText },
+    { href: '/staff/hours', label: 'Hours', icon: Coins },
     { href: '/staff/profile', label: 'Profile', icon: User },
 ] as const;
 

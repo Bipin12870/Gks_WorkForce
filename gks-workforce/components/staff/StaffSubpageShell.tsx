@@ -24,8 +24,8 @@ export default function StaffSubpageShell({
     const hasFooter = Boolean(footer) || withActionFooter;
 
     return (
-        <>
-            <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200 shrink-0">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 shrink-0">
                 <div className="max-w-lg mx-auto relative flex items-center justify-center min-h-14 px-14">
                     <Link
                         href={backHref}
@@ -38,11 +38,11 @@ export default function StaffSubpageShell({
                 </div>
             </header>
             <main
-                className={`max-w-lg mx-auto w-full px-4 pt-4 ${hasFooter ? 'pb-32' : 'pb-6'}`}
+                className={`flex-1 min-h-0 flex flex-col max-w-lg mx-auto w-full px-4 pt-4 overflow-hidden ${hasFooter ? 'pb-32' : ''}`}
             >
                 {children}
             </main>
             {footer}
-        </>
+        </div>
     );
 }

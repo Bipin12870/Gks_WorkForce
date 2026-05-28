@@ -10,8 +10,8 @@ export default function StaffLayout({
 }) {
     return (
         <ProtectedRoute requiredRole="STAFF">
-            <div className="min-h-screen bg-background text-gray-900 flex flex-col pt-[env(safe-area-inset-top)]">
-                <div className="flex-1 pb-24 min-h-0">{children}</div>
+            <div className="h-screen bg-background text-gray-900 flex flex-col pt-[env(safe-area-inset-top)] overflow-hidden">
+                <div className="flex-1 min-h-0 flex flex-col pb-14">{children}</div>
                 <StaffTabBar />
             </div>
         </ProtectedRoute>

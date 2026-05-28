@@ -103,20 +103,24 @@ export default function StaffRosterPage() {
     };
 
     return (
-        <StaffPageShell title="My roster" description="Approved shifts for the selected week">
-            <Card padding={false} className="mb-6 p-4.5">
-                <StaffWeekPicker
-                    weekStart={selectedWeek}
-                    onPrev={() => changeWeek('prev')}
-                    onNext={() => changeWeek('next')}
-                />
-            </Card>
+        <StaffPageShell title="My roster">
+            <div className="flex justify-center mb-5 shrink-0">
+                <div className="w-full max-w-xs">
+                    <StaffWeekPicker
+                        weekStart={selectedWeek}
+                        onPrev={() => changeWeek('prev')}
+                        onNext={() => changeWeek('next')}
+                    />
+                </div>
+            </div>
 
             {loading ? (
-                <Spinner className="py-16" />
+                <div className="flex-1 flex items-center justify-center">
+                    <Spinner />
+                </div>
             ) : (
-                <>
-                    <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <div className="grid grid-cols-2 gap-3 mb-5 shrink-0">
                         <StaffStatCard
                             label="Scheduled hours"
                             value={totalHours.toFixed(2)}
@@ -135,15 +139,17 @@ export default function StaffRosterPage() {
                     </div>
 
                     {!hasAnyShifts ? (
-                        <Card>
-                            <EmptyState
-                                icon={CalendarDays}
-                                title="No shifts this week"
-                                description="When your roster is published, shifts will appear here."
-                            />
-                        </Card>
+                        <div className="shrink-0">
+                            <Card>
+                                <EmptyState
+                                    icon={CalendarDays}
+                                    title="No shifts this week"
+                                    description="When your roster is published, shifts will appear here."
+                                />
+                            </Card>
+                        </div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="flex-1 overflow-y-auto pr-0.5 pb-4 space-y-2">
                             {WEEK_DAYS.map((dayOfWeek) => {
                                 const dayShifts = getShiftsForDay(dayOfWeek);
                                 const isExpanded = expandedDays.has(dayOfWeek);
@@ -231,7 +237,7 @@ export default function StaffRosterPage() {
                             })}
                         </div>
                     )}
-                </>
+                </div>
             )}
         </StaffPageShell>
     );

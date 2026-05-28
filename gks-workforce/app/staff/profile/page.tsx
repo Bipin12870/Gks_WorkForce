@@ -6,7 +6,7 @@ import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffNavGroup from '@/components/staff/StaffNavGroup';
 import StaffNavRow from '@/components/staff/StaffNavRow';
 import Button from '@/components/ui/Button';
-import { CalendarClock, Clock, User } from 'lucide-react';
+import { CalendarClock, FileText, User } from 'lucide-react';
 
 export default function StaffProfilePage() {
     const { logout } = useAuth();
@@ -27,10 +27,10 @@ export default function StaffProfilePage() {
                     description="Weekly hours you can work"
                 />
                 <StaffNavRow
-                    href="/staff/profile/hours"
-                    icon={Clock}
-                    label="Hours & pay"
-                    description="Approved hours and estimates"
+                    href="/staff/profile/timesheets"
+                    icon={FileText}
+                    label="Timesheets"
+                    description="Submit and track worked hours"
                 />
             </StaffNavGroup>
 

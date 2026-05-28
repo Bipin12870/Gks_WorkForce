@@ -13,9 +13,37 @@ export default function StaffLayout({
     useEffect(() => {
         document.documentElement.classList.add('staff-scroll-lock');
         document.body.classList.add('staff-scroll-lock');
+
+        const preventTouchMove = (e: TouchEvent) => {
+            let isScrollable = false;
+            let target = e.target as Element | null;
+            while (target && target !== document.body) {
+                const style = window.getComputedStyle(target);
+                const overflowX = style.overflowX;
+                const overflowY = style.overflowY;
+                if (target instanceof HTMLElement) {
+                    const hasScrollableHeight = (overflowY === 'auto' || overflowY === 'scroll') && target.scrollHeight > target.clientHeight;
+                    const hasScrollableWidth = (overflowX === 'auto' || overflowX === 'scroll') && target.scrollWidth > target.clientWidth;
+                    if (hasScrollableHeight || hasScrollableWidth) {
+                        isScrollable = true;
+                        break;
+                    }
+                }
+                target = target.parentElement;
+            }
+            if (!isScrollable) {
+                if (e.cancelable) {
+                    e.preventDefault();
+                }
+            }
+        };
+
+        document.addEventListener('touchmove', preventTouchMove, { passive: false });
+
         return () => {
             document.documentElement.classList.remove('staff-scroll-lock');
             document.body.classList.remove('staff-scroll-lock');
+            document.removeEventListener('touchmove', preventTouchMove);
         };
     }, []);
 

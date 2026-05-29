@@ -9,7 +9,6 @@ import { getWeekStart, getDayName, formatDate, calculateHours } from '@/lib/util
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffStatCard from '@/components/staff/StaffStatCard';
-import StaffListRow from '@/components/staff/StaffListRow';
 import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
@@ -245,33 +244,54 @@ export default function StaffRosterPage() {
                                                 </div>
                                             </button>
                                             {isExpanded && (
-                                                <div className={`p-4 border-t border-gray-50 space-y-2 ${todayState || pastState ? 'pl-3' : 'pl-4'}`}>
-                                                    {isEmpty ? (
-                                                        <p className="text-xs text-gray-400 text-center py-4">No shifts scheduled</p>
-                                                    ) : (
-                                                        dayShifts.map((shift) => {
-                                                            const durationHours = calculateHours(shift.startTime, shift.endTime);
-                                                            return (
-                                                                <StaffListRow
-                                                                    key={shift.id}
-                                                                    icon={Clock}
-                                                                    iconClassName="text-blue-600"
-                                                                    title={
-                                                                        <p className="text-sm font-semibold text-gray-900">
-                                                                            {shift.startTime} – {shift.endTime}
-                                                                            <span className="text-xs text-gray-500 font-medium ml-1.5">
-                                                                                ({durationHours.toFixed(2)} hrs)
-                                                                            </span>
-                                                                        </p>
-                                                                    }
-                                                                    subtitle={
-                                                                        <p className="text-xs text-gray-400">{formatDate(shift.date.toDate())}</p>
-                                                                    }
-                                                                    trailing={<Badge variant="success">Confirmed</Badge>}
-                                                                />
-                                                            );
-                                                        })
+                                                <div className={`relative ${todayState || pastState ? 'pl-3' : 'pl-4'} pr-4 pb-4 pt-3`}>
+                                                    {/* Continuous vertical guide line bridging from button row to first item */}
+                                                    {!isEmpty && (
+                                                        <div className={`absolute -top-5 h-10 w-[2px] bg-slate-300 ${todayState || pastState ? 'left-3' : 'left-4'}`} />
                                                     )}
+
+                                                    <div className={`${!isEmpty ? 'pl-6' : ''} space-y-3 mt-3`}>
+                                                        {isEmpty ? (
+                                                            <p className="text-xs text-gray-400 text-center py-4">No shifts scheduled</p>
+                                                        ) : (
+                                                            dayShifts.map((shift, idx) => {
+                                                                const durationHours = calculateHours(shift.startTime, shift.endTime);
+                                                                return (
+                                                                    <div key={shift.id} className="relative py-2 flex items-start justify-between gap-4">
+                                                                        {/* Vertical line segment */}
+                                                                        {idx < dayShifts.length - 1 ? (
+                                                                            <div className="absolute top-0 bottom-0 -left-6 w-[2px] bg-slate-300" />
+                                                                        ) : (
+                                                                            <div className="absolute top-0 h-1/2 -left-6 w-[2px] bg-slate-300" />
+                                                                        )}
+                                                                        {/* Horizontal branch line */}
+                                                                        <div className="absolute top-1/2 -left-6 w-6 h-[2px] bg-slate-300" />
+
+                                                                        {/* Shift Details Content (direct on page background) */}
+                                                                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                                                            <Icon icon={Clock} size="sm" className="text-blue-600 shrink-0 mt-0.5" />
+                                                                            <div className="min-w-0">
+                                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                    <span className="text-sm font-semibold text-gray-900">
+                                                                                        {shift.startTime} – {shift.endTime}
+                                                                                    </span>
+                                                                                    <span className="text-xs text-gray-500 font-medium">
+                                                                                        ({durationHours.toFixed(2)} hrs)
+                                                                                    </span>
+                                                                                </div>
+                                                                                <p className="text-xs text-gray-400 mt-0.5">
+                                                                                    {formatDate(shift.date.toDate())}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="shrink-0 pt-0.5">
+                                                                            <Badge variant="success">Confirmed</Badge>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

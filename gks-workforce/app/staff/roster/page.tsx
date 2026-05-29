@@ -171,95 +171,113 @@ export default function StaffRosterPage() {
                             </Card>
                         </div>
                     ) : (
-                        <div className="flex-1 overflow-y-auto pr-0.5 pb-4 space-y-2">
-                            {WEEK_DAYS.map((dayOfWeek) => {
-                                const dayShifts = getShiftsForDay(dayOfWeek);
-                                const isExpanded = expandedDays.has(dayOfWeek);
-                                const isEmpty = dayShifts.length === 0;
-                                const todayState = isToday(dayOfWeek);
-                                const pastState = isPastDay(dayOfWeek);
+                        <div className="flex-1 overflow-y-auto pr-0.5 pb-4">
+                            <div className="bg-white divide-y divide-gray-100 overflow-hidden">
+                                {WEEK_DAYS.map((dayOfWeek) => {
+                                    const dayShifts = getShiftsForDay(dayOfWeek);
+                                    const isExpanded = expandedDays.has(dayOfWeek);
+                                    const isEmpty = dayShifts.length === 0;
+                                    const todayState = isToday(dayOfWeek);
+                                    const pastState = isPastDay(dayOfWeek);
 
-                                if (isEmpty && !isExpanded) {
+                                    if (isEmpty && !isExpanded) {
+                                        return (
+                                            <div
+                                                key={dayOfWeek}
+                                                className={`transition-all ${
+                                                    todayState
+                                                        ? 'border-l-4 border-l-blue-600 bg-blue-50/5'
+                                                        : pastState
+                                                            ? 'border-l-4 border-l-gray-300 bg-gray-50/30 opacity-80'
+                                                            : ''
+                                                }`}
+                                            >
+                                                <button
+                                                    key={dayOfWeek}
+                                                    type="button"
+                                                    onClick={() => toggleDay(dayOfWeek)}
+                                                    className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
+                                                        todayState || pastState ? 'pl-3' : 'pl-4'
+                                                    } hover:bg-gray-50/50 text-gray-900`}
+                                                >
+                                                    <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
+                                                        {getDayName(dayOfWeek)}
+                                                        {todayState && <span className="text-xs text-blue-600 font-semibold">(Today)</span>}
+                                                    </span>
+                                                    <span className="text-xs text-gray-400 font-medium">No shifts</span>
+                                                </button>
+                                            </div>
+                                        );
+                                    }
+
                                     return (
-                                        <button
+                                        <div
                                             key={dayOfWeek}
-                                            type="button"
-                                            onClick={() => toggleDay(dayOfWeek)}
-                                            className={`w-full card-base px-4 py-3 flex items-center justify-between text-left min-h-11 focus-visible:ring-2 focus-visible:ring-blue-500 transition-all ${
-                                                todayState ? 'border-l-4 border-l-blue-600 pl-3.5 bg-blue-50/10' :
-                                                pastState ? 'border-l-4 border-l-gray-300 pl-3.5 bg-gray-50/40 opacity-75' : ''
+                                            className={`transition-all ${
+                                                todayState
+                                                    ? 'border-l-4 border-l-blue-600 bg-blue-50/5'
+                                                    : pastState
+                                                        ? 'border-l-4 border-l-gray-300 bg-gray-50/30 opacity-80'
+                                                        : ''
                                             }`}
                                         >
-                                            <span className="text-section-title">
-                                                {getDayName(dayOfWeek)}
-                                                {todayState && <span className="text-xs text-blue-600 font-semibold ml-1.5">(Today)</span>}
-                                            </span>
-                                            <span className="text-label">No shifts</span>
-                                        </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleDay(dayOfWeek)}
+                                                className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
+                                                    todayState || pastState ? 'pl-3' : 'pl-4'
+                                                } hover:bg-gray-50/50 text-gray-900`}
+                                                aria-expanded={isExpanded}
+                                            >
+                                                <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
+                                                    {getDayName(dayOfWeek)}
+                                                    {todayState && <span className="text-xs text-blue-600 font-semibold">(Today)</span>}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    {dayShifts.length > 0 && (
+                                                        <Badge variant="neutral">{dayShifts.length} shift{dayShifts.length !== 1 ? 's' : ''}</Badge>
+                                                    )}
+                                                    <Icon
+                                                        icon={ChevronDown}
+                                                        size="sm"
+                                                        className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                                    />
+                                                </div>
+                                            </button>
+                                            {isExpanded && (
+                                                <div className={`p-4 border-t border-gray-50 space-y-2 ${todayState || pastState ? 'pl-3' : 'pl-4'}`}>
+                                                    {isEmpty ? (
+                                                        <p className="text-xs text-gray-400 text-center py-4">No shifts scheduled</p>
+                                                    ) : (
+                                                        dayShifts.map((shift) => {
+                                                            const durationHours = calculateHours(shift.startTime, shift.endTime);
+                                                            return (
+                                                                <StaffListRow
+                                                                    key={shift.id}
+                                                                    icon={Clock}
+                                                                    iconClassName="text-blue-600"
+                                                                    title={
+                                                                        <p className="text-sm font-semibold text-gray-900">
+                                                                            {shift.startTime} – {shift.endTime}
+                                                                            <span className="text-xs text-gray-500 font-medium ml-1.5">
+                                                                                ({durationHours.toFixed(2)} hrs)
+                                                                            </span>
+                                                                        </p>
+                                                                    }
+                                                                    subtitle={
+                                                                        <p className="text-xs text-gray-400">{formatDate(shift.date.toDate())}</p>
+                                                                    }
+                                                                    trailing={<Badge variant="success">Confirmed</Badge>}
+                                                                />
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     );
-                                }
-
-                                return (
-                                    <div key={dayOfWeek} className={`card-base overflow-hidden transition-all ${
-                                        todayState ? 'border-l-4 border-l-blue-600 bg-blue-50/5' :
-                                        pastState ? 'border-l-4 border-l-gray-300 bg-gray-50/20 opacity-80' : ''
-                                    }`}>
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleDay(dayOfWeek)}
-                                            className={`w-full px-4 py-3 flex items-center justify-between border-b border-gray-100 min-h-11 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
-                                                todayState || pastState ? 'pl-3.5' : ''
-                                            }`}
-                                            aria-expanded={isExpanded}
-                                        >
-                                            <span className="text-section-title">
-                                                {getDayName(dayOfWeek)}
-                                                {todayState && <span className="text-xs text-blue-600 font-semibold ml-1.5">(Today)</span>}
-                                            </span>
-                                            <div className="flex items-center gap-2">
-                                                {dayShifts.length > 0 && (
-                                                    <Badge variant="neutral">{dayShifts.length} shift{dayShifts.length !== 1 ? 's' : ''}</Badge>
-                                                )}
-                                                <Icon
-                                                    icon={ChevronDown}
-                                                    size="sm"
-                                                    className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                                />
-                                            </div>
-                                        </button>
-                                        {isExpanded && (
-                                            <div className={`p-3 space-y-2 ${todayState ? 'pl-3.5' : ''}`}>
-                                                {isEmpty ? (
-                                                    <p className="text-label text-center py-4">No shifts scheduled</p>
-                                                ) : (
-                                                    dayShifts.map((shift) => {
-                                                        const durationHours = calculateHours(shift.startTime, shift.endTime);
-                                                        return (
-                                                            <StaffListRow
-                                                                key={shift.id}
-                                                                icon={Clock}
-                                                                iconClassName="text-blue-600"
-                                                                title={
-                                                                    <p className="text-section-title">
-                                                                        {shift.startTime} – {shift.endTime}
-                                                                        <span className="text-xs text-gray-500 font-medium ml-1.5">
-                                                                            ({durationHours.toFixed(2)} hrs)
-                                                                        </span>
-                                                                    </p>
-                                                                }
-                                                                subtitle={
-                                                                    <p className="text-label">{formatDate(shift.date.toDate())}</p>
-                                                                }
-                                                                trailing={<Badge variant="success">Confirmed</Badge>}
-                                                            />
-                                                        );
-                                                    })
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                })}
+                            </div>
                         </div>
                     )}
                 </div>

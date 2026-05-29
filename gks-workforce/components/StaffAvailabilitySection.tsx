@@ -511,7 +511,7 @@ export default function StaffAvailabilitySection() {
                                 <button
                                     type="button"
                                     onClick={() => setOpenDay(isOpen ? null : dayOfWeek)}
-                                    className={`w-full flex items-center justify-between py-6 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${todayState || pastState || isRostered ? 'pl-3' : 'pl-4'
+                                    className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${todayState || pastState || isRostered ? 'pl-3' : 'pl-4'
                                         } ${dayLocked
                                             ? 'bg-transparent text-gray-500'
                                             : 'bg-transparent hover:bg-gray-50/50 text-gray-900'

@@ -21,7 +21,10 @@ export default function BadgeManager() {
             return;
         }
 
-        const nav = navigator as any;
+        const nav = navigator as typeof navigator & {
+            setAppBadge: (count?: number) => Promise<void>;
+            clearAppBadge: () => Promise<void>;
+        };
 
         // 2. Clear badge on logout or if no user data
         if (!user || !userData) {

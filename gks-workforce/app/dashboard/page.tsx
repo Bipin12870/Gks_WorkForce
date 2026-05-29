@@ -138,10 +138,12 @@ export default function DashboardPage() {
     );
 }
 
+import type { LucideIcon } from 'lucide-react';
+
 interface DashboardCardProps {
     title: string;
     description: string;
-    icon: any;
+    icon: LucideIcon;
     onClick: () => void;
     badgeCount?: number;
     isWarning?: boolean;

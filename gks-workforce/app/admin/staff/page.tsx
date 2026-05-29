@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
@@ -39,13 +39,7 @@ export default function AdminStaffPage() {
     const [resettingPassword, setResettingPassword] = useState(false);
     const { showNotification } = useNotification();
 
-    useEffect(() => {
-        if (userData?.role === 'ADMIN') {
-            loadStaff();
-        }
-    }, [userData]);
-
-    const loadStaff = async () => {
+    const loadStaff = useCallback(async () => {
         if (!userData || userData.role !== 'ADMIN') return;
         try {
             const snapshot = await getDocs(collection(db, 'users'));
@@ -63,7 +57,13 @@ export default function AdminStaffPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [userData, showNotification]);
+
+    useEffect(() => {
+        if (userData?.role === 'ADMIN') {
+            loadStaff();
+        }
+    }, [userData, loadStaff]);
 
     const handleCreateStaff = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -80,9 +80,9 @@ export default function AdminStaffPage() {
             setFormData({ name: '', username: '', password: '', hourlyRate: 25 });
             setShowCreateForm(false);
             loadStaff();
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error creating staff:', error);
-            showNotification(error.message || 'Failed to create staff account', 'error');
+            showNotification((error as Error).message || 'Failed to create staff account', 'error');
         }
     };
 
@@ -120,9 +120,9 @@ export default function AdminStaffPage() {
             setShowEditModal(false);
             setEditingStaff(null);
             loadStaff();
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error updating staff:', error);
-            showNotification(error.message || 'Failed to update staff', 'error');
+            showNotification((error as Error).message || 'Failed to update staff', 'error');
         } finally {
             setLoading(false);
         }
@@ -156,9 +156,9 @@ export default function AdminStaffPage() {
 
             showNotification(`${staffName} and all associated data have been permanently deleted.`, 'success');
             loadStaff();
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error deleting staff:', error);
-            showNotification(error.message || 'Failed to delete staff and data', 'error');
+            showNotification((error as Error).message || 'Failed to delete staff and data', 'error');
         } finally {
             setLoading(false);
         }
@@ -176,9 +176,9 @@ export default function AdminStaffPage() {
             await resetStaffPassword(editingStaff.id, newPassword);
             showNotification('Password reset successfully!', 'success');
             setNewPassword('');
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error resetting password:', error);
-            showNotification(error.message || 'Failed to reset password', 'error');
+            showNotification((error as Error).message || 'Failed to reset password', 'error');
         } finally {
             setResettingPassword(false);
         }

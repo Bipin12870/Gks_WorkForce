@@ -78,7 +78,7 @@ export async function createShift(shiftData: {
             .where('status', '==', 'APPROVED')
             .get();
 
-        const existingShifts = existingShiftsSnap.docs.map(doc => ({
+        const existingShifts = existingShiftsSnap.docs.map((doc: admin.firestore.QueryDocumentSnapshot) => ({
             id: doc.id,
             start: doc.data().startTime,
             end: doc.data().endTime,
@@ -205,8 +205,8 @@ export async function updateShift(
             .get();
 
         const existingShifts = existingShiftsSnap.docs
-            .filter(doc => doc.id !== shiftId)
-            .map(doc => ({
+            .filter((doc: admin.firestore.QueryDocumentSnapshot) => doc.id !== shiftId)
+            .map((doc: admin.firestore.QueryDocumentSnapshot) => ({
                 id: doc.id,
                 start: doc.data().startTime,
                 end: doc.data().endTime,

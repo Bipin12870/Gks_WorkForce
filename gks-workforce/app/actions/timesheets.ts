@@ -164,7 +164,7 @@ export async function updateTimesheetStatus(
                 .get();
 
             const targetDateStr = timesheetData.date.toDate().toDateString();
-            const overlapsApproved = approvedTimesheets.docs.some(doc => {
+            const overlapsApproved = approvedTimesheets.docs.some((doc: admin.firestore.QueryDocumentSnapshot) => {
                 if (doc.id === timesheetId) return false;
                 const t = doc.data();
                 return t.date.toDate().toDateString() === targetDateStr &&
@@ -180,7 +180,7 @@ export async function updateTimesheetStatus(
         }
 
         // 5. Update Timesheet
-        const updates: Record<string, any> = {
+        const updates: Record<string, unknown> = {
             status,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
@@ -275,7 +275,7 @@ export async function correctTimesheet(
                 .get();
 
             const targetDateStr = timesheetData.date.toDate().toDateString();
-            const overlapsApproved = approvedTimesheets.docs.some(doc => {
+            const overlapsApproved = approvedTimesheets.docs.some((doc: admin.firestore.QueryDocumentSnapshot) => {
                 if (doc.id === timesheetId) return false;
                 const t = doc.data();
                 return t.date.toDate().toDateString() === targetDateStr &&
@@ -305,7 +305,7 @@ export async function correctTimesheet(
         const correctionDocRef = await db.collection('timesheetCorrections').add(correctionPayload);
 
         // Update the original timesheet document with corrected status/times and reason as adminNote
-        const updates: Record<string, any> = {
+        const updates: Record<string, unknown> = {
             status,
             adminNote: reason,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),

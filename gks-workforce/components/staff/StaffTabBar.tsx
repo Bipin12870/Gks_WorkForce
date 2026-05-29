@@ -25,7 +25,7 @@ export default function StaffTabBar() {
     useEffect(() => {
         try {
             const saved = localStorage.getItem('last_staff_profile_path');
-            if (saved && saved.startsWith('/staff/profile')) {
+            if (saved && saved.startsWith('/staff/profile') && /^\/staff\/profile[a-zA-Z0-9\/\-_]*$/.test(saved)) {
                 // eslint-disable-next-line react-hooks/set-state-in-effect
                 setProfileHref(saved);
             }
@@ -80,7 +80,7 @@ export default function StaffTabBar() {
                         (tab.href === '/staff/profile' && pathname.startsWith('/staff/profile'));
 
                     const href = tab.href === '/staff/profile'
-                        ? (isActive ? '/staff/profile' : profileHref)
+                        ? (isActive ? '/staff/profile' : (profileHref.startsWith('/staff/profile') ? profileHref : '/staff/profile'))
                         : tab.href;
 
                     return (

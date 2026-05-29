@@ -62,12 +62,13 @@ export async function createStaffAccount(username: string, password: string, nam
         });
 
         return { success: true, uid: userRecord.uid };
-    } catch (error: any) {
+    } catch (error) {
         console.error('Error in createStaffAccount:', error);
-        let message = error.message || 'Failed to create staff account';
-        if (error.code === 'auth/email-already-in-use') {
+        const err = error as { code?: string; message?: string };
+        let message = err.message || 'Failed to create staff account';
+        if (err.code === 'auth/email-already-in-use') {
             message = 'This username is already taken. Please choose another one.';
-        } else if (error.code === 'auth/weak-password') {
+        } else if (err.code === 'auth/weak-password') {
             message = 'Password is too weak. Please use at least 6 characters.';
         }
         throw new Error(message);
@@ -217,9 +218,10 @@ export async function deleteStaffAccountFull(staffId: string) {
         // 2. Delete the user from Firebase Auth
         try {
             await auth.deleteUser(staffId);
-        } catch (error: any) {
+        } catch (error) {
+            const err = error as { code?: string };
             // If the user is already gone from Auth, we proceed with cascade deletes
-            if (error.code !== 'auth/user-not-found') {
+            if (err.code !== 'auth/user-not-found') {
                 throw error;
             }
         }
@@ -229,23 +231,23 @@ export async function deleteStaffAccountFull(staffId: string) {
 
         // - Shifts
         const shiftsSnap = await db.collection('shifts').where('staffId', '==', staffId).get();
-        shiftsSnap.docs.forEach((doc) => batch.delete(doc.ref));
+        shiftsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
 
         // - Availability
         const availSnap = await db.collection('availability').where('staffId', '==', staffId).get();
-        availSnap.docs.forEach((doc) => batch.delete(doc.ref));
+        availSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
 
         // - TimeRecords
         const timeRecordsSnap = await db.collection('timeRecords').where('staffId', '==', staffId).get();
-        timeRecordsSnap.docs.forEach((doc) => batch.delete(doc.ref));
+        timeRecordsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
 
         // - Roster Audit Logs
         const rosterLogsSnap = await db.collection('rosterAuditLogs').where('staffId', '==', staffId).get();
-        rosterLogsSnap.docs.forEach((doc) => batch.delete(doc.ref));
+        rosterLogsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
 
         // - Timesheets
         const timesheetsSnap = await db.collection('timesheets').where('staffId', '==', staffId).get();
-        timesheetsSnap.docs.forEach((doc) => batch.delete(doc.ref));
+        timesheetsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
 
         // - User document
         batch.delete(db.collection('users').doc(staffId));

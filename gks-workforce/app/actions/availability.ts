@@ -65,7 +65,7 @@ export async function submitAvailability(
             .get();
 
         const lockedDays = new Set<number>();
-        shiftsSnap.docs.forEach((doc) => {
+        shiftsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => {
             lockedDays.add(doc.data().date.toDate().getDay());
         });
 

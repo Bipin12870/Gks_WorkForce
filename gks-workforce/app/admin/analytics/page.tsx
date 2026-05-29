@@ -294,7 +294,7 @@ export default function AnalyticsPage() {
                                                 <Tooltip
                                                     cursor={{ fill: '#f3f4f6' }}
                                                     contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                                    formatter={(value: any, name: any) => [formatCurrency(Number(value)), String(name)]}
+                                                    formatter={(value, name) => [formatCurrency(Number(value ?? 0)), String(name ?? '')]}
                                                 />
                                                 <Legend verticalAlign="top" height={36} />
                                                 <Bar dataKey="rosterCost" name="Rostered" fill="#bfdbfe" radius={[4, 4, 0, 0]} maxBarSize={40} />
@@ -332,7 +332,7 @@ export default function AnalyticsPage() {
                                                 />
                                                 <Tooltip
                                                     contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                                    formatter={(value: any) => [`${Number(value).toFixed(1)} hrs`, '']}
+                                                    formatter={(value) => [`${Number(value ?? 0).toFixed(1)} hrs`, '']}
                                                 />
                                                 <Legend
                                                     verticalAlign="top"

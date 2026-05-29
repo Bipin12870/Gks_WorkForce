@@ -4,10 +4,18 @@ import { useState, useEffect } from 'react';
 import { Share, Download, X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 
+interface BeforeInstallPromptEvent extends Event {
+    prompt: () => Promise<void>;
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
 export default function PwaInstallPrompt() {
-    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [showPrompt, setShowPrompt] = useState(false);
-    const [isIOSDevice, setIsIOSDevice] = useState(false);
+    const [isIOSDevice] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
+    });
 
     useEffect(() => {
         // Only run on client side
@@ -20,13 +28,12 @@ export default function PwaInstallPrompt() {
         // Check if already in standalone (installed) mode
         const isStandalone = 
             window.matchMedia('(display-mode: standalone)').matches || 
-            (window.navigator as any).standalone === true;
+            (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
         
         if (isStandalone) return;
 
         // Detect iOS device
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-        setIsIOSDevice(isIOS);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window);
 
         if (isIOS) {
             // Show prompt for iOS after a short delay
@@ -37,7 +44,7 @@ export default function PwaInstallPrompt() {
         // Handler for Android/Chrome prompt
         const handleBeforeInstallPrompt = (e: Event) => {
             e.preventDefault();
-            setDeferredPrompt(e);
+            setDeferredPrompt(e as BeforeInstallPromptEvent);
             // Show prompt after a short delay
             setTimeout(() => setShowPrompt(true), 3000);
         };

@@ -179,8 +179,8 @@ export interface AuditLog {
     action: string; // e.g., 'TIMESHEET_APPROVE', 'RATE_CHANGE', 'SHIFT_EDIT'
     targetCollection: string; // e.g., 'timesheets', 'users'
     targetDocumentId: string;
-    previousValues?: Record<string, any>;
-    newValues?: Record<string, any>;
+    previousValues?: Record<string, unknown>;
+    newValues?: Record<string, unknown>;
     reason?: string;
     timestamp: Timestamp;
 }

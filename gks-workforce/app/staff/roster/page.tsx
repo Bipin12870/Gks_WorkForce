@@ -200,9 +200,9 @@ export default function StaffRosterPage() {
                                             <div className={`absolute left-[12px] top-[6px] w-2 h-2 rounded-full ${dotColor} z-10`} />
 
                                             {/* Row 1: Date & Duration */}
-                                            <div className="flex items-center justify-between text-base font-semibold text-slate-800 h-5">
+                                            <div className="flex items-center justify-between text-sm font-semibold text-slate-800 h-5">
                                                 <div className="flex items-center gap-2">
-                                                    <span className={isEmpty ? "text-slate-400" : "text-slate-900"}>
+                                                    <span className={isEmpty ? "text-slate-400 font-medium" : "text-slate-800"}>
                                                         {formattedDate}
                                                     </span>
                                                     {todayState && (
@@ -214,7 +214,7 @@ export default function StaffRosterPage() {
                                                 {isEmpty ? (
                                                     <span className="text-xs text-slate-400 font-medium">No shifts</span>
                                                 ) : (
-                                                    <span className="text-base font-bold text-slate-900 tabular-nums">
+                                                    <span className="tabular-nums text-slate-800 font-semibold">
                                                         {formatHoursAndMinutes(totalDailyHours)}
                                                     </span>
                                                 )}
@@ -226,7 +226,7 @@ export default function StaffRosterPage() {
                                                     {dayShifts.map((shift) => (
                                                         <div
                                                             key={shift.id}
-                                                            className="flex items-center justify-between text-sm font-semibold text-slate-600 h-5"
+                                                            className="flex items-center justify-between text-xs font-medium text-slate-500 h-4"
                                                         >
                                                             <span>
                                                                 {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}

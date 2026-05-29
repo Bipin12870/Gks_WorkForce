@@ -8,8 +8,8 @@ export interface AuditParams {
     action: string;
     targetCollection: string;
     targetDocumentId: string;
-    previousValues?: Record<string, any> | null;
-    newValues?: Record<string, any> | null;
+    previousValues?: Record<string, unknown> | null;
+    newValues?: Record<string, unknown> | null;
     reason?: string | null;
 }
 

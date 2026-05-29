@@ -130,7 +130,7 @@ export async function clockIn(
                 .where('shiftId', '==', shift.id)
                 .get();
 
-            const hasCompleted = completedRecords.docs.some(doc => doc.data().clockOutTime !== null);
+            const hasCompleted = completedRecords.docs.some((doc: admin.firestore.QueryDocumentSnapshot) => doc.data().clockOutTime !== null);
             if (hasCompleted) {
                 // Roster shift was already completed/auto-closed today. Treat this clock-in as unscheduled.
                 shift = null;
@@ -327,7 +327,7 @@ export async function clockOut(
             }
         }
 
-        await db.runTransaction(async (transaction) => {
+        await db.runTransaction(async (transaction: admin.firestore.Transaction) => {
             timesheetId = queryTimesheetId;
 
             // Check if there is an existing timesheet for this shift to overwrite (duplicate clock cases)

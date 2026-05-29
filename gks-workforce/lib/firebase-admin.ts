@@ -26,7 +26,6 @@ try {
                     privateKey,
                 }),
             });
-            console.log('Firebase admin initialized successfully');
         }
     }
 } catch (error) {

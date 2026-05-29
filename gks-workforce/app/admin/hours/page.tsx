@@ -28,52 +28,52 @@ export default function AdminHoursPage() {
     const { showNotification } = useNotification();
 
     useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+
+            try {
+                const staffSnapshot = await getDocs(collection(db, 'users'));
+                const map: Record<string, User> = {};
+                staffSnapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    if (data.role === 'STAFF') {
+                        map[docSnap.id] = { id: docSnap.id, ...data } as User;
+                    }
+                });
+                setStaffMap(map);
+
+                const weekStart = new Date(selectedWeek);
+                const timesheetsQ = query(
+                    collection(db, 'timesheets'),
+                    where('weekStartDate', '==', Timestamp.fromDate(weekStart)),
+                    where('status', '==', 'APPROVED')
+                );
+                const timesheetsSnapshot = await getDocs(timesheetsQ);
+                const hours: Record<string, { hours: number; pay: number }> = {};
+
+                timesheetsSnapshot.forEach((docSnap) => {
+                    const ts = docSnap.data() as Timesheet;
+                    if (!hours[ts.staffId]) {
+                        hours[ts.staffId] = { hours: 0, pay: 0 };
+                    }
+                    const payroll = calculatePayrollRecord(ts.workedStart, ts.workedEnd);
+                    const durationHours = payroll.payableMinutes / 60;
+                    const hourlyRate = map[ts.staffId]?.hourlyRate || 0;
+                    hours[ts.staffId].hours += durationHours;
+                    hours[ts.staffId].pay += durationHours * hourlyRate;
+                });
+
+                setStaffHours(hours);
+            } catch (error: unknown) {
+                console.error('Error loading hours data:', error);
+                showNotification('Failed to load hours data. Please try again.', 'error');
+            } finally {
+                setLoading(false);
+            }
+        };
+
         loadData();
-    }, [selectedWeek]);
-
-    const loadData = async () => {
-        setLoading(true);
-
-        try {
-            const staffSnapshot = await getDocs(collection(db, 'users'));
-            const map: Record<string, User> = {};
-            staffSnapshot.forEach((docSnap) => {
-                const data = docSnap.data();
-                if (data.role === 'STAFF') {
-                    map[docSnap.id] = { id: docSnap.id, ...data } as User;
-                }
-            });
-            setStaffMap(map);
-
-            const weekStart = new Date(selectedWeek);
-            const timesheetsQ = query(
-                collection(db, 'timesheets'),
-                where('weekStartDate', '==', Timestamp.fromDate(weekStart)),
-                where('status', '==', 'APPROVED')
-            );
-            const timesheetsSnapshot = await getDocs(timesheetsQ);
-            const hours: Record<string, { hours: number; pay: number }> = {};
-
-            timesheetsSnapshot.forEach((docSnap) => {
-                const ts = docSnap.data() as Timesheet;
-                if (!hours[ts.staffId]) {
-                    hours[ts.staffId] = { hours: 0, pay: 0 };
-                }
-                const payroll = calculatePayrollRecord(ts.workedStart, ts.workedEnd);
-                const durationHours = payroll.payableMinutes / 60;
-                const hourlyRate = map[ts.staffId]?.hourlyRate || 0;
-                hours[ts.staffId].hours += durationHours;
-                hours[ts.staffId].pay += durationHours * hourlyRate;
-            });
-
-            setStaffHours(hours);
-        } catch (error: unknown) {
-            console.error('Error loading hours data:', error);
-            showNotification('Failed to load hours data. Please try again.', 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [selectedWeek, showNotification]);
 
     const changeWeek = (direction: 'prev' | 'next') => {
         const newWeek = new Date(selectedWeek);

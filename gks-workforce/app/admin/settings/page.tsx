@@ -98,7 +98,7 @@ export default function AdminSettingsPage() {
         try {
             await saveShopLocation(parsedLat, parsedLng, parsedRadius, name);
             const updated = { lat: parsedLat, lng: parsedLng, radiusMetres: parsedRadius, name: name.trim() };
-            setCurrent(updated as any);
+            setCurrent(updated as ShopLocation);
             showNotification('Shop location saved successfully!', 'success');
         } catch (err) {
             console.error('Error saving shop location:', err);

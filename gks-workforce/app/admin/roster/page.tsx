@@ -11,7 +11,7 @@ import {
     getDocs,
     Timestamp,
 } from 'firebase/firestore';
-import { Availability, Shift, User } from '@/types';
+import { Availability, Shift, User, TimeRange } from '@/types';
 import { getWeekStart, getDayName, isWithinAvailability } from '@/lib/utils';
 import { createShift, updateShift, deleteShift } from '@/app/actions/shifts';
 import { useNotification } from '@/contexts/NotificationContext';
@@ -37,7 +37,7 @@ export default function AdminRosterPage() {
     const [staffMap, setStaffMap] = useState<Record<string, User>>({});
     const [staffList, setStaffList] = useState<User[]>([]);
     const [showApprovalModal, setShowApprovalModal] = useState(false);
-    const [selectedStaff, setSelectedStaff] = useState<{ id: string; name: string; ranges: any[]; dayOfWeek?: number } | null>(null);
+    const [selectedStaff, setSelectedStaff] = useState<{ id: string; name: string; ranges: TimeRange[]; dayOfWeek?: number } | null>(null);
     const [shiftForm, setShiftForm] = useState({ startTime: '09:00', endTime: '17:00' });
     const [isEditingShift, setIsEditingShift] = useState(false);
     const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
@@ -47,27 +47,36 @@ export default function AdminRosterPage() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [forceOverride, setForceOverride] = useState(false);
 
-    const loadStaff = async () => {
-        if (!userData || userData.role !== 'ADMIN') return;
-        const snapshot = await getDocs(collection(db, 'users'));
-        const map: Record<string, User> = {};
-        const list: User[] = [];
-        snapshot.forEach((doc) => {
-            const u = { id: doc.id, ...doc.data() } as User;
-            if (u.isActive !== false) {
-                map[doc.id] = u;
-                list.push(u);
-            }
-        });
-        setStaffMap(map);
-        setStaffList(list.sort((a, b) => a.name.localeCompare(b.name)));
-    };
-
     // Load staff data
     useEffect(() => {
+        let isMounted = true;
+
+        const loadStaff = async () => {
+            if (!userData || userData.role !== 'ADMIN') return;
+            const snapshot = await getDocs(collection(db, 'users'));
+            const map: Record<string, User> = {};
+            const list: User[] = [];
+            snapshot.forEach((doc) => {
+                const u = { id: doc.id, ...doc.data() } as User;
+                if (u.isActive !== false) {
+                    map[doc.id] = u;
+                    list.push(u);
+                }
+            });
+            
+            if (isMounted) {
+                setStaffMap(map);
+                setStaffList(list.sort((a, b) => a.name.localeCompare(b.name)));
+            }
+        };
+
         if (userData?.role === 'ADMIN') {
             loadStaff();
         }
+
+        return () => {
+            isMounted = false;
+        };
     }, [userData]);
 
     // Real-time listener for availability
@@ -140,15 +149,6 @@ export default function AdminRosterPage() {
         setSelectedWeek(getWeekStart(newWeek));
     };
 
-    // ── Get selected day's date for the list view ──────────────────────────────
-    const getSelectedDate = (): Date => {
-        const dayDate = new Date(selectedWeek);
-        if (selectedDay === -1) return dayDate;
-        dayDate.setDate(dayDate.getDate() + (selectedDay === 0 ? 6 : selectedDay - 1));
-        dayDate.setHours(0, 0, 0, 0);
-        return dayDate;
-    };
-
     // ── Availability helpers ──────────────────────────────────────────────────
     const getAvailabilityForDay = () => {
         let filtered = availability;
@@ -162,7 +162,7 @@ export default function AdminRosterPage() {
     };
 
     // ── List-view modal openers ───────────────────────────────────────────────
-    const openApprovalModal = (staffId: string, ranges: any[], dayOfWeek?: number) => {
+    const openApprovalModal = (staffId: string, ranges: TimeRange[], dayOfWeek?: number) => {
         const staff = staffMap[staffId];
         if (!staff) return;
         setSelectedStaff({ id: staffId, name: staff.name, ranges, dayOfWeek });
@@ -597,7 +597,7 @@ export default function AdminRosterPage() {
                                                 <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
                                                 <div>
                                                     <p className="font-semibold text-amber-800">Availability Conflict</p>
-                                                    <p className="text-amber-700 mt-0.5">This shift falls outside the staff member's submitted availability times.</p>
+                                                    <p className="text-amber-700 mt-0.5">This shift falls outside the staff member&apos;s submitted availability times.</p>
                                                 </div>
                                             </div>
                                             <label className="flex items-center gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/50 transition-colors">

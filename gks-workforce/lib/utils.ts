@@ -16,14 +16,6 @@ export function getWeekStart(date: Date): Date {
     return monday;
 }
 
-/** Local calendar date YYYY-MM-DD (avoids UTC drift in doc IDs). */
-export function formatLocalDateKey(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-}
-
 /**
  * Shift epoch milliseconds to represent client local calendar date at midnight, 
  * returning a Date object representing that local midnight in server storage.
@@ -163,7 +155,6 @@ export function processTimesheetAutomation(
     result.payroll.roundedPayableMinutes = Math.round(rawMinutes / 5) * 5;
 
     // 4. CLASSIFICATION ENGINE (Flags & Bounds)
-    // Store Hours (05:00 - 23:59) — TODO: revert to 09:00 after testing
     const shopOpenTotal = 5 * 60;
     const shopCloseTotal = 23 * 60 + 59;
 
@@ -358,20 +349,6 @@ export function incrementTime(timeStr: string, minsToAdd: number): string {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
-/**
- * Decrement a time string by specified minutes
- */
-export function decrementTime(timeStr: string, minsToSub: number): string {
-    const { hours, minutes } = parseTime(timeStr);
-    let totalMinutes = hours * 60 + minutes - minsToSub;
-    
-    // Clamp to 00:00
-    if (totalMinutes < 0) totalMinutes = 0;
-    
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-}
 
 /**
  * Check if a new range overlaps with existing ranges

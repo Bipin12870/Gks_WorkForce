@@ -66,3 +66,38 @@ export async function saveShopLocation(lat: number, lng: number, radiusMetres: n
         throw new Error((error as Error).message);
     }
 }
+
+/**
+ * Saves availability-related settings (Admin only).
+ * Currently controls whether staff can add multiple time ranges per day.
+ */
+export async function saveAvailabilitySettings(allowMultipleRanges: boolean) {
+    try {
+        const adminUser = await requireAdmin();
+        const db = getAdminDb();
+
+        const docRef = db.collection('config').doc('shopLocation');
+        const existingDoc = await docRef.get();
+        const previousValues = existingDoc.exists ? existingDoc.data() : null;
+
+        await docRef.set(
+            { allowMultipleAvailabilityRanges: allowMultipleRanges },
+            { merge: true }
+        );
+
+        await logAuditEvent({
+            actorId: adminUser.id,
+            actorRole: adminUser.role,
+            action: 'UPDATE_AVAILABILITY_SETTINGS',
+            targetCollection: 'config',
+            targetDocumentId: 'shopLocation',
+            previousValues: { allowMultipleAvailabilityRanges: previousValues?.allowMultipleAvailabilityRanges },
+            newValues: { allowMultipleAvailabilityRanges: allowMultipleRanges },
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error in saveAvailabilitySettings:', error);
+        throw new Error((error as Error).message);
+    }
+}

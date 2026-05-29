@@ -156,11 +156,13 @@ export default function StaffHoursSection() {
             ) : (
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                     <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-2.5 shrink-0">Weekly Breakdown</h3>
-                    <div className="flex-1 overflow-y-auto pr-0.5 pb-4 space-y-3">
-                        {approvedTimesheets.map((ts) => {
+                    <div className="flex-1 overflow-y-auto pr-0.5 pb-4">
+                        {approvedTimesheets.map((ts, idx) => {
                             const payroll = calculatePayrollRecord(ts.workedStart, ts.workedEnd);
                             const hours = payroll.payableMinutes / 60;
                             const isUnrostered = !ts.shiftId;
+                            const isFirst = idx === 0;
+                            const isLast = idx === approvedTimesheets.length - 1;
 
                             const dateObj = ts.date.toDate();
                             const formattedDate = dateObj.toLocaleDateString('en-US', {
@@ -172,30 +174,44 @@ export default function StaffHoursSection() {
                             return (
                                 <div
                                     key={ts.id}
-                                    className="border-l-4 border-l-emerald-500 border border-slate-200 rounded-xl bg-white p-4 sm:p-5"
+                                    className="relative pl-10 pb-8 last:pb-0"
                                 >
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-semibold text-slate-800">{formattedDate}</span>
-                                                {isUnrostered && (
-                                                    <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0 leading-relaxed uppercase tracking-wider">
-                                                        Extra
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-slate-500 font-medium mt-1.5">
-                                                {formatTimeTo12Hour(ts.workedStart)} – {formatTimeTo12Hour(ts.workedEnd)}
-                                            </p>
+                                    {/* Vertical Timeline Track Line */}
+                                    <div
+                                        className="absolute left-[15px] w-[2px] bg-emerald-500"
+                                        style={{
+                                            top: isFirst ? '10px' : '0px',
+                                            bottom: isLast ? undefined : '0px',
+                                            height: isLast ? (isFirst ? '0px' : '10px') : undefined
+                                        }}
+                                    />
+
+                                    {/* Solid Circular Dot Node */}
+                                    <div className="absolute left-[12px] top-[6px] w-2 h-2 rounded-full bg-emerald-500 z-10" />
+
+                                    {/* Row 1: Date & Duration */}
+                                    <div className="flex items-center justify-between text-sm font-semibold text-slate-800 h-5">
+                                        <div className="flex items-center gap-2">
+                                            <span>{formattedDate}</span>
+                                            {isUnrostered && (
+                                                <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0 leading-relaxed uppercase tracking-wider">
+                                                    Extra
+                                                </span>
+                                            )}
                                         </div>
-                                        <div className="shrink-0 text-right">
-                                            <p className="text-sm font-semibold text-slate-800 tabular-nums">{formatHoursAndMinutes(hours)}</p>
-                                            <p className="text-xs font-medium tabular-nums mt-1.5 text-emerald-600">
-                                                {showPayInfo
-                                                    ? `$${(hours * (userData?.hourlyRate || 0)).toFixed(2)}`
-                                                    : '•••'}
-                                            </p>
-                                        </div>
+                                        <span className="tabular-nums">{formatHoursAndMinutes(hours)}</span>
+                                    </div>
+
+                                    {/* Row 2: Clocked Interval & Pay */}
+                                    <div className="flex items-center justify-between text-xs font-medium text-slate-500 mt-1.5 h-4">
+                                        <span>
+                                            {formatTimeTo12Hour(ts.workedStart)} – {formatTimeTo12Hour(ts.workedEnd)}
+                                        </span>
+                                        <span className="font-semibold text-emerald-600 tabular-nums">
+                                            {showPayInfo
+                                                ? `$${(hours * (userData?.hourlyRate || 0)).toFixed(2)}`
+                                                : '•••'}
+                                        </span>
                                     </div>
                                 </div>
                             );

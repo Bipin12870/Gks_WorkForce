@@ -5,16 +5,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Shift } from '@/types';
-import { getWeekStart, getDayName, formatDate, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
+import { getWeekStart, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffStatCard from '@/components/staff/StaffStatCard';
-import Badge from '@/components/ui/Badge';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
 import Card from '@/components/ui/Card';
-import Icon from '@/components/ui/Icon';
-import { CalendarDays, ChevronDown, Clock } from 'lucide-react';
+import { CalendarDays } from 'lucide-react';
 
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
@@ -23,7 +21,6 @@ export default function StaffRosterPage() {
     const [selectedWeek, setSelectedWeek] = useState<Date>(getWeekStart(new Date()));
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loading, setLoading] = useState(true);
-    const [expandedDays, setExpandedDays] = useState<Set<number>>(() => new Set([new Date().getDay()]));
 
     const getDayDate = (dayIndex: number) => {
         const d = new Date(selectedWeek);
@@ -51,14 +48,6 @@ export default function StaffRosterPage() {
         return weekEnd.getTime() <= today.getTime();
     };
 
-    const isPastDay = (dayIndex: number) => {
-        const dayDate = getDayDate(dayIndex);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        dayDate.setHours(0, 0, 0, 0);
-        return dayDate.getTime() < today.getTime();
-    };
-
     useEffect(() => {
         if (!userData || userData.role !== 'STAFF') return;
 
@@ -79,14 +68,6 @@ export default function StaffRosterPage() {
                 loadedShifts.push({ id: doc.id, ...doc.data() } as Shift);
             });
             setShifts(loadedShifts);
-
-            // Auto-expand today and any days with scheduled shifts
-            const today = new Date().getDay();
-            const withShifts = new Set<number>();
-            loadedShifts.forEach((s) => withShifts.add(s.date.toDate().getDay()));
-            const next = new Set<number>([today, ...withShifts]);
-            setExpandedDays(next);
-
             setLoading(false);
         });
 
@@ -106,15 +87,6 @@ export default function StaffRosterPage() {
     const projectedPay = totalHours * (userData?.hourlyRate || 0);
 
     const hasAnyShifts = shifts.length > 0;
-
-    const toggleDay = (day: number) => {
-        setExpandedDays((prev) => {
-            const next = new Set(prev);
-            if (next.has(day)) next.delete(day);
-            else next.add(day);
-            return next;
-        });
-    };
 
     return (
         <StaffPageShell title="My roster">
@@ -151,11 +123,9 @@ export default function StaffRosterPage() {
                         />
                     </div>
 
-                    <div className="flex items-center gap-3 mb-4 shrink-0">
-                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                            Weekly Schedule
-                        </span>
-                        <div className="h-px bg-gray-200 flex-1" />
+                    <div className="flex items-center gap-3 mb-6 shrink-0">
+                        <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">WEEKLY SCHEDULE</span>
+                        <div className="h-px bg-slate-200 flex-1" />
                     </div>
 
                     {!hasAnyShifts ? (
@@ -170,122 +140,99 @@ export default function StaffRosterPage() {
                         </div>
                     ) : (
                         <div className="flex-1 overflow-y-auto pr-0.5 pb-4">
-                            <div className="bg-white divide-y divide-gray-100 overflow-hidden">
-                                {WEEK_DAYS.map((dayOfWeek) => {
+                            <div className="relative pl-1">
+                                {WEEK_DAYS.map((dayOfWeek, idx) => {
                                     const dayShifts = getShiftsForDay(dayOfWeek);
-                                    const isExpanded = expandedDays.has(dayOfWeek);
                                     const isEmpty = dayShifts.length === 0;
                                     const todayState = isToday(dayOfWeek);
-                                    const pastState = isPastDay(dayOfWeek);
+                                    const dayDate = getDayDate(dayOfWeek);
+                                    const formattedDate = dayDate.toLocaleDateString('en-US', {
+                                        weekday: 'long',
+                                        month: 'short',
+                                        day: 'numeric'
+                                    });
 
-                                    if (isEmpty && !isExpanded) {
-                                        return (
-                                            <div
-                                                key={dayOfWeek}
-                                                className={`transition-all ${todayState
-                                                        ? 'border-l-4 border-l-blue-600 bg-blue-50/5'
-                                                        : pastState
-                                                            ? 'border-l-4 border-l-gray-300 bg-gray-50/30 opacity-80'
-                                                            : ''
-                                                    }`}
-                                            >
-                                                <button
-                                                    key={dayOfWeek}
-                                                    type="button"
-                                                    onClick={() => toggleDay(dayOfWeek)}
-                                                    className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${todayState || pastState ? 'pl-3' : 'pl-4'
-                                                        } hover:bg-gray-50/50 text-gray-900`}
-                                                >
-                                                    <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
-                                                        {getDayName(dayOfWeek)}
-                                                        {todayState && <span className="text-xs text-blue-600 font-semibold">(Today)</span>}
-                                                    </span>
-                                                    <span className="text-xs text-gray-400 font-medium">No shifts</span>
-                                                </button>
-                                            </div>
-                                        );
+                                    const isFirst = idx === 0;
+                                    const isLast = idx === WEEK_DAYS.length - 1;
+
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0);
+
+                                    const checkDate = new Date(dayDate);
+                                    checkDate.setHours(0, 0, 0, 0);
+
+                                    const isPast = checkDate.getTime() < today.getTime();
+
+                                    let lineColor = "bg-slate-200";
+                                    let dotColor = "bg-slate-300";
+
+                                    if (!isEmpty) {
+                                        if (isPast) {
+                                            lineColor = "bg-amber-400";
+                                            dotColor = "bg-amber-500";
+                                        } else {
+                                            lineColor = "bg-blue-500";
+                                            dotColor = "bg-blue-500";
+                                        }
                                     }
+
+                                    const totalDailyHours = dayShifts.reduce(
+                                        (sum, s) => sum + calculateHours(s.startTime, s.endTime),
+                                        0
+                                    );
 
                                     return (
                                         <div
                                             key={dayOfWeek}
-                                            className={`transition-all ${todayState
-                                                    ? 'border-l-4 border-l-blue-600 bg-blue-50/5'
-                                                    : pastState
-                                                        ? 'border-l-4 border-l-gray-300 bg-gray-50/30 opacity-80'
-                                                        : ''
-                                                }`}
+                                            className="relative pl-10 pb-8 last:pb-0"
                                         >
-                                            <button
-                                                type="button"
-                                                onClick={() => toggleDay(dayOfWeek)}
-                                                className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${todayState || pastState ? 'pl-3' : 'pl-4'
-                                                    } hover:bg-gray-50/50 text-gray-900`}
-                                                aria-expanded={isExpanded}
-                                            >
-                                                <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
-                                                    {getDayName(dayOfWeek)}
-                                                    {todayState && <span className="text-xs text-blue-600 font-semibold">(Today)</span>}
-                                                </span>
+                                            {/* Vertical Timeline Track Line */}
+                                            <div
+                                                className={`absolute left-[15px] w-[2px] ${lineColor}`}
+                                                style={{
+                                                    top: isFirst ? '10px' : '0px',
+                                                    bottom: isLast ? undefined : '0px',
+                                                    height: isLast ? (isFirst ? '0px' : '10px') : undefined
+                                                }}
+                                            />
+
+                                            {/* Solid Circular Dot Node */}
+                                            <div className={`absolute left-[12px] top-[6px] w-2 h-2 rounded-full ${dotColor} z-10`} />
+
+                                            {/* Row 1: Date & Duration */}
+                                            <div className="flex items-center justify-between text-base font-semibold text-slate-800 h-5">
                                                 <div className="flex items-center gap-2">
-                                                    {dayShifts.length > 0 && (
-                                                        <Badge variant="neutral">{dayShifts.length} shift{dayShifts.length !== 1 ? 's' : ''}</Badge>
+                                                    <span className={isEmpty ? "text-slate-400" : "text-slate-900"}>
+                                                        {formattedDate}
+                                                    </span>
+                                                    {todayState && (
+                                                        <span className="text-xs text-blue-600 font-semibold">
+                                                            (Today)
+                                                        </span>
                                                     )}
-                                                    <Icon
-                                                        icon={ChevronDown}
-                                                        size="sm"
-                                                        className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                                    />
                                                 </div>
-                                            </button>
-                                            {isExpanded && (
-                                                <div className={`relative ${todayState || pastState ? 'pl-3' : 'pl-4'} pr-4 pb-4 pt-0`}>
-                                                    {/* Continuous vertical guide line bridging from button row to first item */}
-                                                    {!isEmpty && (
-                                                        <div className={`absolute -top-5 h-8 w-[2px] bg-emerald-500 ${todayState || pastState ? 'left-[27px]' : 'left-[31px]'}`} />
-                                                    )}
+                                                {isEmpty ? (
+                                                    <span className="text-xs text-slate-400 font-medium">No shifts</span>
+                                                ) : (
+                                                    <span className="text-base font-bold text-slate-900 tabular-nums">
+                                                        {formatHoursAndMinutes(totalDailyHours)}
+                                                    </span>
+                                                )}
+                                            </div>
 
-                                                    <div className="space-y-3 mt-1">
-                                                        {isEmpty ? (
-                                                            <p className="text-xs text-gray-400 text-center py-4">No shifts scheduled</p>
-                                                        ) : (
-                                                            dayShifts.map((shift, idx) => {
-                                                                const durationHours = calculateHours(shift.startTime, shift.endTime);
-                                                                return (
-                                                                    <div key={shift.id} className="relative py-2 pl-8 flex items-start justify-between gap-4">
-                                                                        {/* Vertical line segment */}
-                                                                        {idx < dayShifts.length - 1 ? (
-                                                                            <div className="absolute top-0 bottom-0 left-[15px] w-[2px] bg-emerald-500" />
-                                                                        ) : (
-                                                                            <div className="absolute top-0 h-[18px] left-[15px] w-[2px] bg-emerald-500" />
-                                                                        )}
-
-                                                                        {/* Clock Icon Node sitting centered on top of the line */}
-                                                                        <div className="absolute left-[6px] top-[8px] w-5 h-5 rounded-full bg-white z-10 flex items-center justify-center shadow-xs">
-                                                                            <Icon icon={Clock} size="sm" className="text-emerald-500" />
-                                                                        </div>
-
-                                                                        {/* Left side: Shift times */}
-                                                                        <div className="min-w-0 flex-1">
-                                                                            <span className="text-base font-bold text-gray-900">
-                                                                                {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}
-                                                                            </span>
-                                                                        </div>
-
-                                                                        {/* Right side: Duration & Date stacked */}
-                                                                        <div className="shrink-0 text-right">
-                                                                            <span className="text-sm font-bold text-gray-900 block">
-                                                                                {formatHoursAndMinutes(durationHours)}
-                                                                            </span>
-                                                                            <p className="text-xs font-semibold text-gray-500 mt-0.5">
-                                                                                {formatDate(shift.date.toDate())}
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })
-                                                        )}
-                                                    </div>
+                                            {/* Row 2: Shift Intervals */}
+                                            {!isEmpty && (
+                                                <div className="mt-1.5 space-y-1">
+                                                    {dayShifts.map((shift) => (
+                                                        <div
+                                                            key={shift.id}
+                                                            className="flex items-center justify-between text-sm font-semibold text-slate-600 h-5"
+                                                        >
+                                                            <span>
+                                                                {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             )}
                                         </div>

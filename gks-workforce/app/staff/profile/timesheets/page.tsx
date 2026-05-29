@@ -10,7 +10,6 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { createManualTimesheet } from '@/app/actions/timesheets';
 import StaffSubpageShell from '@/components/staff/StaffSubpageShell';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
-import { TimesheetStatusBadge, TimesheetSourceBadge } from '@/components/admin/adminTimesheetBadges';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -20,7 +19,49 @@ import EmptyState from '@/components/ui/EmptyState';
 import {
     Clock,
     FileText,
+    MapPin,
+    PenLine,
+    AlertTriangle,
+    Timer,
+    HelpCircle,
+    Check,
+    X,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+const getSourceDetails = (source?: string, distanceMetres?: number | null): { icon: LucideIcon; text: string; className: string } | null => {
+    switch (source) {
+        case 'GPS_VERIFIED':
+            return { icon: MapPin, text: 'GPS verified', className: 'text-emerald-600' };
+        case 'MANUAL':
+            return { icon: PenLine, text: 'Manual', className: 'text-slate-500' };
+        case 'GPS_OVERTIME':
+            return { icon: Clock, text: 'Overtime', className: 'text-amber-600' };
+        case 'GPS_OUTSIDE':
+            return { icon: AlertTriangle, text: distanceMetres != null ? `Off-site (${distanceMetres}m)` : 'Off-site', className: 'text-rose-600' };
+        case 'AUTO_CLOSED':
+            return { icon: Timer, text: 'Auto-closed', className: 'text-amber-600' };
+        case 'GPS_UNMATCHED':
+            return { icon: HelpCircle, text: 'Unmatched', className: 'text-amber-600' };
+        case 'AFTER_HOURS':
+            return { icon: Clock, text: 'After hours', className: 'text-rose-600' };
+        default:
+            return null;
+    }
+};
+
+const getStatusDetails = (status: string): { icon: LucideIcon; text: string; className: string } | null => {
+    switch (status) {
+        case 'APPROVED':
+            return { icon: Check, text: 'Approved', className: 'text-emerald-600' };
+        case 'REJECTED':
+            return { icon: X, text: 'Rejected', className: 'text-rose-600' };
+        case 'PENDING':
+            return { icon: Clock, text: 'Pending review', className: 'text-amber-600' };
+        default:
+            return null;
+    }
+};
 
 export default function StaffProfileTimesheetsPage() {
     const { userData } = useAuth();
@@ -378,7 +419,7 @@ export default function StaffProfileTimesheetsPage() {
                                         <span className="font-semibold text-slate-800 text-sm sm:text-base truncate">
                                             {formattedLongDate}
                                             {item.type === 'UNROSTERED' && (
-                                                <Badge variant="warning" className="ml-1.5 text-[9px] px-1.5 py-0">Unrostered</Badge>
+                                                <span className="ml-1.5 text-[9px] font-semibold text-amber-600 uppercase tracking-wider">Unrostered</span>
                                             )}
                                         </span>
                                     </div>
@@ -394,7 +435,7 @@ export default function StaffProfileTimesheetsPage() {
                                         )}
                                     </div>
                                 </div>
-
+ 
                                 {/* Bottom row of card */}
                                 <div className="flex items-center justify-between gap-4 mt-1.5 pl-[23px]">
                                     <span className="text-xs sm:text-sm text-slate-500 font-medium">
@@ -402,12 +443,25 @@ export default function StaffProfileTimesheetsPage() {
                                     </span>
                                     <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                         {timesheet ? (
-                                            <TimesheetStatusBadge status={timesheet.status} />
+                                            (() => {
+                                                const stat = getStatusDetails(timesheet.status);
+                                                if (!stat) return null;
+                                                const StatusIcon = stat.icon;
+                                                return (
+                                                    <div className={`flex items-center gap-1.5 text-xs font-semibold ${stat.className}`}>
+                                                        <StatusIcon size={13} className="shrink-0" />
+                                                        <span>{stat.text === 'Pending review' ? 'Pending' : stat.text}</span>
+                                                    </div>
+                                                );
+                                            })()
                                         ) : shift && isFutureShift(shift) ? (
                                             <Badge variant="neutral" className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 border border-current/10">Future</Badge>
                                         ) : shift ? (
                                             activeRecord ? (
-                                                <Badge variant="warning" className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 border border-current/10">Clock active</Badge>
+                                                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-600">
+                                                    <Clock size={13} className="shrink-0" />
+                                                    <span>Clock active</span>
+                                                </div>
                                             ) : (
                                                 <Button
                                                     variant="secondary"
@@ -433,7 +487,7 @@ export default function StaffProfileTimesheetsPage() {
                                             <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Roster</span>
-                                                    <span className="text-xs font-semibold text-slate-700">
+                                                    <span className="text-sm font-semibold text-slate-800">
                                                         {shift ? `${formatTimeTo12Hour(shift.startTime)} – ${formatTimeTo12Hour(shift.endTime)}` : 'Unscheduled'}
                                                     </span>
                                                     {shift && (
@@ -445,36 +499,46 @@ export default function StaffProfileTimesheetsPage() {
 
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Clocked</span>
-                                                    <span className="text-xs font-semibold text-slate-700">
+                                                    <span className="text-sm font-semibold text-slate-800">
                                                         {formatTimeTo12Hour(timesheet.workedStart)} – {formatTimeTo12Hour(timesheet.workedEnd)}
                                                     </span>
                                                 </div>
 
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Source</span>
-                                                    <div className="mt-0.5">
-                                                        <TimesheetSourceBadge source={timesheet.source} distanceMetres={timesheet.clockOutDistanceMetres} />
-                                                    </div>
+                                                    {(() => {
+                                                        const src = getSourceDetails(timesheet.source, timesheet.clockOutDistanceMetres);
+                                                        if (!src) return <span className="text-sm font-semibold text-slate-800">—</span>;
+                                                        const SourceIcon = src.icon;
+                                                        return (
+                                                            <div className={`flex items-center gap-1.5 text-sm font-semibold mt-0.5 ${src.className}`}>
+                                                                <SourceIcon size={14} className="shrink-0" />
+                                                                <span>{src.text}</span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
 
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</span>
-                                                    <span className={`text-xs font-semibold mt-0.5 ${
-                                                        timesheet.status === 'APPROVED' ? 'text-emerald-600' :
-                                                        timesheet.status === 'REJECTED' ? 'text-rose-600' :
-                                                        'text-amber-600'
-                                                    }`}>
-                                                        {timesheet.status === 'APPROVED' ? 'Approved' :
-                                                         timesheet.status === 'REJECTED' ? 'Rejected' :
-                                                         'Pending review'}
-                                                    </span>
+                                                    {(() => {
+                                                        const stat = getStatusDetails(timesheet.status);
+                                                        if (!stat) return <span className="text-sm font-semibold text-slate-800">—</span>;
+                                                        const StatusIcon = stat.icon;
+                                                        return (
+                                                            <div className={`flex items-center gap-1.5 text-sm font-semibold mt-0.5 ${stat.className}`}>
+                                                                <StatusIcon size={14} className="shrink-0" />
+                                                                <span>{stat.text}</span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
 
                                             {timesheet.adminNote && (
                                                 <div className="pt-3 border-t border-slate-100 flex flex-col gap-1">
                                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Manager Note</span>
-                                                    <p className="text-xs text-slate-600 leading-relaxed italic bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                                    <p className="text-sm font-semibold text-slate-700 leading-relaxed italic mt-0.5">
                                                         &ldquo;{timesheet.adminNote}&rdquo;
                                                     </p>
                                                 </div>

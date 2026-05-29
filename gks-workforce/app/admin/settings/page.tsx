@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { saveShopLocation } from '@/app/actions/settings';
+import { saveShopLocation, saveAvailabilitySettings } from '@/app/actions/settings';
 import { getShopLocation } from '@/lib/geofence';
 import { ShopLocation } from '@/types';
 import { useNotification } from '@/contexts/NotificationContext';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import Button from '@/components/ui/Button';
 import Icon from '@/components/ui/Icon';
-import { MapPin, AlertTriangle, LocateFixed } from 'lucide-react';
+import { MapPin, AlertTriangle, LocateFixed, SplitSquareVertical } from 'lucide-react';
 
 export default function AdminSettingsPage() {
     const { userData } = useAuth();
@@ -23,6 +23,8 @@ export default function AdminSettingsPage() {
     const [locating, setLocating] = useState(false);
     const [saving, setSaving] = useState(false);
     const [loadingCurrent, setLoadingCurrent] = useState(true);
+    const [allowMultipleRanges, setAllowMultipleRanges] = useState(false);
+    const [savingRangeToggle, setSavingRangeToggle] = useState(false);
 
     // Load existing shop location on mount
     useEffect(() => {
@@ -34,6 +36,7 @@ export default function AdminSettingsPage() {
                 setLng(String(loc.lng));
                 setRadius(String(loc.radiusMetres));
                 setName(loc.name);
+                setAllowMultipleRanges(loc.allowMultipleAvailabilityRanges ?? false);
             }
             setLoadingCurrent(false);
         })();
@@ -102,6 +105,23 @@ export default function AdminSettingsPage() {
             showNotification((err as Error).message || 'Failed to save location. Please try again.', 'error');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleRangeToggle = async (value: boolean) => {
+        setAllowMultipleRanges(value);
+        setSavingRangeToggle(true);
+        try {
+            await saveAvailabilitySettings(value);
+            showNotification(
+                value ? 'Multiple ranges enabled for staff.' : 'Multiple ranges disabled — staff will use a single range per day.',
+                'success'
+            );
+        } catch (err) {
+            setAllowMultipleRanges(!value); // revert on error
+            showNotification((err as Error).message || 'Failed to save setting.', 'error');
+        } finally {
+            setSavingRangeToggle(false);
         }
     };
 
@@ -310,6 +330,46 @@ export default function AdminSettingsPage() {
                                 Shifts are auto-closed 30 minutes after the rostered end time if staff forget to clock out
                             </li>
                         </ul>
+                    </div>
+                    {/* Availability Settings Card */}
+                    <div className="admin-section-card p-6">
+                        <div className="mb-5">
+                            <h2 className="text-section-title">Availability Settings</h2>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Control how staff can submit their weekly availability.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-4 py-4 border-t border-gray-100">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                                    <Icon icon={SplitSquareVertical} size="sm" />
+                                </span>
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-800">Allow multiple time ranges per day</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">
+                                        When off, staff can only set one availability block per day (e.g. 9:00–17:00).
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={allowMultipleRanges}
+                                disabled={savingRangeToggle}
+                                onClick={() => handleRangeToggle(!allowMultipleRanges)}
+                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 ${
+                                    allowMultipleRanges ? 'bg-blue-600' : 'bg-gray-300'
+                                }`}
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ${
+                                        allowMultipleRanges ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                />
+                            </button>
+                        </div>
                     </div>
 
         </div>

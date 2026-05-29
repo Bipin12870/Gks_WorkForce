@@ -19,6 +19,7 @@ import {
     isWithinShopHours,
 } from '@/lib/utils';
 import { submitAvailability } from '@/app/actions/availability';
+import { getShopLocation } from '@/lib/geofence';
 import { useNotification } from '@/contexts/NotificationContext';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import Button from '@/components/ui/Button';
@@ -105,6 +106,7 @@ export default function StaffAvailabilitySection() {
     const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
     const [openDay, setOpenDay] = useState<number | null>(new Date().getDay());
     const { showNotification } = useNotification();
+    const [allowMultipleRanges, setAllowMultipleRanges] = useState(false);
     // Prevents saving draft during initial Firestore load
     const draftReady = useRef(false);
 
@@ -172,6 +174,10 @@ export default function StaffAvailabilitySection() {
             setAvailability(finalAvailability);
             setIsRecurring(finalRecurring);
             setLockedDays(daysWithShifts);
+
+            // Load admin toggle for multiple ranges (no auth required — public config)
+            const shopConfig = await getShopLocation();
+            setAllowMultipleRanges(shopConfig?.allowMultipleAvailabilityRanges ?? false);
         } catch (error) {
             console.error('Error loading availability:', error);
             showNotification('Failed to load your availability. Please set it again.', 'error');
@@ -504,7 +510,14 @@ export default function StaffAvailabilitySection() {
                             >
                                 <button
                                     type="button"
-                                    onClick={() => setOpenDay(isOpen ? null : dayOfWeek)}
+                                    onClick={() => {
+                                        const opening = !isOpen;
+                                        setOpenDay(opening ? dayOfWeek : null);
+                                        // In single-range mode, auto-seed a default range when the day is empty
+                                        if (opening && !allowMultipleRanges && !dayLocked && ranges.length === 0) {
+                                            addTimeRange(dayOfWeek);
+                                        }
+                                    }}
                                     className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${todayState || pastState || isRostered ? 'pl-3' : 'pl-4'
                                         } ${dayLocked
                                             ? 'bg-transparent text-gray-500'
@@ -538,7 +551,7 @@ export default function StaffAvailabilitySection() {
                                 {isOpen && (
                                     <div className={`p-3.5 sm:p-4 border-t border-gray-100 space-y-4 ${todayState || pastState || isRostered ? 'pl-3 sm:pl-3.5' : ''
                                         }`}>
-                                        {!dayLocked && (
+                                        {!dayLocked && allowMultipleRanges && (
                                             <div className="flex justify-center">
                                                 <Button variant="ghost-primary" size="sm" onClick={() => addTimeRange(dayOfWeek)}>
                                                     <Icon icon={Plus} size="sm" /> Add range

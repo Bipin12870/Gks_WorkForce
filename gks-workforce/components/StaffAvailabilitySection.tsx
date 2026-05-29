@@ -418,73 +418,67 @@ export default function StaffAvailabilitySection() {
 
     return (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="shrink-0 space-y-4 mb-3">
-                <div className="flex justify-center">
-                    <div className="w-full max-w-xs">
-                        <StaffWeekPicker
-                            weekStart={selectedWeek}
-                            onPrev={() => changeWeek('prev')}
-                            onNext={() => changeWeek('next')}
-                        />
-                    </div>
+            <div className="shrink-0 flex justify-center mb-5">
+                <div className="w-full max-w-xs">
+                    <StaffWeekPicker
+                        weekStart={selectedWeek}
+                        onPrev={() => changeWeek('prev')}
+                        onNext={() => changeWeek('next')}
+                    />
                 </div>
-                {!allDaysLocked && (
-                    <div className="flex items-center justify-center gap-8 px-1">
-                        {/* Copy past week — demoted to text-link */}
-                        <div className="flex flex-col gap-0.5">
-                            <button
-                                type="button"
-                                onClick={copyFromLastWeek}
-                                disabled={loading}
-                                className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-40 transition-colors"
-                            >
-                                <Icon icon={Copy} size="sm" className="text-gray-400" />
-                                Copy past week
-                            </button>
-                            {hasLockedDays && (
-                                <span className="text-[11px] text-gray-400 leading-none pl-[22px]">
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Repeat weekly — iOS-style toggle */}
-                        <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
-                            <span className="text-sm font-medium text-gray-600">Repeat weekly</span>
-                            <div
-                                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
-                                    isRecurring ? 'bg-blue-600' : 'bg-gray-300'
-                                }`}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={isRecurring}
-                                    onChange={(e) => setIsRecurring(e.target.checked)}
-                                    className="sr-only"
-                                />
-                                <span
-                                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
-                                        isRecurring ? 'translate-x-4' : 'translate-x-0'
-                                    }`}
-                                />
-                            </div>
-                        </label>
-                    </div>
-                )}
             </div>
 
-            <div className="shrink-0 mt-1 mb-4 px-1">
-                {hasLockedDays ? (
-                    <div className="bg-red-50 border border-red-100 rounded-lg py-2 px-3 flex items-center justify-center gap-2 text-red-700">
-                        <Icon icon={Lock} size="sm" className="text-red-500 shrink-0" />
-                        <span className="text-[11px] font-medium leading-none">
-                            Roster published
-                        </span>
+            {!allDaysLocked && (
+                <div className="shrink-0 flex items-center justify-center gap-20 mb-10 px-1">
+                    {/* Copy past week — demoted to text-link */}
+                    <div className="flex flex-col gap-0.5">
+                        <button
+                            type="button"
+                            onClick={copyFromLastWeek}
+                            disabled={loading}
+                            className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-40 transition-colors"
+                        >
+                            <Icon icon={Copy} size="sm" className="text-gray-400" />
+                            Copy past week
+                        </button>
+                        {hasLockedDays && (
+                            <span className="text-[11px] text-gray-400 leading-none pl-[22px]">
+                            </span>
+                        )}
                     </div>
-                ) : (
-                    <p className="text-[11px] text-blue-500 text-center leading-snug">
-                        Set between store times.
-                    </p>
-                )}
+
+                    {/* Repeat weekly — iOS-style toggle */}
+                    <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
+                        <span className="text-sm font-medium text-gray-600">Repeat weekly</span>
+                        <div
+                            className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+                                isRecurring ? 'bg-blue-600' : 'bg-gray-300'
+                            }`}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={isRecurring}
+                                onChange={(e) => setIsRecurring(e.target.checked)}
+                                className="sr-only"
+                            />
+                            <span
+                                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                    isRecurring ? 'translate-x-4' : 'translate-x-0'
+                                }`}
+                            />
+                        </div>
+                    </label>
+                </div>
+            )}
+
+            <div className="flex items-center gap-3 mt-2 mb-6 shrink-0 px-1">
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                    Weekly Availability
+                </span>
+                <div className="h-px bg-gray-200 flex-1" />
+                <span className={`text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${hasLockedDays ? 'text-red-500' : 'text-blue-500'}`}>
+                    {hasLockedDays ? 'Roster Published' : 'Set between store hours'}
+                </span>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-0.5 pb-[calc(6.75rem+env(safe-area-inset-bottom))]">

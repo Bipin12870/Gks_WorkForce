@@ -21,12 +21,11 @@ import {
 import { submitAvailability } from '@/app/actions/availability';
 import { useNotification } from '@/contexts/NotificationContext';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
-import StaffAlert from '@/components/staff/StaffAlert';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Icon from '@/components/ui/Icon';
 import StaffActionFooter from '@/components/staff/StaffActionFooter';
-import { AlertTriangle, ChevronDown, Info, Lock, Plus, Trash2, Copy } from 'lucide-react';
+import { ChevronDown, Lock, Plus, Trash2, Copy } from 'lucide-react';
 
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
@@ -196,6 +195,17 @@ export default function StaffAvailabilitySection() {
         dayDate.setHours(0, 0, 0, 0);
 
         return dayDate.getTime() < today.getTime();
+    }, [selectedWeek]);
+
+    const isToday = useCallback((dayOfWeek: number) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const dayDate = new Date(selectedWeek);
+        dayDate.setDate(dayDate.getDate() + (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+        dayDate.setHours(0, 0, 0, 0);
+
+        return dayDate.getTime() === today.getTime();
     }, [selectedWeek]);
 
     const isDayLocked = useCallback((dayOfWeek: number) => {
@@ -408,7 +418,7 @@ export default function StaffAvailabilitySection() {
 
     return (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="shrink-0 space-y-4 mb-4">
+            <div className="shrink-0 space-y-4 mb-3">
                 <div className="flex justify-center">
                     <div className="w-full max-w-xs">
                         <StaffWeekPicker
@@ -418,177 +428,192 @@ export default function StaffAvailabilitySection() {
                         />
                     </div>
                 </div>
-                <div className="flex gap-2 w-full">
-                    <Button
-                        variant="secondary"
-                        size="md"
-                        onClick={copyFromLastWeek}
-                        disabled={allDaysLocked || loading}
-                        className="flex-1 sm:flex-initial"
-                    >
-                        <Icon icon={Copy} size="sm" className="text-gray-500" />
-                        Copy past week
-                    </Button>
-                    <label
-                        className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-all select-none min-h-11 flex-1 sm:flex-initial ${
-                            allDaysLocked
-                                ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200 text-gray-400'
-                                : isRecurring
-                                ? 'bg-blue-50/60 border-blue-200 text-blue-700 cursor-pointer shadow-xs'
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 cursor-pointer shadow-sm'
-                        }`}
-                    >
-                        <input
-                             type="checkbox"
-                             checked={isRecurring}
-                             onChange={(e) => setIsRecurring(e.target.checked)}
-                             disabled={allDaysLocked}
-                            className="sr-only"
-                        />
-                        <div className={`w-4 h-4 rounded-sm border flex items-center justify-center transition-colors ${isRecurring ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-white'}`}>
-                            {isRecurring && (
-                                <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 20 20">
-                                    <path d="M0 11l2-2 5 5L18 3l2 2L7 18z" />
-                                </svg>
+                {!allDaysLocked && (
+                    <div className="flex items-center justify-center gap-8 px-1">
+                        {/* Copy past week — demoted to text-link */}
+                        <div className="flex flex-col gap-0.5">
+                            <button
+                                type="button"
+                                onClick={copyFromLastWeek}
+                                disabled={loading}
+                                className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-40 transition-colors"
+                            >
+                                <Icon icon={Copy} size="sm" className="text-gray-400" />
+                                Copy past week
+                            </button>
+                            {hasLockedDays && (
+                                <span className="text-[11px] text-gray-400 leading-none pl-[22px]">
+                                </span>
                             )}
                         </div>
-                        <span>Recurring</span>
-                    </label>
-                </div>
-            </div>
 
-            <div className="shrink-0 mb-4">
-                {hasLockedDays ? (
-                    <StaffAlert variant="danger" icon={AlertTriangle} title="Roster published" compact>
-                        Approved days are locked.
-                    </StaffAlert>
-                ) : (
-                    <StaffAlert variant="info" icon={Info} title="Shop hours" compact>
-                        Set times between {SHOP_OPEN_TIME}–{SHOP_CLOSE_TIME} (snaps to 15m).
-                    </StaffAlert>
+                        {/* Repeat weekly — iOS-style toggle */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
+                            <span className="text-sm font-medium text-gray-600">Repeat weekly</span>
+                            <div
+                                className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+                                    isRecurring ? 'bg-blue-600' : 'bg-gray-300'
+                                }`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={isRecurring}
+                                    onChange={(e) => setIsRecurring(e.target.checked)}
+                                    className="sr-only"
+                                />
+                                <span
+                                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                                        isRecurring ? 'translate-x-4' : 'translate-x-0'
+                                    }`}
+                                />
+                            </div>
+                        </label>
+                    </div>
                 )}
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-0.5 pb-[calc(6.75rem+env(safe-area-inset-bottom))] space-y-2">
-                {WEEK_DAYS.map((dayOfWeek) => {
-                    const ranges = availability[dayOfWeek] || [];
-                    const isOpen = openDay === dayOfWeek;
-                    const dayLocked = isDayLocked(dayOfWeek);
-                    return (
-                        <div key={dayOfWeek} className={`border border-gray-200 rounded-lg overflow-hidden ${dayLocked ? 'bg-gray-50/30' : 'bg-white'}`}>
-                            <button
-                                type="button"
-                                onClick={() => setOpenDay(isOpen ? null : dayOfWeek)}
-                                className={`w-full flex items-center justify-between px-4 py-3 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
-                                    dayLocked
-                                        ? 'bg-gray-100/70 text-gray-500'
-                                        : 'bg-gray-50/80 hover:bg-gray-100/80 text-gray-900'
-                                }`}
-                                aria-expanded={isOpen}
+            <div className="shrink-0 mt-1 mb-4 px-1">
+                {hasLockedDays ? (
+                    <div className="bg-red-50 border border-red-100 rounded-lg py-2 px-3 flex items-center justify-center gap-2 text-red-700">
+                        <Icon icon={Lock} size="sm" className="text-red-500 shrink-0" />
+                        <span className="text-[11px] font-medium leading-none">
+                            Roster published
+                        </span>
+                    </div>
+                ) : (
+                    <p className="text-[11px] text-blue-500 text-center leading-snug">
+                        Set between store times.
+                    </p>
+                )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-0.5 pb-[calc(6.75rem+env(safe-area-inset-bottom))]">
+                <div className="bg-white divide-y divide-gray-100 overflow-hidden">
+                    {WEEK_DAYS.map((dayOfWeek) => {
+                        const ranges = availability[dayOfWeek] || [];
+                        const isOpen = openDay === dayOfWeek;
+                        const todayState = isToday(dayOfWeek);
+                        const pastState = isPastDay(dayOfWeek);
+                        const isRostered = lockedDays.has(dayOfWeek);
+                        const dayLocked = isDayLocked(dayOfWeek);
+                        return (
+                            <div
+                                key={dayOfWeek}
+                                className={`transition-all ${todayState
+                                        ? 'border-l-4 border-l-blue-600 bg-blue-50/5'
+                                        : isRostered
+                                            ? 'border-l-4 border-l-amber-500 bg-amber-50/5'
+                                            : pastState
+                                                ? 'border-l-4 border-l-gray-300 bg-gray-50/30 opacity-80'
+                                                : ''
+                                    }`}
                             >
-                                <span className={`text-sm font-semibold ${dayLocked ? 'text-gray-500' : 'text-gray-900'}`}>
-                                    {getDayName(dayOfWeek)}
-                                    {dayLocked && (
-                                        <span className={`ml-2 text-[10px] font-semibold rounded-sm px-1.5 py-0.5 uppercase tracking-wider select-none ${
-                                            lockedDays.has(dayOfWeek)
-                                                ? 'text-amber-700 bg-amber-50 border border-amber-200/50'
-                                                : 'text-slate-600 bg-slate-50 border border-slate-200/50'
-                                        }`}>
-                                            {lockedDays.has(dayOfWeek) ? 'Rostered' : 'Past'}
-                                        </span>
-                                    )}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    {ranges.length > 0 && (
-                                        <span className={`text-xs ${dayLocked ? 'text-gray-400' : 'text-gray-500'}`}>
-                                            {ranges.length} range{ranges.length !== 1 ? 's' : ''}
-                                        </span>
-                                    )}
-                                    {dayLocked ? (
-                                        <Icon
-                                            icon={Lock}
-                                            size="sm"
-                                            className="text-gray-400 shrink-0"
-                                        />
-                                    ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenDay(isOpen ? null : dayOfWeek)}
+                                    className={`w-full flex items-center justify-between py-6 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${todayState || pastState || isRostered ? 'pl-3' : 'pl-4'
+                                        } ${dayLocked
+                                            ? 'bg-transparent text-gray-500'
+                                            : 'bg-transparent hover:bg-gray-50/50 text-gray-900'
+                                        }`}
+                                    aria-expanded={isOpen}
+                                >
+                                    <span className={`flex items-center gap-1.5 text-sm font-semibold ${dayLocked ? 'text-gray-500' : 'text-gray-900'}`}>
+                                        {getDayName(dayOfWeek)}
+                                        {todayState && <span className="text-xs text-blue-600 font-semibold">(Today)</span>}
+                                        {dayLocked && (
+                                            <Lock
+                                                className="text-gray-400 shrink-0 w-3.5 h-3.5"
+                                                aria-hidden="true"
+                                            />
+                                        )}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {ranges.length > 0 && (
+                                            <span className={`text-xs ${dayLocked ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                {ranges.length} range{ranges.length !== 1 ? 's' : ''}
+                                            </span>
+                                        )}
                                         <Icon
                                             icon={ChevronDown}
                                             size="sm"
                                             className={`text-gray-500 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`}
                                         />
-                                    )}
-                                </div>
-                            </button>
-                            {isOpen && (
-                                <div className="p-3.5 sm:p-4 space-y-4 border-t border-gray-100">
-                                    {!dayLocked && (
-                                        <Button variant="ghost-primary" size="sm" onClick={() => addTimeRange(dayOfWeek)}>
-                                            <Icon icon={Plus} size="sm" /> Add range
-                                        </Button>
-                                    )}
-                                    {ranges.length === 0 ? (
-                                        <p className="text-label text-center py-2">No availability set</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {ranges.map((range, index) => {
-                                                const issue = !dayLocked ? rangeHasIssue(range) : null;
-                                                return (
-                                                    <div key={index} className="space-y-1.5 min-w-0 w-full">
-                                                        <div
-                                                            className={`flex items-center gap-2 p-2 border rounded-xl min-w-0 w-full ${
-                                                                dayLocked
-                                                                    ? 'bg-gray-100/30 border-gray-200'
-                                                                    : 'bg-white border-gray-100 shadow-xs'
-                                                            }`}
-                                                        >
-                                                            <Input
-                                                                type="time"
-                                                                value={range.start}
-                                                                step="900"
-                                                                onChange={(e) =>
-                                                                    updateTimeRange(dayOfWeek, index, 'start', e.target.value)
-                                                                }
-                                                                disabled={dayLocked}
-                                                                className="flex-1 min-w-0 text-center px-2 py-1.5 h-10 min-h-0 text-sm bg-transparent"
-                                                            />
-                                                            <span className="text-sm text-gray-400 shrink-0 select-none font-medium">to</span>
-                                                            <Input
-                                                                type="time"
-                                                                value={range.end}
-                                                                step="900"
-                                                                onChange={(e) =>
-                                                                    updateTimeRange(dayOfWeek, index, 'end', e.target.value)
-                                                                }
-                                                                disabled={dayLocked}
-                                                                className="flex-1 min-w-0 text-center px-2 py-1.5 h-10 min-h-0 text-sm bg-transparent"
-                                                            />
-                                                            {!dayLocked && (
-                                                                <Button
-                                                                    variant="ghost-danger"
-                                                                    size="sm"
-                                                                    onClick={() => removeTimeRange(dayOfWeek, index)}
-                                                                    aria-label="Remove range"
-                                                                    className="shrink-0 h-10 w-10 flex items-center justify-center p-0 min-w-0 min-h-0"
-                                                                >
-                                                                    <Icon icon={Trash2} size="sm" className="text-red-500" />
-                                                                </Button>
+                                    </div>
+                                </button>
+                                {isOpen && (
+                                    <div className={`p-3.5 sm:p-4 border-t border-gray-100 space-y-4 ${todayState || pastState || isRostered ? 'pl-3 sm:pl-3.5' : ''
+                                        }`}>
+                                        {!dayLocked && (
+                                            <div className="flex justify-center">
+                                                <Button variant="ghost-primary" size="sm" onClick={() => addTimeRange(dayOfWeek)}>
+                                                    <Icon icon={Plus} size="sm" /> Add range
+                                                </Button>
+                                            </div>
+                                        )}
+                                        {ranges.length === 0 ? (
+                                            <p className="text-label text-center py-2">No availability set</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {ranges.map((range, index) => {
+                                                    const issue = !dayLocked ? rangeHasIssue(range) : null;
+                                                    return (
+                                                        <div key={index} className="space-y-1.5 min-w-0 w-full">
+                                                            <div
+                                                                className={`flex items-center gap-2 p-2 border rounded-xl min-w-0 w-full ${dayLocked
+                                                                        ? 'bg-gray-100/30 border-gray-200'
+                                                                        : 'bg-white border-gray-100 shadow-xs'
+                                                                    }`}
+                                                            >
+                                                                <Input
+                                                                    type="time"
+                                                                    value={range.start}
+                                                                    step="900"
+                                                                    onChange={(e) =>
+                                                                        updateTimeRange(dayOfWeek, index, 'start', e.target.value)
+                                                                    }
+                                                                    disabled={dayLocked}
+                                                                    className="flex-1 min-w-0 text-center px-2 py-1.5 h-10 min-h-0 text-sm bg-transparent"
+                                                                />
+                                                                <span className="text-sm text-gray-600 shrink-0 select-none font-semibold">to</span>
+                                                                <Input
+                                                                    type="time"
+                                                                    value={range.end}
+                                                                    step="900"
+                                                                    onChange={(e) =>
+                                                                        updateTimeRange(dayOfWeek, index, 'end', e.target.value)
+                                                                    }
+                                                                    disabled={dayLocked}
+                                                                    className="flex-1 min-w-0 text-center px-2 py-1.5 h-10 min-h-0 text-sm bg-transparent"
+                                                                />
+                                                                {!dayLocked && (
+                                                                    <Button
+                                                                        variant="ghost-danger"
+                                                                        size="sm"
+                                                                        onClick={() => removeTimeRange(dayOfWeek, index)}
+                                                                        aria-label="Remove range"
+                                                                        className="shrink-0 h-10 w-10 flex items-center justify-center p-0 min-w-0 min-h-0"
+                                                                    >
+                                                                        <Icon icon={Trash2} size="sm" className="text-red-500" />
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                            {issue && (
+                                                                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 w-full">
+                                                                    {issue}
+                                                                </p>
                                                             )}
                                                         </div>
-                                                        {issue && (
-                                                            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                                                                {issue}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
 
             {canSubmit && (

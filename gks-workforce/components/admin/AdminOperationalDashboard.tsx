@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminStatCard from '@/components/admin/AdminStatCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
@@ -194,6 +195,24 @@ export default function AdminOperationalDashboard() {
         });
     }, [staffList, todayShifts, activeRecords, completedRecordsToday, nowTime]);
 
+    // Sort crew by status priority (Working -> Late -> Scheduled -> Completed -> Off Duty)
+    const sortedCrewStatusList = useMemo(() => {
+        const weights: Record<CrewStatus['status'], number> = {
+            working: 1,
+            unscheduled_working: 2,
+            late: 3,
+            upcoming: 4,
+            completed: 5,
+            off: 6,
+        };
+        return [...crewStatusList].sort((a, b) => {
+            const wa = weights[a.status] || 99;
+            const wb = weights[b.status] || 99;
+            if (wa !== wb) return wa - wb;
+            return a.name.localeCompare(b.name);
+        });
+    }, [crewStatusList]);
+
     // Active working counts
     const activeWorkingCount = useMemo(() => {
         return crewStatusList.filter((c) => c.status === 'working' || c.status === 'unscheduled_working').length;
@@ -231,21 +250,10 @@ export default function AdminOperationalDashboard() {
     return (
         <div className="space-y-6">
             {/* ── Greeting Banner ── */}
-            <div className="relative overflow-hidden bg-gradient-to-r from-blue-50 via-indigo-50/60 to-slate-50 border border-slate-200/80 rounded-3xl p-6 sm:p-8 text-slate-800 shadow-xs">
-                <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-blue-100/30 rounded-full blur-2xl" />
-                <div className="absolute bottom-0 left-0 -mb-6 -ml-6 w-48 h-48 bg-indigo-100/40 rounded-full blur-3xl" />
-                
-                <div className="relative z-10">
-
-                    <h1 className="text-xl sm:text-3xl font-semibold tracking-tight mt-3 text-slate-900">
-                        Good Evening, Tony
-                    </h1>
-                    <p className="text-sm sm:text-base text-slate-600 mt-1.5 max-w-md">
-                        Today is {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}. 
-                        There are currently <strong className="text-blue-700 font-semibold">{activeWorkingCount} staff</strong> clocked in.
-                    </p>
-                </div>
-            </div>
+            <AdminPageHeader
+                title="Good Evening, Tony"
+                description={`Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}. There are currently ${activeWorkingCount} staff clocked in.`}
+            />
 
             {/* ── Key Metrics ── */}
             <section className="grid grid-cols-1 sm:grid-cols-3 gap-4" aria-label="Key metrics">
@@ -275,115 +283,116 @@ export default function AdminOperationalDashboard() {
             </section>
 
             {/* ── Main Dashboard Layout Grid ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* ── Left Column: Live Shop Status Monitor (2/3 width) ── */}
-                <div className="lg:col-span-2">
+                {/* ── Left Column: Live Shop Status Monitor (1/2 width) ── */}
+                <div>
                     {/* Live Shop Monitor Card */}
                     <Card className="p-5 shadow-sm border border-slate-200 h-full">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
-                            <div>
+                        <div className="border-b border-slate-100 pb-4 mb-4">
+                            <div className="flex items-center justify-between">
                                 <h2 className="text-base font-semibold text-slate-800">Live Shop Crew</h2>
-                                <p className="text-xs text-slate-400 mt-0.5">Real-time attendance & schedule mapping</p>
+                                <span className="flex h-2 w-2 relative">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
                             </div>
-                            <span className="flex h-2 w-2 relative">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
+                            <p className="text-xs text-slate-400 mt-0.5">Real-time attendance & schedule mapping</p>
                         </div>
 
                         {/* Crew List */}
                         <div className="divide-y divide-slate-100 max-h-[360px] overflow-y-auto pr-1">
-                            {crewStatusList.length === 0 ? (
+                            {sortedCrewStatusList.length === 0 ? (
                                 <div className="text-center py-8">
                                     <p className="text-sm text-slate-400">No staff members configured.</p>
                                 </div>
-                            ) : crewStatusList.filter(c => c.status !== 'off').length === 0 ? (
-                                <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                                    <p className="text-sm font-semibold text-slate-500">No shifts scheduled for today.</p>
-                                    <button 
-                                        onClick={() => router.push('/admin/roster')}
-                                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 mt-2 block mx-auto underline"
-                                    >
-                                        Go schedule shifts
-                                    </button>
-                                </div>
                             ) : (
-                                crewStatusList
-                                    .filter((c) => c.status !== 'off')
-                                    .map((member) => (
-                                        <div key={member.staffId} className="flex items-center justify-between py-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 shadow-xs border ${
-                                                    member.status === 'working' || member.status === 'unscheduled_working'
-                                                        ? 'bg-emerald-100 border-emerald-200 text-emerald-700'
-                                                        : member.status === 'late'
-                                                            ? 'bg-red-100 border-red-200 text-red-700 animate-pulse'
-                                                            : member.status === 'completed'
-                                                                ? 'bg-slate-100 border-slate-200 text-slate-600'
-                                                                : 'bg-blue-50 border-blue-100 text-blue-700'
-                                                }`}>
-                                                    {member.initials}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-semibold text-slate-800 truncate">{member.name}</p>
-                                                    <p className="text-xs text-slate-400 font-medium">
-                                                        {member.status === 'working' && `Clocked in: ${member.clockInTime}`}
-                                                        {member.status === 'unscheduled_working' && `Unscheduled · Clocked in: ${member.clockInTime}`}
-                                                        {member.status === 'completed' && `Finished · Clocked: ${member.clockInTime}–${member.clockOutTime}`}
-                                                        {member.status === 'late' && `Absent · Rostered: ${member.shiftTime}`}
-                                                        {member.status === 'upcoming' && `Rostered: ${member.shiftTime}`}
-                                                    </p>
-                                                </div>
+                                sortedCrewStatusList.map((member) => (
+                                    <div key={member.staffId} className={`flex items-center justify-between py-3 ${member.status === 'off' ? 'opacity-60' : ''}`}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 shadow-xs border ${
+                                                member.status === 'working' || member.status === 'unscheduled_working'
+                                                    ? 'bg-emerald-100 border-emerald-200 text-emerald-700'
+                                                    : member.status === 'late'
+                                                        ? 'bg-red-100 border-red-200 text-red-700 animate-pulse'
+                                                        : member.status === 'completed'
+                                                            ? 'bg-slate-100 border-slate-200 text-slate-600'
+                                                            : member.status === 'upcoming'
+                                                                ? 'bg-blue-50 border-blue-100 text-blue-700'
+                                                                : 'bg-gray-50 border-gray-100 text-gray-400'
+                                            }`}>
+                                                {member.initials}
                                             </div>
-                                            
-                                            {/* Status Badge */}
-                                            <div>
-                                                {member.status === 'working' && (
-                                                    <Badge variant="success">Clocked In</Badge>
-                                                )}
-                                                {member.status === 'unscheduled_working' && (
-                                                    <Badge variant="success">Unscheduled</Badge>
-                                                )}
-                                                {member.status === 'completed' && (
-                                                    <Badge variant="neutral">Completed</Badge>
-                                                )}
-                                                {member.status === 'late' && (
-                                                    <Badge variant="danger">Absent / Late</Badge>
-                                                )}
-                                                {member.status === 'upcoming' && (
-                                                    <Badge variant="neutral">Scheduled</Badge>
-                                                )}
+                                            <div className="min-w-0">
+                                                <p className={`text-sm font-semibold truncate ${member.status === 'off' ? 'text-slate-500 font-medium' : 'text-slate-800'}`}>{member.name}</p>
+                                                <p className="text-xs text-slate-400 font-medium">
+                                                    {member.status === 'working' && `Clocked in: ${member.clockInTime}`}
+                                                    {member.status === 'unscheduled_working' && `Unscheduled · Clocked in: ${member.clockInTime}`}
+                                                    {member.status === 'completed' && `Finished · Clocked: ${member.clockInTime}–${member.clockOutTime}`}
+                                                    {member.status === 'late' && `Absent · Rostered: ${member.shiftTime}`}
+                                                    {member.status === 'upcoming' && `Rostered: ${member.shiftTime}`}
+                                                    {member.status === 'off' && 'Off duty'}
+                                                </p>
                                             </div>
                                         </div>
-                                    ))
+                                        
+                                        {/* Status Badge */}
+                                        <div>
+                                            {member.status === 'working' && (
+                                                <Badge variant="success">Clocked In</Badge>
+                                            )}
+                                            {member.status === 'unscheduled_working' && (
+                                                <Badge variant="success">Unscheduled</Badge>
+                                            )}
+                                            {member.status === 'completed' && (
+                                                <Badge variant="neutral">Completed</Badge>
+                                            )}
+                                            {member.status === 'late' && (
+                                                <Badge variant="danger">Absent / Late</Badge>
+                                            )}
+                                            {member.status === 'upcoming' && (
+                                                <Badge variant="info">Scheduled</Badge>
+                                            )}
+                                            {member.status === 'off' && (
+                                                <Badge variant="neutral" className="text-slate-400 border-slate-100/50 bg-slate-50/50">Off Duty</Badge>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
                             )}
                         </div>
                     </Card>
                 </div>
 
-                {/* ── Right Column: Labor Hours Progress (1/3 width) ── */}
-                <div className="lg:col-span-1">
+                {/* ── Right Column: Labor Hours Progress (1/2 width) ── */}
+                <div>
                     <Card className="p-5 shadow-sm border border-slate-200 h-full flex flex-col justify-between">
                         <div>
                             <h2 className="text-base font-semibold text-slate-800">Labor Hours Progress</h2>
                             <p className="text-xs text-slate-400 mt-0.5 mb-6">Comparison of rostered budget vs. actual hours today</p>
                             
                             <div className="space-y-4">
-                                <div className="flex justify-between text-xs font-semibold text-slate-600">
-                                    <span>Rostered Budget: {scheduledHoursTotal.toFixed(1)} hrs</span>
-                                    <span className="text-blue-600 font-semibold">Actual: {workedHoursTotal.toFixed(1)} hrs</span>
+                                <div className="flex justify-between text-sm font-medium text-slate-600">
+                                    <span>Rostered Budget</span>
+                                    <span className="font-semibold text-slate-800">{scheduledHoursTotal.toFixed(1)} hrs</span>
                                 </div>
-                                <div className="w-full h-3.5 bg-slate-100 rounded-full overflow-hidden flex">
-                                    <div 
-                                        className="bg-blue-600 h-full rounded-full transition-all duration-500" 
-                                        style={{ width: `${scheduledHoursTotal > 0 ? Math.min(100, (workedHoursTotal / scheduledHoursTotal) * 100) : 0}%` }}
-                                    />
+                                <div className="flex justify-between text-sm font-medium text-slate-600">
+                                    <span>Actual Worked</span>
+                                    <span className="font-semibold text-blue-600">{workedHoursTotal.toFixed(1)} hrs</span>
                                 </div>
-                                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
-                                    <span>0%</span>
-                                    <span>{scheduledHoursTotal > 0 ? `${((workedHoursTotal / scheduledHoursTotal) * 100).toFixed(0)}% used` : 'No hours allocated'}</span>
-                                    <span>100%+</span>
+                                <div className="pt-2">
+                                    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                                        <div 
+                                            className="bg-blue-600 h-full rounded-full transition-all duration-500" 
+                                            style={{ width: `${scheduledHoursTotal > 0 ? Math.min(100, (workedHoursTotal / scheduledHoursTotal) * 100) : 0}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between items-center mt-2 text-xs text-slate-400">
+                                        <span>Progress</span>
+                                        <span className="font-semibold text-slate-700">
+                                            {scheduledHoursTotal > 0 ? `${((workedHoursTotal / scheduledHoursTotal) * 100).toFixed(0)}% used` : '0%'}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

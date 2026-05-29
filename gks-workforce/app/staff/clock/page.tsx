@@ -465,7 +465,7 @@ export default function ClockInOutPage() {
     };
 
     return (
-        <StaffPageShell title="Time Clock" maxWidth="md" centered headerCentered>
+        <StaffPageShell title="Time Clock" maxWidth="md" centered headerCentered scrollable>
             <Card className="w-full p-6 sm:p-8 space-y-6">
                 {gpsAlert()}
 

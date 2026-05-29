@@ -7,7 +7,7 @@ export default function StaffProfileDetailsPage() {
     const { userData } = useAuth();
 
     return (
-        <StaffSubpageShell title="Personal details">
+        <StaffSubpageShell title="Personal details" scrollable>
             <div className="bg-white rounded-xl border border-gray-200">
                 <div className="px-4 py-4">
                     <p className="text-label">Name</p>

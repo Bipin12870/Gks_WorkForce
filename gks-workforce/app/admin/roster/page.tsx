@@ -12,7 +12,7 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { Availability, Shift, User, TimeRange } from '@/types';
-import { getWeekStart, getDayName, isWithinAvailability } from '@/lib/utils';
+import { getWeekStart, getDayName, isWithinAvailability, formatTimeTo12Hour } from '@/lib/utils';
 import { createShift, updateShift, deleteShift } from '@/app/actions/shifts';
 import { useNotification } from '@/contexts/NotificationContext';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
@@ -25,7 +25,7 @@ import RosterWeeklyGrid from '@/components/admin/RosterWeeklyGrid';
 import Badge from '@/components/ui/Badge';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-import { CalendarDays, LayoutList, AlertTriangle, Calendar } from 'lucide-react';
+import { CalendarDays, LayoutList, AlertTriangle } from 'lucide-react';
 
 export default function AdminRosterPage() {
     const { userData } = useAuth();
@@ -256,50 +256,55 @@ export default function AdminRosterPage() {
 
     return (
         <>
-            <AdminPageHeader
-                title="Roster & availability"
-                description="Approve shifts against submitted availability for the selected week and day."
-            />
+            <div className="flex flex-col h-[calc(100vh-120px)] lg:h-auto overflow-hidden lg:overflow-visible min-h-0">
+                <div className="shrink-0">
+                <AdminPageHeader
+                    title="Roster & availability"
+                    description="Approve shifts against submitted availability for the selected week and day."
+                />
+            </div>
 
-            <AdminFilterBar
-                weekStart={selectedWeek}
-                onWeekPrev={() => changeWeek('prev')}
-                onWeekNext={() => changeWeek('next')}
-                selectedDay={selectedDay}
-                onDayChange={setSelectedDay}
-                staffValue={staffFilter ?? 'ALL'}
-                onStaffChange={(id) => {
-                    setStaffFilter(id === 'ALL' ? null : id);
-                    setFilterMode('HARD');
-                }}
-                staffOptions={staffOptions}
-                showDayAndStaff={viewMode !== 'grid'}
-            />
-
-            {/* View toggle — desktop only */}
-            <div className="hidden lg:flex items-center gap-2 mb-4">
-                <button
-                    onClick={() => setViewMode('grid')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        viewMode === 'grid'
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                >
-                    <CalendarDays size={14} />
-                    Weekly Grid
-                </button>
-                <button
-                    onClick={() => setViewMode('list')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        viewMode === 'list'
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                >
-                    <LayoutList size={14} />
-                    List View
-                </button>
+            <div className="shrink-0">
+                <AdminFilterBar
+                    weekStart={selectedWeek}
+                    onWeekPrev={() => changeWeek('prev')}
+                    onWeekNext={() => changeWeek('next')}
+                    selectedDay={selectedDay}
+                    onDayChange={setSelectedDay}
+                    staffValue={staffFilter ?? 'ALL'}
+                    onStaffChange={(id) => {
+                        setStaffFilter(id === 'ALL' ? null : id);
+                        setFilterMode('HARD');
+                    }}
+                    staffOptions={staffOptions}
+                    showDayAndStaff={viewMode !== 'grid'}
+                    extra={
+                        <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                                    viewMode === 'grid'
+                                        ? 'bg-white text-slate-800 shadow-xs border border-slate-200/20'
+                                         : 'text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                <CalendarDays size={13} />
+                                Weekly Grid
+                            </button>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                                    viewMode === 'list'
+                                        ? 'bg-white text-slate-800 shadow-xs border border-slate-200/20'
+                                         : 'text-slate-500 hover:text-slate-800'
+                                }`}
+                            >
+                                <LayoutList size={13} />
+                                List View
+                            </button>
+                        </div>
+                    }
+                />
             </div>
 
             {/* ── DESKTOP: Grid view ─────────────────────────────────────── */}
@@ -321,7 +326,7 @@ export default function AdminRosterPage() {
             )}
 
             {/* ── DESKTOP: List view ────────────────────────────────────────── */}
-            {(viewMode === 'list' || selectedDay === -1) && (
+            {viewMode === 'list' && (
                 <div className="hidden lg:grid lg:grid-cols-2 gap-8">
                     {/* LEFT SECTION - Roster */}
                     <div>
@@ -414,8 +419,8 @@ export default function AdminRosterPage() {
                 </div>
             )}
 
-            {/* ── MOBILE: Tab view (unchanged) ─────────────────────────────── */}
-            <div className="lg:hidden admin-section-card">
+            {/* ── MOBILE: Tab view ─────────────────────────────── */}
+            <div className="lg:hidden admin-section-card flex-1 min-h-0 flex flex-col overflow-hidden mb-2">
                 <AdminTabs
                     tabs={[
                         { id: 'roster', label: 'Roster', count: shifts.length },
@@ -424,7 +429,7 @@ export default function AdminRosterPage() {
                     activeId={activeMobileTab}
                     onChange={(id) => setActiveMobileTab(id as 'roster' | 'availability')}
                 />
-                <div className="p-4 space-y-3 min-h-[320px]">
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-8">
                     {activeMobileTab === 'roster' ? (
                         shifts.length === 0 ? (
                             <div className="py-20 text-center">
@@ -487,8 +492,9 @@ export default function AdminRosterPage() {
                     )}
                 </div>
             </div>
+        </div>
 
-            {/* ── Form Modal (list-view new/edit) ──────────────────────────── */}
+        {/* ── Form Modal (list-view new/edit) ──────────────────────────── */}
             <AdminFormModal
                 open={showApprovalModal && !!selectedStaff}
                 onClose={() => setShowApprovalModal(false)}
@@ -550,62 +556,64 @@ export default function AdminRosterPage() {
 
                         return (
                             <>
-                                <div className="mb-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
-                                    <p className="text-label text-blue-800 mb-2">Availability</p>
+                                <div className="mb-4 p-3.5 bg-blue-50/40 border-l-4 border-l-blue-500 rounded-r-xl">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-700 mb-1">Availability</p>
                                     {selectedStaff.ranges.length === 0 ? (
-                                        <p className="text-sm text-amber-800">No submission for this day.</p>
+                                        <p className="text-sm font-medium text-slate-500">No submission for this day.</p>
                                     ) : (
                                         selectedStaff.ranges.map((range, idx) => (
-                                            <p key={idx} className="text-sm font-semibold tabular-nums text-gray-900">
-                                                {range.start} – {range.end}
+                                            <p key={idx} className="text-sm font-semibold tabular-nums text-slate-800">
+                                                {formatTimeTo12Hour(range.start)} – {formatTimeTo12Hour(range.end)}
                                             </p>
                                         ))
                                     )}
                                 </div>
 
                                 {isPastDate && (
-                                    <div className="mb-4 p-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold flex gap-2.5 items-start">
-                                        <Calendar size={16} className="text-slate-500 shrink-0 mt-0.5" />
+                                    <div className="mb-4 p-3.5 bg-orange-50/40 border-l-4 border-l-orange-500 rounded-r-xl text-xs font-semibold flex gap-2.5 items-start">
+                                        <AlertTriangle size={15} className="text-orange-600 shrink-0 mt-0.5" />
                                         <div>
-                                            <p className="font-semibold text-slate-800">Past Date Warning</p>
-                                            <p className="text-slate-600 mt-0.5">You are scheduling a rostered shift for a day that has already passed.</p>
+                                            <p className="font-semibold text-orange-800">Past Date Warning</p>
+                                            <p className="text-orange-700 font-medium mt-0.5">You are scheduling a rostered shift for a day that has already passed.</p>
                                         </div>
                                     </div>
                                 )}
 
                                 <div className="space-y-4">
-                                    <div>
-                                        <label className="text-label block mb-1">Shift start</label>
-                                        <Input
-                                            type="time"
-                                            value={shiftForm.startTime}
-                                            onChange={(e) => setShiftForm({ ...shiftForm, startTime: e.target.value })}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-label block mb-1">Shift end</label>
-                                        <Input
-                                            type="time"
-                                            value={shiftForm.endTime}
-                                            onChange={(e) => setShiftForm({ ...shiftForm, endTime: e.target.value })}
-                                        />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-label block mb-1.5">Shift start</label>
+                                            <Input
+                                                type="time"
+                                                value={shiftForm.startTime}
+                                                onChange={(e) => setShiftForm({ ...shiftForm, startTime: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-label block mb-1.5">Shift end</label>
+                                            <Input
+                                                type="time"
+                                                value={shiftForm.endTime}
+                                                onChange={(e) => setShiftForm({ ...shiftForm, endTime: e.target.value })}
+                                            />
+                                        </div>
                                     </div>
 
                                     {hasConflict && (
                                         <div className="space-y-3 pt-2">
-                                            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-semibold flex gap-2.5 items-start">
-                                                <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                                            <div className="p-3.5 bg-amber-50/40 border-l-4 border-l-amber-500 rounded-r-xl text-xs font-semibold flex gap-2.5 items-start">
+                                                <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
                                                 <div>
                                                     <p className="font-semibold text-amber-800">Availability Conflict</p>
-                                                    <p className="text-amber-700 mt-0.5">This shift falls outside the staff member&apos;s submitted availability times.</p>
+                                                    <p className="text-amber-700 font-medium mt-0.5">This shift falls outside the staff member&apos;s submitted availability times.</p>
                                                 </div>
                                             </div>
-                                            <label className="flex items-center gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/50 transition-colors">
+                                            <label className="flex items-center gap-3 p-3 bg-slate-50/60 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100/50 transition-colors">
                                                 <input
                                                     type="checkbox"
                                                     checked={forceOverride}
                                                     onChange={(e) => setForceOverride(e.target.checked)}
-                                                    className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 focus:ring-offset-0"
+                                                    className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer"
                                                 />
                                                 <span className="text-xs font-semibold text-slate-700 select-none">
                                                     Force override availability limits

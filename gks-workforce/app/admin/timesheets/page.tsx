@@ -541,7 +541,7 @@ function AdminTimesheetsContent() {
 
                         <div>
                             <label className="text-label block mb-1">
-                                Admin note {(selectedTimesheet.requiresAdminNote || selectedTimesheet.status === 'APPROVED') && <span className="text-red-650">*</span>}
+                                Admin note {(selectedTimesheet.requiresAdminNote || selectedTimesheet.status === 'APPROVED') && <span className="text-red-500">*</span>}
                             </label>
                             <textarea
                                 value={adminNote}

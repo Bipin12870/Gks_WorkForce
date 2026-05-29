@@ -15,6 +15,7 @@ interface StaffPageShellProps {
     centered?: boolean;
     /** Center-align header title and optional description (mobile app style) */
     headerCentered?: boolean;
+    scrollable?: boolean;
     children: ReactNode;
 }
 
@@ -24,6 +25,7 @@ export default function StaffPageShell({
     maxWidth = 'lg',
     centered = false,
     headerCentered = true,
+    scrollable = false,
     children,
 }: StaffPageShellProps) {
     return (
@@ -41,7 +43,7 @@ export default function StaffPageShell({
             <main
                 className={`flex-1 min-h-0 flex flex-col ${widthClass[maxWidth]} w-full mx-auto px-4 py-5 ${
                     centered ? 'items-center' : ''
-                } overflow-hidden`}
+                } ${scrollable ? 'overflow-y-auto' : 'overflow-hidden'}`}
             >
                 {children}
             </main>

@@ -18,7 +18,7 @@ export default function StaffProfilePage() {
     };
 
     return (
-        <StaffPageShell title="Profile" headerCentered>
+        <StaffPageShell title="Profile" headerCentered scrollable>
             <StaffNavGroup title="Work">
                 <StaffNavRow
                     href="/staff/profile/availability"

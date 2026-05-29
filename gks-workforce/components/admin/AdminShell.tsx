@@ -44,7 +44,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     return (
         <div className="min-h-screen bg-background flex">
             {/* Desktop sidebar */}
-            <aside className="hidden lg:flex lg:w-60 xl:w-64 flex-col border-r border-gray-200 bg-white shrink-0 sticky top-0 h-screen">
+            <aside className="hidden lg:flex lg:w-60 xl:w-64 flex-col border-r border-gray-200 bg-white shrink-0 sticky top-0 h-screen pb-4">
                 <div className="px-4 py-5 border-b border-gray-100">
                     <Link href="/dashboard" className="flex items-center gap-2.5">
                         <Logo size={36} />
@@ -71,7 +71,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 />
             )}
             <aside
-                className={`lg:hidden fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] bg-white border-r border-gray-200 shadow-xl flex flex-col transition-transform duration-200 ${
+                className={`lg:hidden fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] bg-white border-r border-gray-200 shadow-xl flex flex-col pb-4 transition-transform duration-200 ${
                     mobileOpen ? 'translate-x-0' : '-translate-x-full'
                 }`}
             >

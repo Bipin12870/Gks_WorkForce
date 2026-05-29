@@ -11,6 +11,7 @@ interface StaffSubpageShellProps {
     /** Reserve space for StaffActionFooter (tab bar + action bar) */
     withActionFooter?: boolean;
     footer?: ReactNode;
+    scrollable?: boolean;
     children: ReactNode;
 }
 
@@ -19,6 +20,7 @@ export default function StaffSubpageShell({
     backHref = '/staff/profile',
     withActionFooter = false,
     footer,
+    scrollable = false,
     children,
 }: StaffSubpageShellProps) {
     const hasFooter = Boolean(footer) || withActionFooter;
@@ -38,7 +40,7 @@ export default function StaffSubpageShell({
                 </div>
             </header>
             <main
-                className={`flex-1 min-h-0 flex flex-col max-w-lg mx-auto w-full px-4 pt-4 overflow-hidden ${withActionFooter ? 'pb-[calc(5rem+env(safe-area-inset-bottom))]' : hasFooter ? 'pb-32' : ''}`}
+                className={`flex-1 min-h-0 flex flex-col max-w-lg mx-auto w-full px-4 pt-4 ${scrollable ? 'overflow-y-auto' : 'overflow-hidden'} ${withActionFooter ? 'pb-[calc(5rem+env(safe-area-inset-bottom))]' : hasFooter ? 'pb-32' : ''}`}
             >
                 {children}
             </main>

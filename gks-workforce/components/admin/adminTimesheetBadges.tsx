@@ -32,6 +32,16 @@ export function TimesheetSourceBadge({ source, distanceMetres }: { source?: Time
     if (!cfg) return null;
     const label =
         source === 'GPS_OUTSIDE' && distanceMetres != null ? `${cfg.label} (${distanceMetres}m)` : cfg.label;
+
+    if (source === 'GPS_VERIFIED') {
+        return (
+            <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 font-medium select-none">
+                <MapPin size={12} className="text-slate-400 shrink-0" />
+                GPS verified
+            </span>
+        );
+    }
+
     return (
         <Badge variant={cfg.variant} className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 shadow-3xs border border-current/10">
             <Icon icon={cfg.icon} size="sm" className="opacity-80" />
@@ -74,14 +84,49 @@ export function AutomationStatusBadge({
 
 export function TimesheetFlagChips({ flags }: { flags: string[] }) {
     if (!flags.length) return null;
+
+    const getFlagCls = (flag: string) => {
+        switch (flag) {
+            case 'GPS_OUTSIDE':
+            case 'AFTER_HOURS':
+                return 'text-rose-700 bg-rose-50 border-rose-200/60';
+            case 'OVERTIME':
+            case 'EARLY_CLOCK_IN':
+            case 'LATE_CLOCK_IN':
+                return 'text-amber-800 bg-amber-50 border-amber-200/60';
+            case 'MANUAL_EDIT_DETECTED':
+            default:
+                return 'text-slate-600 bg-slate-50 border-slate-200/65';
+        }
+    };
+
+    const getFlagLabel = (flag: string) => {
+        switch (flag) {
+            case 'GPS_OUTSIDE':
+                return 'Off-site';
+            case 'AFTER_HOURS':
+                return 'After hours';
+            case 'MANUAL_EDIT_DETECTED':
+                return 'Manual Edit';
+            case 'EARLY_CLOCK_IN':
+                return 'Early clock-in';
+            case 'LATE_CLOCK_IN':
+                return 'Late clock-in';
+            case 'OVERTIME':
+                return 'Overtime';
+            default:
+                return flag.replace(/_/g, ' ');
+        }
+    };
+
     return (
         <div className="flex flex-wrap gap-1">
             {flags.map((flag) => (
                 <span 
                     key={flag} 
-                    className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full"
+                    className={`text-[9px] font-semibold uppercase tracking-wider border px-2 py-0.5 rounded-full ${getFlagCls(flag)}`}
                 >
-                    {flag.replace(/_/g, ' ')}
+                    {getFlagLabel(flag)}
                 </span>
             ))}
         </div>

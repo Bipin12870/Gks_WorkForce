@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { User, Timesheet } from '@/types';
-import { getWeekStart, calculatePayrollRecord } from '@/lib/utils';
+import { getWeekStart, calculatePayrollRecord, formatHoursAndMinutes } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminWeekPicker from '@/components/admin/AdminWeekPicker';
@@ -102,7 +102,7 @@ export default function AdminHoursPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <AdminStatCard
                     label="Total payable hours"
-                    value={`${totalHours.toFixed(2)} hrs`}
+                    value={formatHoursAndMinutes(totalHours)}
                     icon={Clock}
                 />
                 <AdminStatCard
@@ -143,7 +143,7 @@ export default function AdminHoursPage() {
                                             <span className="text-gray-500 tabular-nums">${staff.hourlyRate.toFixed(2)}/hr</span>
                                         </AdminTableTd>
                                         <AdminTableTd>
-                                            <span className="font-medium tabular-nums">{hours.toFixed(2)} hrs</span>
+                                            <span className="font-medium tabular-nums">{formatHoursAndMinutes(hours)}</span>
                                         </AdminTableTd>
                                         <AdminTableTd align="right">
                                             <span className="font-semibold text-green-700 tabular-nums">

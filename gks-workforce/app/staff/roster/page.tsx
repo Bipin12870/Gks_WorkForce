@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Shift } from '@/types';
-import { getWeekStart, getDayName, formatDate, calculateHours } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffStatCard from '@/components/staff/StaffStatCard';
@@ -27,7 +27,7 @@ export default function StaffRosterPage() {
 
     const getDayDate = (dayIndex: number) => {
         const d = new Date(selectedWeek);
-        const currentMondayDay = 1; 
+        const currentMondayDay = 1;
         let offset = dayIndex - currentMondayDay;
         if (offset < 0) offset += 7;
         d.setDate(d.getDate() + offset);
@@ -137,8 +137,7 @@ export default function StaffRosterPage() {
                     <div className="grid grid-cols-2 gap-3 mb-10 shrink-0">
                         <StaffStatCard
                             label="Scheduled hours"
-                            value={totalHours.toFixed(2)}
-                            suffix="hrs"
+                            value={formatHoursAndMinutes(totalHours, true)}
                             accent={isPastWeek() ? 'gray' : 'blue'}
                         />
                         <StaffStatCard
@@ -183,21 +182,19 @@ export default function StaffRosterPage() {
                                         return (
                                             <div
                                                 key={dayOfWeek}
-                                                className={`transition-all ${
-                                                    todayState
+                                                className={`transition-all ${todayState
                                                         ? 'border-l-4 border-l-blue-600 bg-blue-50/5'
                                                         : pastState
                                                             ? 'border-l-4 border-l-gray-300 bg-gray-50/30 opacity-80'
                                                             : ''
-                                                }`}
+                                                    }`}
                                             >
                                                 <button
                                                     key={dayOfWeek}
                                                     type="button"
                                                     onClick={() => toggleDay(dayOfWeek)}
-                                                    className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
-                                                        todayState || pastState ? 'pl-3' : 'pl-4'
-                                                    } hover:bg-gray-50/50 text-gray-900`}
+                                                    className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${todayState || pastState ? 'pl-3' : 'pl-4'
+                                                        } hover:bg-gray-50/50 text-gray-900`}
                                                 >
                                                     <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
                                                         {getDayName(dayOfWeek)}
@@ -212,20 +209,18 @@ export default function StaffRosterPage() {
                                     return (
                                         <div
                                             key={dayOfWeek}
-                                            className={`transition-all ${
-                                                todayState
+                                            className={`transition-all ${todayState
                                                     ? 'border-l-4 border-l-blue-600 bg-blue-50/5'
                                                     : pastState
                                                         ? 'border-l-4 border-l-gray-300 bg-gray-50/30 opacity-80'
                                                         : ''
-                                            }`}
+                                                }`}
                                         >
                                             <button
                                                 type="button"
                                                 onClick={() => toggleDay(dayOfWeek)}
-                                                className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
-                                                    todayState || pastState ? 'pl-3' : 'pl-4'
-                                                } hover:bg-gray-50/50 text-gray-900`}
+                                                className={`w-full flex items-center justify-between py-5 pr-4 min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${todayState || pastState ? 'pl-3' : 'pl-4'
+                                                    } hover:bg-gray-50/50 text-gray-900`}
                                                 aria-expanded={isExpanded}
                                             >
                                                 <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
@@ -244,48 +239,47 @@ export default function StaffRosterPage() {
                                                 </div>
                                             </button>
                                             {isExpanded && (
-                                                <div className={`relative ${todayState || pastState ? 'pl-3' : 'pl-4'} pr-4 pb-4 pt-3`}>
+                                                <div className={`relative ${todayState || pastState ? 'pl-3' : 'pl-4'} pr-4 pb-4 pt-0`}>
                                                     {/* Continuous vertical guide line bridging from button row to first item */}
                                                     {!isEmpty && (
-                                                        <div className={`absolute -top-5 h-10 w-[2px] bg-slate-300 ${todayState || pastState ? 'left-3' : 'left-4'}`} />
+                                                        <div className={`absolute -top-5 h-8 w-[2px] bg-emerald-500 ${todayState || pastState ? 'left-[27px]' : 'left-[31px]'}`} />
                                                     )}
 
-                                                    <div className={`${!isEmpty ? 'pl-6' : ''} space-y-3 mt-3`}>
+                                                    <div className="space-y-3 mt-1">
                                                         {isEmpty ? (
                                                             <p className="text-xs text-gray-400 text-center py-4">No shifts scheduled</p>
                                                         ) : (
                                                             dayShifts.map((shift, idx) => {
                                                                 const durationHours = calculateHours(shift.startTime, shift.endTime);
                                                                 return (
-                                                                    <div key={shift.id} className="relative py-2 flex items-start justify-between gap-4">
+                                                                    <div key={shift.id} className="relative py-2 pl-8 flex items-start justify-between gap-4">
                                                                         {/* Vertical line segment */}
                                                                         {idx < dayShifts.length - 1 ? (
-                                                                            <div className="absolute top-0 bottom-0 -left-6 w-[2px] bg-slate-300" />
+                                                                            <div className="absolute top-0 bottom-0 left-[15px] w-[2px] bg-emerald-500" />
                                                                         ) : (
-                                                                            <div className="absolute top-0 h-1/2 -left-6 w-[2px] bg-slate-300" />
+                                                                            <div className="absolute top-0 h-[18px] left-[15px] w-[2px] bg-emerald-500" />
                                                                         )}
-                                                                        {/* Horizontal branch line */}
-                                                                        <div className="absolute top-1/2 -left-6 w-6 h-[2px] bg-slate-300" />
 
-                                                                        {/* Shift Details Content (direct on page background) */}
-                                                                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                                                            <Icon icon={Clock} size="sm" className="text-blue-600 shrink-0 mt-0.5" />
-                                                                            <div className="min-w-0">
-                                                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                                                    <span className="text-sm font-semibold text-gray-900">
-                                                                                        {shift.startTime} – {shift.endTime}
-                                                                                    </span>
-                                                                                    <span className="text-xs text-gray-500 font-medium">
-                                                                                        ({durationHours.toFixed(2)} hrs)
-                                                                                    </span>
-                                                                                </div>
-                                                                                <p className="text-xs text-gray-400 mt-0.5">
-                                                                                    {formatDate(shift.date.toDate())}
-                                                                                </p>
-                                                                            </div>
+                                                                        {/* Clock Icon Node sitting centered on top of the line */}
+                                                                        <div className="absolute left-[6px] top-[8px] w-5 h-5 rounded-full bg-white z-10 flex items-center justify-center shadow-xs">
+                                                                            <Icon icon={Clock} size="sm" className="text-emerald-500" />
                                                                         </div>
-                                                                        <div className="shrink-0 pt-0.5">
-                                                                            <Badge variant="success">Confirmed</Badge>
+
+                                                                        {/* Left side: Shift times */}
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <span className="text-base font-bold text-gray-900">
+                                                                                {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        {/* Right side: Duration & Date stacked */}
+                                                                        <div className="shrink-0 text-right">
+                                                                            <span className="text-sm font-bold text-gray-900 block">
+                                                                                {formatHoursAndMinutes(durationHours)}
+                                                                            </span>
+                                                                            <p className="text-xs font-semibold text-gray-500 mt-0.5">
+                                                                                {formatDate(shift.date.toDate())}
+                                                                            </p>
                                                                         </div>
                                                                     </div>
                                                                 );

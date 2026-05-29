@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
 import { Timesheet, TimesheetStatus, User } from '@/types';
-import { getWeekStart, formatDate } from '@/lib/utils';
+import { getWeekStart, formatDate, formatTimeTo12Hour } from '@/lib/utils';
 import { updateTimesheetStatus, correctTimesheet } from '@/app/actions/timesheets';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
@@ -51,6 +51,7 @@ function AdminTimesheetsContent() {
     useEffect(() => {
         const filter = searchParams.get('filter');
         if (filter === 'flagged') {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setShowFlaggedOnly(true);
             setStatusFilter('PENDING');
             setSelectedDay(-1);
@@ -68,17 +69,17 @@ function AdminTimesheetsContent() {
     const [adminNote, setAdminNote] = useState('');
     const [voidTimesheet, setVoidTimesheet] = useState(false);
 
-    const loadStaff = async () => {
-        if (!userData || userData.role !== 'ADMIN') return;
-        const snapshot = await getDocs(collection(db, 'users'));
-        const map: Record<string, User> = {};
-        snapshot.forEach((doc) => {
-            map[doc.id] = { id: doc.id, ...doc.data() } as User;
-        });
-        setStaffMap(map);
-    };
-
     useEffect(() => {
+        const loadStaff = async () => {
+            if (!userData || userData.role !== 'ADMIN') return;
+            const snapshot = await getDocs(collection(db, 'users'));
+            const map: Record<string, User> = {};
+            snapshot.forEach((doc) => {
+                map[doc.id] = { id: doc.id, ...doc.data() } as User;
+            });
+            setStaffMap(map);
+        };
+
         if (userData?.role === 'ADMIN') {
             loadStaff();
         }
@@ -88,6 +89,7 @@ function AdminTimesheetsContent() {
     useEffect(() => {
         if (!userData || userData.role !== 'ADMIN') return;
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         const weekStart = new Date(selectedWeek);
         const weekEnd = new Date(selectedWeek);
@@ -133,7 +135,7 @@ function AdminTimesheetsContent() {
         return () => {
             unsubscribeTimesheets();
         };
-    }, [selectedWeek, selectedDay, userData]);
+    }, [selectedWeek, selectedDay, userData, showNotification]);
 
 
 
@@ -307,7 +309,7 @@ function AdminTimesheetsContent() {
                     ]}
                     activeId={statusFilter}
                     onChange={(id) => {
-                        setStatusFilter(id as any);
+                        setStatusFilter(id as 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL');
                         setSelectedTimesheetIds([]);
                     }}
                 />
@@ -407,13 +409,13 @@ function AdminTimesheetsContent() {
                                     <div className="flex flex-col gap-1">
                                         <span className="text-gray-400 font-semibold uppercase tracking-wider text-[9px]">Roster</span>
                                         <span className="font-medium text-gray-600">
-                                            {item.timesheet.approvedShiftStart ? `${item.timesheet.approvedShiftStart}–${item.timesheet.approvedShiftEnd}` : 'Unscheduled'}
+                                            {item.timesheet.approvedShiftStart ? `${formatTimeTo12Hour(item.timesheet.approvedShiftStart)}–${formatTimeTo12Hour(item.timesheet.approvedShiftEnd)}` : 'Unscheduled'}
                                         </span>
                                     </div>
                                     <div className="flex flex-col gap-1">
                                         <span className="text-gray-400 font-semibold uppercase tracking-wider text-[9px]">Clocked</span>
                                         <span className={`font-medium ${item.isMissed ? 'text-red-500' : 'text-gray-800'}`}>
-                                            {item.timesheet.workedStart ? `${item.timesheet.workedStart}–${item.timesheet.workedEnd}` : 'No clock-in'}
+                                            {item.timesheet.workedStart ? `${formatTimeTo12Hour(item.timesheet.workedStart)}–${formatTimeTo12Hour(item.timesheet.workedEnd)}` : 'No clock-in'}
                                         </span>
                                     </div>
                                 </div>
@@ -513,13 +515,13 @@ function AdminTimesheetsContent() {
                             <div>
                                 <p className="text-label">Roster</p>
                                 <p className="font-semibold tabular-nums mt-0.5">
-                                    {selectedTimesheet.approvedShiftStart ? `${selectedTimesheet.approvedShiftStart} – ${selectedTimesheet.approvedShiftEnd}` : 'Unscheduled'}
+                                    {selectedTimesheet.approvedShiftStart ? `${formatTimeTo12Hour(selectedTimesheet.approvedShiftStart)} – ${formatTimeTo12Hour(selectedTimesheet.approvedShiftEnd)}` : 'Unscheduled'}
                                 </p>
                             </div>
                             <div>
                                 <p className="text-label">Submitted</p>
                                 <p className="font-semibold tabular-nums mt-0.5">
-                                    {selectedTimesheet.workedStart ? `${selectedTimesheet.workedStart} – ${selectedTimesheet.workedEnd}` : 'No clock-in'}
+                                    {selectedTimesheet.workedStart ? `${formatTimeTo12Hour(selectedTimesheet.workedStart)} – ${formatTimeTo12Hour(selectedTimesheet.workedEnd)}` : 'No clock-in'}
                                 </p>
                             </div>
                         </div>

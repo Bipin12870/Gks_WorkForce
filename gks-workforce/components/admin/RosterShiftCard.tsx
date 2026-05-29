@@ -1,7 +1,7 @@
 'use client';
 
 import { Shift } from '@/types';
-import { formatDate, getDayName, calculateHours } from '@/lib/utils';
+import { formatDate, getDayName, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Icon from '@/components/ui/Icon';
@@ -28,7 +28,9 @@ export default function RosterShiftCard({
     onRemove,
     compact,
 }: RosterShiftCardProps) {
-    const hours = calculateHours(shift.startTime, shift.endTime).toFixed(2);
+    const hoursVal = calculateHours(shift.startTime, shift.endTime);
+    const hoursFormatted = formatHoursAndMinutes(hoursVal);
+    const hoursFormattedShort = formatHoursAndMinutes(hoursVal, true);
 
     return (
         <div
@@ -51,7 +53,7 @@ export default function RosterShiftCard({
                     <p className="text-label mt-0.5">{formatDate(shift.date.toDate())}</p>
                     <div className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-blue-700 tabular-nums">
                         <Icon icon={Clock} size="sm" />
-                        {shift.startTime} – {shift.endTime}
+                        {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}
                     </div>
                 </div>
                 {!compact && (onEdit || onRemove) && (
@@ -70,12 +72,12 @@ export default function RosterShiftCard({
                 )}
             </div>
             {!compact && (
-                <p className="text-label text-right mt-2 tabular-nums">{hours} hrs</p>
+                <p className="text-label text-right mt-2 tabular-nums">{hoursFormatted}</p>
             )}
             {compact && (
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                    <Badge variant="info">{shift.startTime} – {shift.endTime}</Badge>
-                    <span className="text-xs font-semibold tabular-nums">{hours}h</span>
+                    <Badge variant="info">{formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}</Badge>
+                    <span className="text-xs font-semibold tabular-nums">{hoursFormattedShort}</span>
                 </div>
             )}
         </div>

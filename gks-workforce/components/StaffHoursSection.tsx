@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Timesheet } from '@/types';
-import { getWeekStart, calculatePayrollRecord } from '@/lib/utils';
+import { getWeekStart, calculatePayrollRecord, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
@@ -22,6 +22,7 @@ export default function StaffHoursSection() {
     useEffect(() => {
         const saved = localStorage.getItem('gks_show_pay_info');
         if (saved !== null) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setShowPayInfo(saved === 'true');
         }
     }, []);
@@ -38,6 +39,7 @@ export default function StaffHoursSection() {
         const weekEnd = new Date(selectedWeek);
         weekEnd.setDate(weekEnd.getDate() + 7);
 
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
 
         const timesheetsQ = query(
@@ -124,8 +126,7 @@ export default function StaffHoursSection() {
                     <div className="px-5 py-3.5">
                         <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">Hours</span>
                         <span className="text-base font-semibold text-slate-800 tabular-nums">
-                            {totalHours.toFixed(2)}
-                            <span className="text-xs font-medium text-slate-400 ml-1">hrs</span>
+                            {formatHoursAndMinutes(totalHours)}
                         </span>
                     </div>
                     <div className="px-5 py-3.5">
@@ -184,11 +185,11 @@ export default function StaffHoursSection() {
                                                 )}
                                             </div>
                                             <p className="text-xs text-slate-500 font-medium mt-1.5">
-                                                {ts.workedStart} – {ts.workedEnd}
+                                                {formatTimeTo12Hour(ts.workedStart)} – {formatTimeTo12Hour(ts.workedEnd)}
                                             </p>
                                         </div>
                                         <div className="shrink-0 text-right">
-                                            <p className="text-sm font-semibold text-slate-800 tabular-nums">{hours.toFixed(2)} hrs</p>
+                                            <p className="text-sm font-semibold text-slate-800 tabular-nums">{formatHoursAndMinutes(hours)}</p>
                                             <p className="text-xs font-medium tabular-nums mt-1.5 text-emerald-600">
                                                 {showPayInfo
                                                     ? `$${(hours * (userData?.hourlyRate || 0)).toFixed(2)}`

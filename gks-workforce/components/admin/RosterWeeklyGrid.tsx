@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { Availability, Shift, User } from '@/types';
-import { getDayName, parseTime } from '@/lib/utils';
+import { getDayName, parseTime, formatTimeTo12Hour } from '@/lib/utils';
 import { Clock } from 'lucide-react';
 
 interface RosterWeeklyGridProps {
@@ -46,7 +46,7 @@ export default function RosterWeeklyGrid({
 
     const getShift = (staffId: string, targetDate: Date) => {
         return shifts.find((s) => {
-            const shiftDate = s.date instanceof Date ? s.date : (s.date as any).toDate();
+            const shiftDate = s.date instanceof Date ? s.date : (s.date as { toDate: () => Date }).toDate();
             return s.staffId === staffId && shiftDate.toDateString() === targetDate.toDateString();
         });
     };
@@ -173,7 +173,7 @@ export default function RosterWeeklyGrid({
                                                     : 'bg-blue-600 border-blue-700 text-white'
                                         }`}>
                                             <span className="text-[12px] font-semibold tracking-tight">
-                                                {shift.startTime} – {shift.endTime}
+                                                {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}
                                             </span>
                                             <div className="flex items-center gap-1 mt-1 opacity-90">
                                                 <Clock size={11} />
@@ -209,7 +209,7 @@ export default function RosterWeeklyGrid({
                                                         : 'bg-emerald-50/80 border-emerald-100/60 text-emerald-800'
                                                 }`}>
                                                     <span className={`text-[11px] font-semibold tracking-tight ${isPast ? 'text-slate-400' : 'text-emerald-800'}`}>
-                                                        {avail.timeRanges[0].start}–{avail.timeRanges[0].end}
+                                                        {formatTimeTo12Hour(avail.timeRanges[0].start)}–{formatTimeTo12Hour(avail.timeRanges[0].end)}
                                                     </span>
                                                     <span className={`text-[9px] font-semibold tracking-wide uppercase mt-0.5 ${isPast ? 'text-slate-400/80' : 'text-emerald-600/80'}`}>
                                                         Available

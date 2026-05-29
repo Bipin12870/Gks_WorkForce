@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Timesheet } from '@/types';
-import { formatDate, processTimesheetAutomation, calculatePayrollRecord } from '@/lib/utils';
+import { formatDate, processTimesheetAutomation, calculatePayrollRecord, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
 import {
     TimesheetFlagChips,
     TimesheetSourceBadge,
@@ -57,7 +57,7 @@ export default function TimesheetTableRow({
     const getVarianceBadge = (val: number) => {
         if (val === 0) return <span className="text-gray-300 font-normal text-xs">—</span>;
         const sign = val > 0 ? '+' : '';
-        const text = `${sign}${val.toFixed(2)}h`;
+        const text = `${sign}${formatHoursAndMinutes(Math.abs(val), true)}`;
         const cls =
             val > 0.5
                 ? 'text-amber-600 border-amber-200 bg-amber-50/40'
@@ -120,10 +120,10 @@ export default function TimesheetTableRow({
                 <td className="px-5 py-4">
                     <div className="flex flex-col">
                         <span className="text-gray-500 text-sm font-medium tabular-nums">
-                            {ts.approvedShiftStart ? `${ts.approvedShiftStart}\u2013${ts.approvedShiftEnd}` : 'Unscheduled'}
+                            {ts.approvedShiftStart ? `${formatTimeTo12Hour(ts.approvedShiftStart)}–${formatTimeTo12Hour(ts.approvedShiftEnd)}` : 'Unscheduled'}
                         </span>
                         {ts.approvedShiftStart && (
-                            <span className="text-[10px] text-gray-400 font-medium mt-0.5">{approvedHours.toFixed(2)}h rostered</span>
+                            <span className="text-[10px] text-gray-400 font-medium mt-0.5">{formatHoursAndMinutes(approvedHours, true)} rostered</span>
                         )}
                     </div>
                 </td>
@@ -132,10 +132,10 @@ export default function TimesheetTableRow({
                 <td className="px-5 py-4">
                     <div className="flex flex-col">
                         <span className={`text-sm font-medium tabular-nums ${!ts.workedStart ? 'text-amber-600' : 'text-gray-900'}`}>
-                            {ts.workedStart ? `${ts.workedStart}\u2013${ts.workedEnd}` : 'No clock-in'}
+                            {ts.workedStart ? `${formatTimeTo12Hour(ts.workedStart)}–${formatTimeTo12Hour(ts.workedEnd)}` : 'No clock-in'}
                         </span>
                         {ts.workedStart && (
-                            <span className="text-[10px] text-gray-400 font-medium mt-0.5">{workedHours.toFixed(2)}h clocked</span>
+                            <span className="text-[10px] text-gray-400 font-medium mt-0.5">{formatHoursAndMinutes(workedHours, true)} clocked</span>
                         )}
                     </div>
                 </td>
@@ -230,26 +230,26 @@ export default function TimesheetTableRow({
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Rostered</span>
                                     <span className="text-sm font-medium text-gray-700 tabular-nums">
-                                        {ts.approvedShiftStart ? `${ts.approvedShiftStart} – ${ts.approvedShiftEnd}` : '—'}
+                                        {ts.approvedShiftStart ? `${formatTimeTo12Hour(ts.approvedShiftStart)} – ${formatTimeTo12Hour(ts.approvedShiftEnd)}` : '—'}
                                     </span>
                                     <span className="text-xs text-gray-400">
-                                        {ts.approvedShiftStart ? `${approvedHours.toFixed(2)}h expected` : 'Unscheduled shift'}
+                                        {ts.approvedShiftStart ? `${formatHoursAndMinutes(approvedHours)} expected` : 'Unscheduled shift'}
                                     </span>
                                 </div>
 
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Clocked</span>
                                     <span className={`text-sm font-medium tabular-nums ${!ts.workedStart ? 'text-gray-400' : 'text-gray-700'}`}>
-                                        {ts.workedStart ? `${ts.workedStart} – ${ts.workedEnd}` : 'No clock-in'}
+                                        {ts.workedStart ? `${formatTimeTo12Hour(ts.workedStart)} – ${formatTimeTo12Hour(ts.workedEnd)}` : 'No clock-in'}
                                     </span>
                                     <span className="text-xs text-gray-400">
-                                        {ts.workedStart ? `${workedHours.toFixed(2)}h tracked` : 'No activity recorded'}
+                                        {ts.workedStart ? `${formatHoursAndMinutes(workedHours)} tracked` : 'No activity recorded'}
                                     </span>
                                 </div>
 
                                 <div className="flex flex-col gap-0.5">
                                     <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payable</span>
-                                    <span className="text-sm font-semibold text-emerald-600 tabular-nums">{payableHours.toFixed(2)}h</span>
+                                    <span className="text-sm font-semibold text-emerald-600 tabular-nums">{formatHoursAndMinutes(payableHours, true)}</span>
                                     <span className={`text-xs ${
                                         !ts.approvedShiftStart ? 'text-gray-400'
                                         : diff > 0.5 ? 'text-amber-500'
@@ -259,7 +259,7 @@ export default function TimesheetTableRow({
                                     }`}>
                                         {!ts.approvedShiftStart ? 'Unscheduled'
                                             : diff === 0 ? 'On time'
-                                            : `${diff > 0 ? '+' : ''}${diff.toFixed(2)}h variance`}
+                                            : `${diff > 0 ? '+' : ''}${formatHoursAndMinutes(Math.abs(diff), true)} variance`}
                                     </span>
                                 </div>
 

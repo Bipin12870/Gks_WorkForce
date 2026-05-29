@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { TimeRecord, Shift } from '@/types';
 import { formatTimeToHHmm, roundToNearest5Minutes, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';
-import { isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
+import { isWithinShopHours, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, formatTimeTo12Hour } from '@/lib/utils';
 import { clockIn, clockOut } from '@/app/actions/clock';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffAlert from '@/components/staff/StaffAlert';
@@ -250,8 +250,8 @@ export default function ClockInOutPage() {
             const actualIn = formatTimeToHHmm(now);
             const roundingNote =
                 roundedIn !== actualIn
-                    ? ` Recorded time will be ${roundedIn} (rounded to the nearest 5 minutes from ${actualIn}).`
-                    : ` Recorded time will be ${roundedIn}.`;
+                    ? ` Recorded time will be ${formatTimeTo12Hour(roundedIn)} (rounded to the nearest 5 minutes from ${formatTimeTo12Hour(actualIn)}).`
+                    : ` Recorded time will be ${formatTimeTo12Hour(roundedIn)}.`;
 
             if (!todayShift) {
                 setConfirmModalData({
@@ -290,7 +290,7 @@ export default function ClockInOutPage() {
                 setConfirmModalData({
                     action: 'clock-in',
                     title: 'Starting Early',
-                    message: `You are clocking in early. Your rostered shift starts at ${todayShift.startTime} (in ${Math.abs(diffMins)} minutes). Do you want to proceed?${roundingNote}`,
+                    message: `You are clocking in early. Your rostered shift starts at ${formatTimeTo12Hour(todayShift.startTime)} (in ${Math.abs(diffMins)} minutes). Do you want to proceed?${roundingNote}`,
                     type: 'early',
                 });
                 return;
@@ -298,7 +298,7 @@ export default function ClockInOutPage() {
                 setConfirmModalData({
                     action: 'clock-in',
                     title: 'Running Late',
-                    message: `You are clocking in late. Your rostered shift was scheduled to start at ${todayShift.startTime} (${diffMins} minutes ago). Do you want to proceed?${roundingNote}`,
+                    message: `You are clocking in late. Your rostered shift was scheduled to start at ${formatTimeTo12Hour(todayShift.startTime)} (${diffMins} minutes ago). Do you want to proceed?${roundingNote}`,
                     type: 'late',
                 });
                 return;
@@ -362,8 +362,8 @@ export default function ClockInOutPage() {
             const actualOut = formatTimeToHHmm(now);
             const roundingNote =
                 roundedOut !== actualOut
-                    ? ` Recorded time will be ${roundedOut} (rounded to the nearest 5 minutes from ${actualOut}).`
-                    : ` Recorded time will be ${roundedOut}.`;
+                    ? ` Recorded time will be ${formatTimeTo12Hour(roundedOut)} (rounded to the nearest 5 minutes from ${formatTimeTo12Hour(actualOut)}).`
+                    : ` Recorded time will be ${formatTimeTo12Hour(roundedOut)}.`;
 
             if (geo && shop && geo.distanceMetres !== null && !geo.withinRange) {
                 setConfirmModalData({
@@ -478,13 +478,10 @@ export default function ClockInOutPage() {
                                 <span className="inline-block w-1.5 h-1.5 bg-blue-600 rounded-full motion-reduce:animate-none animate-ping" />
                                 <span>
                                     Started at{' '}
-                                    {activeRecord.clockInTime.toDate().toLocaleTimeString([], {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                    })}
+                                    {formatTimeTo12Hour(formatTimeToHHmm(activeRecord.clockInTime.toDate()))}
                                 </span>
                             </div>
-                            <p className="text-label mt-1">Rounded in: {activeRecord.clockInRounded}</p>
+                            <p className="text-label mt-1">Rounded in: {formatTimeTo12Hour(activeRecord.clockInRounded)}</p>
                         </div>
 
                         <Button
@@ -525,7 +522,7 @@ export default function ClockInOutPage() {
                                 <p className="text-sm text-gray-600 font-medium">Ready to start your shift</p>
                                 {todayShift && (
                                     <p className="text-label mt-2">
-                                        Rostered: {todayShift.startTime} – {todayShift.endTime}
+                                    Rostered: {formatTimeTo12Hour(todayShift.startTime)} – {formatTimeTo12Hour(todayShift.endTime)}
                                     </p>
                                 )}
                             </div>

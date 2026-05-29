@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Shift, Timesheet, TimeRecord } from '@/types';
-import { getWeekStart, getDayName, formatDate, calculateHours } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import { createManualTimesheet } from '@/app/actions/timesheets';
 import StaffSubpageShell from '@/components/staff/StaffSubpageShell';
@@ -134,7 +134,7 @@ export default function StaffProfileTimesheetsPage() {
             unsubscribeTimesheets();
             unsubscribeActiveRecord();
         };
-    }, [selectedWeek, userData]);
+    }, [selectedWeek, userData, showNotification]);
 
     const changeWeek = (direction: 'prev' | 'next') => {
         const newWeek = new Date(selectedWeek);
@@ -310,7 +310,7 @@ export default function StaffProfileTimesheetsPage() {
                                     <div>
                                         <span className="text-section-title">{formatDate(item.date.toDate())}</span>
                                         <p className="text-label mt-1">
-                                            {getDayName(item.date.toDate().getDay())} · Roster: {shift.startTime} – {shift.endTime}
+                                            {getDayName(item.date.toDate().getDay())} · Roster: {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}
                                         </p>
                                     </div>
                                     <div className="space-y-3">
@@ -385,7 +385,7 @@ export default function StaffProfileTimesheetsPage() {
                                     <div className="shrink-0 text-right">
                                         {timesheet ? (
                                             <span className="font-semibold text-slate-800 text-sm sm:text-base tabular-nums">
-                                                {workedDuration.toFixed(2)} hrs
+                                                {formatHoursAndMinutes(workedDuration)}
                                             </span>
                                         ) : shift && isFutureShift(shift) ? (
                                             <span className="text-xs text-slate-400 font-medium">Future shift</span>
@@ -398,7 +398,7 @@ export default function StaffProfileTimesheetsPage() {
                                 {/* Bottom row of card */}
                                 <div className="flex items-center justify-between gap-4 mt-1.5 pl-[23px]">
                                     <span className="text-xs sm:text-sm text-slate-500 font-medium">
-                                        {shift ? `Roster: ${shift.startTime} – ${shift.endTime}` : timesheet ? `Clocked: ${timesheet.workedStart} – ${timesheet.workedEnd}` : ''}
+                                        {shift ? `Roster: ${formatTimeTo12Hour(shift.startTime)} – ${formatTimeTo12Hour(shift.endTime)}` : timesheet ? `Clocked: ${formatTimeTo12Hour(timesheet.workedStart)} – ${formatTimeTo12Hour(timesheet.workedEnd)}` : ''}
                                     </span>
                                     <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                         {timesheet ? (
@@ -434,11 +434,11 @@ export default function StaffProfileTimesheetsPage() {
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Roster</span>
                                                     <span className="text-xs font-semibold text-slate-700">
-                                                        {shift ? `${shift.startTime} – ${shift.endTime}` : 'Unscheduled'}
+                                                        {shift ? `${formatTimeTo12Hour(shift.startTime)} – ${formatTimeTo12Hour(shift.endTime)}` : 'Unscheduled'}
                                                     </span>
                                                     {shift && (
                                                         <span className="text-[10px] text-slate-400 font-medium">
-                                                            {calculateHours(shift.startTime, shift.endTime).toFixed(2)}h expected
+                                                            {formatHoursAndMinutes(calculateHours(shift.startTime, shift.endTime))} expected
                                                         </span>
                                                     )}
                                                 </div>
@@ -446,7 +446,7 @@ export default function StaffProfileTimesheetsPage() {
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Clocked</span>
                                                     <span className="text-xs font-semibold text-slate-700">
-                                                        {timesheet.workedStart} – {timesheet.workedEnd}
+                                                        {formatTimeTo12Hour(timesheet.workedStart)} – {formatTimeTo12Hour(timesheet.workedEnd)}
                                                     </span>
                                                 </div>
 

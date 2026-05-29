@@ -239,6 +239,40 @@ export function calculateHours(startTime: string, endTime: string): number {
 }
 
 /**
+ * Format hours (in decimal) to actual hours and minutes.
+ * E.g. 0.0833 -> "5 mins" (or "5m" if short is true)
+ * E.g. 1.5 -> "1 hr 30 mins" (or "1h 30m" if short is true)
+ * E.g. 12 -> "12 hrs" (or "12h" if short is true)
+ */
+export function formatHoursAndMinutes(hours: number, short: boolean = false): string {
+    const isNegative = hours < 0;
+    const absHours = Math.abs(hours);
+    const totalMinutes = Math.round(absHours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+
+    const sign = isNegative ? '-' : '';
+
+    if (short) {
+        if (h === 0) {
+            return `${sign}${m}m`;
+        }
+        if (m === 0) {
+            return `${sign}${h}h`;
+        }
+        return `${sign}${h}h ${m}m`;
+    } else {
+        if (h === 0) {
+            return `${sign}${m} min${m !== 1 ? 's' : ''}`;
+        }
+        if (m === 0) {
+            return `${sign}${h} hr${h !== 1 ? 's' : ''}`;
+        }
+        return `${sign}${h} hr${h !== 1 ? 's' : ''} ${m} min${m !== 1 ? 's' : ''}`;
+    }
+}
+
+/**
  * Backwards compatible helper for legacy calculatePayrollRecord calls.
  */
 export function calculatePayrollRecord(
@@ -365,4 +399,25 @@ export function isWithinAvailability(
             !isTimeBefore(range.end, shiftEnd)
         );
     });
+}
+
+/**
+ * Convert HH:mm 24-hour time string to 12-hour format with lowercase am/pm
+ * E.g. "09:00" -> "9:00 am"
+ * E.g. "17:30" -> "5:30 pm"
+ * E.g. "12:00" -> "12:00 pm"
+ * E.g. "00:00" -> "12:00 am"
+ */
+export function formatTimeTo12Hour(timeStr: string): string {
+    if (!timeStr) return '';
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return timeStr;
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    if (isNaN(hours) || isNaN(minutes)) return timeStr;
+
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+    const minStr = String(minutes).padStart(2, '0');
+    return `${hour12}:${minStr} ${ampm}`;
 }

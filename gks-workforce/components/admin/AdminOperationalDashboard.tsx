@@ -14,7 +14,7 @@ import {
     ArrowRight,
 } from 'lucide-react';
 import { Shift, User, TimeRecord } from '@/types';
-import { parseTime } from '@/lib/utils';
+import { parseTime, formatTimeTo12Hour } from '@/lib/utils';
 
 
 
@@ -163,13 +163,13 @@ export default function AdminOperationalDashboard() {
             if (activeRecord) {
                 status = shift ? 'working' : 'unscheduled_working';
                 const dateObj = activeRecord.clockInTime.toDate();
-                clockInTime = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                clockInTime = formatTimeTo12Hour(dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }));
             } else if (completedRecord) {
                 status = 'completed';
                 const dateIn = completedRecord.clockInTime.toDate();
                 const dateOut = completedRecord.clockOutTime!.toDate();
-                clockInTime = dateIn.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-                clockOutTime = dateOut.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                clockInTime = formatTimeTo12Hour(dateIn.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }));
+                clockOutTime = formatTimeTo12Hour(dateOut.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }));
             } else if (shift) {
                 // Check if shift is late
                 const [startH, startM] = shift.startTime.split(':').map(Number);
@@ -187,7 +187,7 @@ export default function AdminOperationalDashboard() {
                 name: member.name,
                 initials,
                 status,
-                shiftTime: shift ? `${shift.startTime}–${shift.endTime}` : undefined,
+                shiftTime: shift ? `${formatTimeTo12Hour(shift.startTime)}–${formatTimeTo12Hour(shift.endTime)}` : undefined,
                 clockInTime,
                 clockOutTime,
             };

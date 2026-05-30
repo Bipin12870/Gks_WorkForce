@@ -1,5 +1,7 @@
 import { ReactNode } from 'react';
 import Card from '@/components/ui/Card';
+import Icon from '@/components/ui/Icon';
+import { LucideIcon } from 'lucide-react';
 
 interface StaffStatCardProps {
     label: string;
@@ -7,17 +9,27 @@ interface StaffStatCardProps {
     suffix?: string;
     accent?: 'blue' | 'green' | 'gray';
     prefix?: string;
+    icon?: LucideIcon;
 }
 
-export default function StaffStatCard({ label, value, suffix, accent = 'blue', prefix }: StaffStatCardProps) {
+export default function StaffStatCard({ label, value, suffix, accent = 'blue', prefix, icon }: StaffStatCardProps) {
+    const valueColor = {
+        blue: 'text-blue-600',
+        green: 'text-green-600',
+        gray: 'text-gray-900',
+    }[accent];
+
     return (
-        <Card borderAccent={accent} padding={false} className="p-4">
-            <p className="text-label mb-1.5 leading-tight">{label}</p>
-            <div className="flex items-baseline gap-0.5 flex-wrap">
-                {prefix && <span className="text-xs font-medium text-gray-400">{prefix}</span>}
-                <p className="text-lg font-semibold tabular-nums text-gray-900 leading-tight">{value}</p>
-                {suffix && <span className="text-xs font-medium text-gray-400">{suffix}</span>}
+        <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 mb-1.5 text-slate-500">
+                {icon && <Icon icon={icon} size="sm" />}
+                <p className="text-sm font-medium">{label}</p>
             </div>
-        </Card>
+            <div className="flex items-baseline gap-0.5 flex-wrap">
+                {prefix && <span className={`text-xl font-bold ${valueColor}`}>{prefix}</span>}
+                <p className={`text-2xl font-bold tabular-nums leading-tight ${valueColor}`}>{value}</p>
+                {suffix && <span className={`text-xl font-bold ${valueColor}`}>{suffix}</span>}
+            </div>
+        </div>
     );
 }

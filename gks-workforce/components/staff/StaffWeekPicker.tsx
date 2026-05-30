@@ -14,31 +14,27 @@ interface StaffWeekPickerProps {
 
 export default function StaffWeekPicker({ weekStart, onPrev, onNext, trailing }: StaffWeekPickerProps) {
     return (
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 w-full">
-            <div className="flex items-center bg-gray-50 p-1 rounded-xl border border-gray-100 flex-1 sm:flex-initial">
-                <Button
+        <div className="flex w-full justify-center">
+            <div className="flex items-center justify-between bg-slate-100/80 p-1.5 rounded-2xl w-full max-w-[280px]">
+                <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={onPrev}
-                    className="min-h-11 min-w-11 p-0 shrink-0"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
                     aria-label="Previous week"
                 >
-                    <Icon icon={ChevronLeft} size="md" />
-                </Button>
-                <div className="flex-1 px-3 py-2 text-sm font-semibold text-gray-900 text-center whitespace-nowrap min-w-[140px]">
+                    <Icon icon={ChevronLeft} size="sm" />
+                </button>
+                <div className="px-2 text-sm font-bold text-slate-800 text-center whitespace-nowrap">
                     Week of {formatDate(weekStart)}
                 </div>
-                <Button
+                <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={onNext}
-                    className="min-h-11 min-w-11 p-0 shrink-0"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
                     aria-label="Next week"
                 >
-                    <Icon icon={ChevronRight} size="md" />
-                </Button>
+                    <Icon icon={ChevronRight} size="sm" />
+                </button>
             </div>
             {trailing}
         </div>

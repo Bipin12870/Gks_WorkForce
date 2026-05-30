@@ -443,7 +443,7 @@ export default function StaffAvailabilitySection() {
 
             {!allDaysLocked && (
                 <div className="shrink-0 flex items-center justify-center gap-20 mb-10 px-1">
-                    {/* Copy past week — demoted to text-link */}
+                    {/* Copy last week — demoted to text-link */}
                     <div className="flex flex-col gap-0.5">
                         <button
                             type="button"
@@ -452,7 +452,7 @@ export default function StaffAvailabilitySection() {
                             className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-40 transition-colors"
                         >
                             <Icon icon={Copy} size="sm" className="text-gray-400" />
-                            Copy past week
+                            Copy last week
                         </button>
                         {hasLockedDays && (
                             <span className="text-[11px] text-gray-400 leading-none pl-[22px]">
@@ -485,9 +485,8 @@ export default function StaffAvailabilitySection() {
             )}
 
             <div className="flex items-center gap-3 mt-2 mb-6 shrink-0 px-1">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                    Weekly Availability
-                </span>
+                <span className="text-sm font-medium text-slate-700 whitespace-nowrap">Weekly availability</span>
+
                 <div className="h-px bg-gray-200 flex-1" />
                 <span className={`text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${hasLockedDays ? 'text-red-500' : 'text-blue-500'}`}>
                     {hasLockedDays ? 'Roster Published' : 'Open'}

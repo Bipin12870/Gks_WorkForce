@@ -152,20 +152,21 @@ export default function RosterWeeklyGrid({
                                     onClick={() => onCellClick(member.id, dayOfWeek, shift)}
                                 >
                                     {shift ? (
-                                        // Shift Block
-                                        <div className={`w-full h-full rounded-xl border flex flex-col justify-center items-center px-2 py-1 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                                        <div className={`w-full h-full rounded-xl border flex flex-col justify-center items-center px-1 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                                             isPast
                                                 ? 'bg-slate-100 border-slate-200 text-slate-500' 
                                                 : shift.availabilityOverride 
                                                     ? 'bg-amber-50 border-amber-300 text-amber-900' 
                                                     : 'bg-blue-600 border-blue-700 text-white'
-                                        }`}>
-                                            <span className="text-[11px] font-semibold tracking-tight whitespace-nowrap">
+                                        }`}
+                                        title={`${getDurationHrs(shift.startTime, shift.endTime)} hrs total`}
+                                        >
+                                            <span className="text-[11px] font-semibold tracking-tight whitespace-nowrap group-hover:hidden">
                                                 {formatTimeTo12Hour(shift.startTime)}–{formatTimeTo12Hour(shift.endTime)}
                                             </span>
-                                            <div className="flex items-center gap-1 mt-1 opacity-90">
-                                                <Clock size={11} />
-                                                <span className="text-[10px] font-medium">{getDurationHrs(shift.startTime, shift.endTime)} hrs</span>
+                                            <div className="hidden group-hover:flex items-center gap-1.5 opacity-95">
+                                                <Clock size={12} />
+                                                <span className="text-[11px] font-bold">{getDurationHrs(shift.startTime, shift.endTime)} hrs</span>
                                             </div>
                                         </div>
                                     ) : isUnavailable ? (

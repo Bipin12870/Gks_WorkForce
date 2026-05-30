@@ -12,7 +12,7 @@ import StaffStatCard from '@/components/staff/StaffStatCard';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
 import Card from '@/components/ui/Card';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Clock, CircleDollarSign } from 'lucide-react';
 
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
@@ -106,25 +106,27 @@ export default function StaffRosterPage() {
                 </div>
             ) : (
                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                    <div className="grid grid-cols-2 gap-3 mb-10 shrink-0">
+                    <div className="grid grid-cols-2 gap-3 mb-5 shrink-0">
                         <StaffStatCard
-                            label="Scheduled hours"
-                            value={formatHoursAndMinutes(totalHours, true)}
+                            label="Scheduled"
+                            value={`${totalHours}h`}
+                            icon={Clock}
                             accent={isPastWeek() ? 'gray' : 'blue'}
                         />
                         <StaffStatCard
                             label="Projected pay"
                             value={projectedPay.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0,
                             })}
                             prefix="$"
+                            icon={CircleDollarSign}
                             accent={isPastWeek() ? 'gray' : 'green'}
                         />
                     </div>
 
                     <div className="flex items-center gap-3 mb-6 shrink-0">
-                        <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">WEEKLY SCHEDULE</span>
+                        <span className="text-sm font-medium text-slate-700 whitespace-nowrap">Weekly schedule</span>
                         <div className="h-px bg-slate-200 flex-1" />
                     </div>
 
@@ -164,7 +166,7 @@ export default function StaffRosterPage() {
                                     const isPast = checkDate.getTime() < today.getTime();
 
                                     let lineColor = "bg-slate-200";
-                                    let dotColor = "bg-slate-300";
+                                    let dotColor = "bg-slate-200";
 
                                     if (!isEmpty) {
                                         if (isPast) {
@@ -184,23 +186,11 @@ export default function StaffRosterPage() {
                                     return (
                                         <div
                                             key={dayOfWeek}
-                                            className="relative pl-10 pb-8 last:pb-0"
+                                            className="relative pl-4 pb-8 last:pb-0"
                                         >
-                                            {/* Vertical Timeline Track Line */}
-                                            <div
-                                                className={`absolute left-[15px] w-[2px] ${lineColor}`}
-                                                style={{
-                                                    top: isFirst ? '10px' : '0px',
-                                                    bottom: isLast ? undefined : '0px',
-                                                    height: isLast ? (isFirst ? '0px' : '10px') : undefined
-                                                }}
-                                            />
-
-                                            {/* Solid Circular Dot Node */}
-                                            <div className={`absolute left-[12px] top-[6px] w-2 h-2 rounded-full ${dotColor} z-10`} />
 
                                             {/* Row 1: Date & Duration */}
-                                            <div className="flex items-center justify-between text-sm font-semibold text-slate-800 h-5">
+                                            <div className="flex items-center justify-between text-sm font-semibold text-slate-800 h-5 pr-8">
                                                 <div className="flex items-center gap-2">
                                                     <span className={isEmpty ? "text-slate-400 font-medium" : "text-slate-800"}>
                                                         {formattedDate}
@@ -212,7 +202,7 @@ export default function StaffRosterPage() {
                                                     )}
                                                 </div>
                                                 {isEmpty ? (
-                                                    <span className="text-xs text-slate-400 font-medium">No shifts</span>
+                                                    <span className="text-lg text-slate-200 font-bold">Off</span>
                                                 ) : (
                                                     <span className="tabular-nums text-slate-800 font-semibold">
                                                         {formatHoursAndMinutes(totalDailyHours)}
@@ -220,19 +210,25 @@ export default function StaffRosterPage() {
                                                 )}
                                             </div>
 
-                                            {/* Row 2: Shift Intervals */}
+                                            {/* Row 2: Shift Intervals & Duration Bar */}
                                             {!isEmpty && (
-                                                <div className="mt-1.5 space-y-1">
-                                                    {dayShifts.map((shift) => (
-                                                        <div
-                                                            key={shift.id}
-                                                            className="flex items-center justify-between text-xs font-medium text-slate-500 h-4"
-                                                        >
-                                                            <span>
+                                                <div className="mt-1">
+                                                    <div className="space-y-1">
+                                                        {dayShifts.map((shift) => (
+                                                            <div
+                                                                key={shift.id}
+                                                                className="text-xs font-medium text-slate-500"
+                                                            >
                                                                 {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}
-                                                            </span>
-                                                        </div>
-                                                    ))}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="w-full max-w-[220px] h-1.5 rounded-full bg-slate-200 overflow-hidden mt-1.5">
+                                                        <div 
+                                                            className="h-full rounded-full transition-all duration-500 bg-blue-500"
+                                                            style={{ width: `${Math.min((totalDailyHours / 12) * 100, 100)}%` }}
+                                                        />
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

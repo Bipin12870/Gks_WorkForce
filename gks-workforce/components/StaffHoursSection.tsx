@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Timesheet } from '@/types';
 import { getWeekStart, calculatePayrollRecord, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';

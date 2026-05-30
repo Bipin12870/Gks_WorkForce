@@ -2,8 +2,6 @@
 
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 
 /**
  * BadgeManager handles the PWA "App Badging API" to show a numeric count
@@ -32,57 +30,68 @@ export default function BadgeManager() {
             return;
         }
 
+        let active = true;
         let unsubscribe = () => {};
 
-        try {
-            if (userData.role === 'ADMIN') {
-                // ADMIN: Count pending timesheets needing approval
-                const q = query(
-                    collection(db, 'timesheets'),
-                    where('status', '==', 'PENDING')
-                );
+        // 3. Load Firestore dynamically to keep layout.tsx bundle light
+        import('firebase/firestore').then(async ({ collection, query, where, onSnapshot, Timestamp }) => {
+            if (!active) return;
+            const { db } = await import('@/lib/firebase-db');
+            if (!active) return;
 
-                unsubscribe = onSnapshot(q, (snapshot) => {
-                    const count = snapshot.size;
-                    if (count > 0) {
-                        nav.setAppBadge(count).catch(() => {});
-                    } else {
-                        nav.clearAppBadge().catch(() => {});
-                    }
-                }, (err) => {
-                    console.error('BadgeManager Admin Error:', err);
-                });
-            } else {
-                // STAFF: Count shifts assigned for today
-                const startOfToday = new Date();
-                startOfToday.setHours(0, 0, 0, 0);
-                
-                const endOfToday = new Date();
-                endOfToday.setHours(23, 59, 59, 999);
+            try {
+                if (userData.role === 'ADMIN') {
+                    // ADMIN: Count pending timesheets needing approval
+                    const q = query(
+                        collection(db, 'timesheets'),
+                        where('status', '==', 'PENDING')
+                    );
 
-                const q = query(
-                    collection(db, 'shifts'),
-                    where('staffId', '==', user.uid),
-                    where('date', '>=', Timestamp.fromDate(startOfToday)),
-                    where('date', '<=', Timestamp.fromDate(endOfToday))
-                );
+                    unsubscribe = onSnapshot(q, (snapshot) => {
+                        const count = snapshot.size;
+                        if (count > 0) {
+                            nav.setAppBadge(count).catch(() => {});
+                        } else {
+                            nav.clearAppBadge().catch(() => {});
+                        }
+                    }, (err) => {
+                        console.error('BadgeManager Admin Error:', err);
+                    });
+                } else {
+                    // STAFF: Count shifts assigned for today
+                    const startOfToday = new Date();
+                    startOfToday.setHours(0, 0, 0, 0);
+                    
+                    const endOfToday = new Date();
+                    endOfToday.setHours(23, 59, 59, 999);
 
-                unsubscribe = onSnapshot(q, (snapshot) => {
-                    const count = snapshot.size;
-                    if (count > 0) {
-                        nav.setAppBadge(count).catch(() => {});
-                    } else {
-                        nav.clearAppBadge().catch(() => {});
-                    }
-                }, (err) => {
-                    console.error('BadgeManager Staff Error:', err);
-                });
+                    const q = query(
+                        collection(db, 'shifts'),
+                        where('staffId', '==', user.uid),
+                        where('date', '>=', Timestamp.fromDate(startOfToday)),
+                        where('date', '<=', Timestamp.fromDate(endOfToday))
+                    );
+
+                    unsubscribe = onSnapshot(q, (snapshot) => {
+                        const count = snapshot.size;
+                        if (count > 0) {
+                            nav.setAppBadge(count).catch(() => {});
+                        } else {
+                            nav.clearAppBadge().catch(() => {});
+                        }
+                    }, (err) => {
+                        console.error('BadgeManager Staff Error:', err);
+                    });
+                }
+            } catch (err) {
+                console.error('BadgeManager Async Init Error:', err);
             }
-        } catch (err) {
-            console.error('BadgeManager Initialization Error:', err);
-        }
+        });
 
-        return () => unsubscribe();
+        return () => {
+            active = false;
+            unsubscribe();
+        };
     }, [user, userData]);
 
     return null; // This component does not render any UI

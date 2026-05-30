@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { User, Timesheet } from '@/types';
 import { getWeekStart, calculatePayrollRecord, formatHoursAndMinutes } from '@/lib/utils';

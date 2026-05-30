@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { TimeRecord, Shift } from '@/types';
 import { formatTimeToHHmm, roundToNearest5Minutes, getDistanceMetres, isSignificantOvertime } from '@/lib/geofence';

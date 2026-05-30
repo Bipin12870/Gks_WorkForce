@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNotification } from '@/contexts/NotificationContext';
 import { User } from '@/types';

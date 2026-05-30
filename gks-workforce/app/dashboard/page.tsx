@@ -5,10 +5,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Logo from '@/components/Logo';
-import AdminDashboardWrapper from '@/components/admin/AdminDashboardWrapper';
-import AdminOperationalDashboard from '@/components/admin/AdminOperationalDashboard';
+import dynamic from 'next/dynamic';
+
+const AdminDashboardWrapper = dynamic(() => import('@/components/admin/AdminDashboardWrapper'), {
+    loading: () => <div className="p-8 text-center text-gray-500">Loading admin panel...</div>
+});
+const AdminOperationalDashboard = dynamic(() => import('@/components/admin/AdminOperationalDashboard'), {
+    loading: () => <div className="p-8 text-center text-gray-500">Loading dashboard...</div>
+});
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import Icon from '@/components/ui/Icon';
 import { MapPin, Calendar, ClipboardList, Clock, DollarSign } from 'lucide-react';

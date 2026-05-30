@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, onSnapshot, Timestamp, getDocs, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminStatCard from '@/components/admin/AdminStatCard';
 import Card from '@/components/ui/Card';

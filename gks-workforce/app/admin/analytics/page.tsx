@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { User, Timesheet, Shift } from '@/types';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';

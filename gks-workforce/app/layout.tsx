@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import BadgeManager from "@/components/BadgeManager";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const sourceSerif4 = Source_Serif_4({
   subsets: ["latin"],
@@ -45,6 +46,7 @@ export default function RootLayout({
       <body
         className={`${sourceSerif4.className} antialiased`}
       >
+        <ServiceWorkerRegister />
         <AuthProvider>
           <NotificationProvider>
             <BadgeManager />

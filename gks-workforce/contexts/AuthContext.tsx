@@ -2,8 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged, signInWithEmailAndPassword, signOut, getIdToken } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { User, TimeRecord, Shift, ShopLocation } from '@/types';
 
 interface AuthContextType {
@@ -54,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
         }, 6000);
 
-        const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+        const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
             setUser(firebaseUser);
 
             // Clean up previous listeners if any
@@ -68,64 +67,119 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             if (firebaseUser) {
-                try {
-                    // Fetch user data from Firestore
-                    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-                    if (userDoc.exists()) {
-                        setUserData({ id: userDoc.id, ...userDoc.data() } as User);
+                const uid = firebaseUser.uid;
+                const cachedUserKey = `gks_user_data_${uid}`;
+
+                // 1. Try to load from localStorage first for instant load
+                let hasCache = false;
+                if (typeof window !== 'undefined') {
+                    const cachedUser = localStorage.getItem(cachedUserKey);
+                    const cachedShop = localStorage.getItem('gks_shop_location');
+
+                    if (cachedUser) {
+                        try {
+                            setUserData(JSON.parse(cachedUser));
+                            hasCache = true;
+                        } catch (e) {
+                            console.error('Failed to parse cached user data', e);
+                        }
                     }
-                } catch (err) {
-                    console.error('Error fetching user document:', err);
+                    if (cachedShop) {
+                        try {
+                            setShopLocation(JSON.parse(cachedShop));
+                        } catch (e) {
+                            console.error('Failed to parse cached shop location', e);
+                        }
+                    }
                 }
 
-                // Fetch shop location once in the background
-                const shopRef = doc(db, 'config', 'shopLocation');
-                getDoc(shopRef).then((snap) => {
-                    if (snap.exists()) {
-                        setShopLocation(snap.data() as ShopLocation);
-                    }
-                }).catch((err) => {
-                    console.error('Error fetching shop location:', err);
-                });
+                // If cache exists, set loading to false immediately to reveal the app shell
+                if (hasCache && !loadingTimedOut) {
+                    clearTimeout(safetyTimer);
+                    setLoading(false);
+                }
 
-                // Listen to active clock-in record in real-time
-                const activeQ = query(
-                    collection(db, 'timeRecords'),
-                    where('staffId', '==', firebaseUser.uid),
-                    where('clockOutTime', '==', null)
-                );
-                unsubscribeActive = onSnapshot(activeQ, (snapshot) => {
-                    if (!snapshot.empty) {
-                        const docSnap = snapshot.docs[0];
-                        setActiveRecord({ id: docSnap.id, ...docSnap.data() } as TimeRecord);
-                    } else {
-                        setActiveRecord(null);
-                    }
-                }, (error) => {
-                    console.error('Error listening to active record:', error);
-                });
+                // 2. Fetch fresh data from Firestore in the background
+                (async () => {
+                    try {
+                        const { doc, getDoc, collection, query, where, onSnapshot, Timestamp } = await import('firebase/firestore');
+                        const { db } = await import('@/lib/firebase-db');
 
-                // Listen to today's approved shift in real-time
-                const startOfToday = new Date();
-                startOfToday.setHours(0, 0, 0, 0);
-                const dateTimestamp = Timestamp.fromDate(startOfToday);
+                        // Fetch user data from Firestore
+                        const userDoc = await getDoc(doc(db, 'users', uid));
+                        if (userDoc.exists()) {
+                            const freshUser = { id: userDoc.id, ...userDoc.data() } as User;
+                            setUserData(freshUser);
+                            if (typeof window !== 'undefined') {
+                                localStorage.setItem(cachedUserKey, JSON.stringify(freshUser));
+                            }
+                        }
 
-                const shiftsQ = query(
-                    collection(db, 'shifts'),
-                    where('staffId', '==', firebaseUser.uid),
-                    where('date', '==', dateTimestamp),
-                    where('status', '==', 'APPROVED')
-                );
-                unsubscribeShifts = onSnapshot(shiftsQ, (snapshot) => {
-                    if (!snapshot.empty) {
-                        const docSnap = snapshot.docs[0];
-                        setTodayShift({ id: docSnap.id, ...docSnap.data() } as Shift);
-                    } else {
-                        setTodayShift(null);
+                        // Fetch shop location
+                        const shopRef = doc(db, 'config', 'shopLocation');
+                        const shopSnap = await getDoc(shopRef);
+                        if (shopSnap.exists()) {
+                            const freshShop = shopSnap.data() as ShopLocation;
+                            setShopLocation(freshShop);
+                            if (typeof window !== 'undefined') {
+                                localStorage.setItem('gks_shop_location', JSON.stringify(freshShop));
+                            }
+                        }
+
+                        // If we didn't have cache, set loading to false now that basic user data is here
+                        if (!hasCache && !loadingTimedOut) {
+                            clearTimeout(safetyTimer);
+                            setLoading(false);
+                        }
+
+                        // Listen to active clock-in record in real-time
+                        const activeQ = query(
+                            collection(db, 'timeRecords'),
+                            where('staffId', '==', uid),
+                            where('clockOutTime', '==', null)
+                        );
+                        unsubscribeActive = onSnapshot(activeQ, (snapshot) => {
+                            if (!snapshot.empty) {
+                                const docSnap = snapshot.docs[0];
+                                setActiveRecord({ id: docSnap.id, ...docSnap.data() } as TimeRecord);
+                            } else {
+                                setActiveRecord(null);
+                            }
+                        }, (error) => {
+                            console.error('Error listening to active record:', error);
+                        });
+
+                        // Listen to today's approved shift in real-time
+                        const startOfToday = new Date();
+                        startOfToday.setHours(0, 0, 0, 0);
+                        const dateTimestamp = Timestamp.fromDate(startOfToday);
+
+                        const shiftsQ = query(
+                            collection(db, 'shifts'),
+                            where('staffId', '==', uid),
+                            where('date', '==', dateTimestamp),
+                            where('status', '==', 'APPROVED')
+                        );
+                        unsubscribeShifts = onSnapshot(shiftsQ, (snapshot) => {
+                            if (!snapshot.empty) {
+                                const docSnap = snapshot.docs[0];
+                                setTodayShift({ id: docSnap.id, ...docSnap.data() } as Shift);
+                            } else {
+                                setTodayShift(null);
+                            }
+                        }, (error) => {
+                            console.error('Error listening to today shift:', error);
+                        });
+
+                    } catch (err) {
+                        console.error('Background Firestore operations failed:', err);
+                        // Make sure we resolve loading state even on failure if not resolved yet
+                        if (!hasCache && !loadingTimedOut) {
+                            clearTimeout(safetyTimer);
+                            setLoading(false);
+                        }
                     }
-                }, (error) => {
-                    console.error('Error listening to today shift:', error);
-                });
+                })();
 
                 // Set session cookie for server-side auth (non-blocking background task)
                 getIdToken(firebaseUser).then((idToken) => {
@@ -143,15 +197,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUserData(null);
                 setActiveRecord(null);
                 setTodayShift(null);
+                setShopLocation(null);
+
                 // Clear session cookie on logout (non-blocking background task)
                 fetch('/api/auth/session', { method: 'DELETE' }).catch((error) => {
                     console.error('Failed to clear session cookie:', error);
                 });
-            }
 
-            if (!loadingTimedOut) {
-                clearTimeout(safetyTimer);
-                setLoading(false);
+                // Clear cached user info
+                if (typeof window !== 'undefined') {
+                    for (let i = localStorage.length - 1; i >= 0; i--) {
+                        const key = localStorage.key(i);
+                        if (key && (key.startsWith('gks_user_data_') || key === 'gks_shop_location')) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                }
+
+                if (!loadingTimedOut) {
+                    clearTimeout(safetyTimer);
+                    setLoading(false);
+                }
             }
         });
 

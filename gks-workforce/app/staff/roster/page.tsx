@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Shift } from '@/types';
 import { getWeekStart, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';

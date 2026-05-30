@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Clock, CalendarDays, Coins, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import { collection, onSnapshot, query, Timestamp, where } from 'firebase/firestore';
 import Icon from '@/components/ui/Icon';
 

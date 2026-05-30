@@ -5,7 +5,7 @@
  * All functions are safe to call from client components.
  */
 
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/firebase-db';
 import { doc, getDoc } from 'firebase/firestore';
 import { ShopLocation } from '@/types';
 

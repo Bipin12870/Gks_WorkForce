@@ -39,6 +39,7 @@
 }
 
 html, body {
+  font-size: 112.5%; /* Scales base rem from 16px to 18px (+2px) */
   max-width: 100vw;
   overflow-x: hidden;
   overscroll-behavior-x: none;

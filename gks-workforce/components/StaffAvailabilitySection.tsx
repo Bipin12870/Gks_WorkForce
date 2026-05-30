@@ -490,7 +490,7 @@ export default function StaffAvailabilitySection() {
                 </span>
                 <div className="h-px bg-gray-200 flex-1" />
                 <span className={`text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${hasLockedDays ? 'text-red-500' : 'text-blue-500'}`}>
-                    {hasLockedDays ? 'Roster Published' : 'Set between store hours'}
+                    {hasLockedDays ? 'Roster Published' : 'Open'}
                 </span>
             </div>
 

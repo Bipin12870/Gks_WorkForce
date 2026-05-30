@@ -39,11 +39,19 @@
 }
 
 html, body {
-  font-size: 112.5%; /* Scales base rem from 16px to 18px (+2px) */
+  /* 16px base (standard) for mobile devices so it doesn't feel cramped */
+  font-size: 100%; 
   max-width: 100vw;
   overflow-x: hidden;
   overscroll-behavior-x: none;
   overscroll-behavior-y: none;
+}
+
+/* Tablet (768px) and up: scale the entire UI to 18px base */
+@media (min-width: 768px) {
+  html, body {
+    font-size: 112.5%; 
+  }
 }
 
 /* Staff PWA viewport locks for native mobile app feel */

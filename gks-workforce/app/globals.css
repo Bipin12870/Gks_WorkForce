@@ -249,3 +249,33 @@ body, input, select, textarea, button {
 .animate-session-pulse {
   animation: sessionPulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+@keyframes toastSlideInUp {
+  from {
+    transform: translateY(1rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastSlideInDown {
+  from {
+    transform: translateY(-1rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-toast-up {
+  animation: toastSlideInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-down {
+  animation: toastSlideInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

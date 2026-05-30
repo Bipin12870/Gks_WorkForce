@@ -1,52 +1,36 @@
 'use client';
 
 import Badge from '@/components/ui/Badge';
-import Icon from '@/components/ui/Icon';
 import { TimesheetStatus, TimesheetSource } from '@/types';
-import {
-    PenLine,
-    MapPin,
-    Clock,
-    AlertTriangle,
-    Timer,
-    HelpCircle,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 
-const SOURCE_CONFIG: Record<
-    TimesheetSource,
-    { label: string; variant: 'neutral' | 'success' | 'warning' | 'danger' | 'info'; icon: LucideIcon }
-> = {
-    MANUAL: { label: 'Manual', variant: 'neutral', icon: PenLine },
-    GPS_VERIFIED: { label: 'GPS verified', variant: 'success', icon: MapPin },
-    GPS_OVERTIME: { label: 'Overtime', variant: 'warning', icon: Clock },
-    GPS_OUTSIDE: { label: 'Off-site', variant: 'danger', icon: AlertTriangle },
-    AUTO_CLOSED: { label: 'Auto-closed', variant: 'warning', icon: Timer },
-    GPS_UNMATCHED: { label: 'Unmatched', variant: 'warning', icon: HelpCircle },
-    AFTER_HOURS: { label: 'After hours', variant: 'danger', icon: Clock },
+// ── Source display config ──
+// GPS_VERIFIED renders nothing (it's the default/normal state).
+// GPS_OUTSIDE is dead code since geofence is enforced on clock-out,
+// but kept in config for historical data display.
+const SOURCE_DISPLAY: Record<string, { label: string; className: string }> = {
+    MANUAL:       { label: 'Manual',      className: 'text-gray-500' },
+    GPS_OVERTIME: { label: 'Overtime',    className: 'text-amber-600' },
+    AUTO_CLOSED:  { label: 'Auto-closed', className: 'text-amber-600' },
+    GPS_UNMATCHED:{ label: 'Unmatched',   className: 'text-amber-600' },
+    AFTER_HOURS:  { label: 'After hours', className: 'text-rose-600' },
+    GPS_OUTSIDE:  { label: 'Off-site',    className: 'text-rose-600' },
 };
 
-export function TimesheetSourceBadge({ source, distanceMetres }: { source?: TimesheetSource; distanceMetres?: number | null }) {
-    if (!source) return null;
-    const cfg = SOURCE_CONFIG[source];
-    if (!cfg) return null;
-    const label =
-        source === 'GPS_OUTSIDE' && distanceMetres != null ? `${cfg.label} (${distanceMetres}m)` : cfg.label;
+/**
+ * Renders the timesheet source as clean inline text.
+ * GPS_VERIFIED = blank (it's the norm, no label needed).
+ * Anomalous sources get a subtle colored label.
+ */
+export function TimesheetSourceBadge({ source }: { source?: TimesheetSource }) {
+    if (!source || source === 'GPS_VERIFIED') return null;
 
-    if (source === 'GPS_VERIFIED') {
-        return (
-            <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 font-medium select-none">
-                <MapPin size={12} className="text-slate-400 shrink-0" />
-                GPS verified
-            </span>
-        );
-    }
+    const cfg = SOURCE_DISPLAY[source];
+    if (!cfg) return null;
 
     return (
-        <Badge variant={cfg.variant} className="text-[10px] font-medium tracking-tight rounded-full px-2.5 py-0.5 shadow-3xs border border-current/10">
-            <Icon icon={cfg.icon} size="sm" className="opacity-80" />
-            {label}
-        </Badge>
+        <span className={`text-xs font-medium ${cfg.className}`}>
+            {cfg.label}
+        </span>
     );
 }
 
@@ -82,49 +66,49 @@ export function AutomationStatusBadge({
     }
 }
 
+/**
+ * Renders flag chips as clean, compact labels.
+ * Filters out EARLY_CLOCK_IN (low-value noise) and GPS_OUTSIDE (dead).
+ */
 export function TimesheetFlagChips({ flags }: { flags: string[] }) {
-    if (!flags.length) return null;
+    // Filter out noise flags
+    const meaningful = flags.filter(f => f !== 'EARLY_CLOCK_IN' && f !== 'GPS_OUTSIDE');
+    if (!meaningful.length) return null;
 
-    const getFlagCls = (flag: string) => {
+    const getFlagStyle = (flag: string) => {
         switch (flag) {
-            case 'GPS_OUTSIDE':
             case 'AFTER_HOURS':
-                return 'text-rose-700 bg-rose-50 border-rose-200/60';
+                return 'text-rose-600';
             case 'OVERTIME':
-            case 'EARLY_CLOCK_IN':
             case 'LATE_CLOCK_IN':
-                return 'text-amber-800 bg-amber-50 border-amber-200/60';
+                return 'text-amber-600';
             case 'MANUAL_EDIT_DETECTED':
             default:
-                return 'text-slate-600 bg-slate-50 border-slate-200/65';
+                return 'text-gray-500';
         }
     };
 
     const getFlagLabel = (flag: string) => {
         switch (flag) {
-            case 'GPS_OUTSIDE':
-                return 'Off-site';
             case 'AFTER_HOURS':
                 return 'After hours';
             case 'MANUAL_EDIT_DETECTED':
-                return 'Manual Edit';
-            case 'EARLY_CLOCK_IN':
-                return 'Early clock-in';
+                return 'Manual edit';
             case 'LATE_CLOCK_IN':
                 return 'Late clock-in';
             case 'OVERTIME':
                 return 'Overtime';
             default:
-                return flag.replace(/_/g, ' ');
+                return flag.replace(/_/g, ' ').toLowerCase();
         }
     };
 
     return (
-        <div className="flex flex-wrap gap-1">
-            {flags.map((flag) => (
-                <span 
-                    key={flag} 
-                    className={`text-[9px] font-semibold uppercase tracking-wider border px-2 py-0.5 rounded-full ${getFlagCls(flag)}`}
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {meaningful.map((flag) => (
+                <span
+                    key={flag}
+                    className={`text-xs font-medium ${getFlagStyle(flag)}`}
                 >
                     {getFlagLabel(flag)}
                 </span>

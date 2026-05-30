@@ -7,8 +7,9 @@ import {
     TimesheetFlagChips,
     TimesheetSourceBadge,
 } from '@/components/admin/adminTimesheetBadges';
-import { Check, X, Edit2, ChevronDown, ChevronUp, Calendar, Clock, AlertTriangle, MessageSquare } from 'lucide-react';
+import { Check, X, Edit2, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 
+// ── Deterministic avatar colors keyed by name hash ──
 const AVATAR_COLORS = [
     { bg: 'bg-blue-50/80', text: 'text-blue-700', border: 'border-blue-200/50' },
     { bg: 'bg-emerald-50/80', text: 'text-emerald-700', border: 'border-emerald-200/50' },
@@ -24,8 +25,7 @@ function getAvatarStyle(name: string) {
     for (let i = 0; i < name.length; i++) {
         hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const idx = Math.abs(hash) % AVATAR_COLORS.length;
-    return AVATAR_COLORS[idx];
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 interface TimesheetTableRowProps {
@@ -63,69 +63,64 @@ export default function TimesheetTableRow({
     const payableHours = automation.payroll.roundedPayableMinutes / 60;
     const diff = workedHours - approvedHours;
 
-    const getInitials = (name: string) => {
-        return name
-            .split(' ')
-            .map((n) => n[0])
-            .join('')
-            .toUpperCase()
-            .substring(0, 2);
-    };
+    const getInitials = (name: string) =>
+        name.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2);
 
-    // Style variance badge
-    const getVarianceBadge = (val: number) => {
-        if (val === 0) return <span className="text-gray-300 font-normal text-xs">—</span>;
-        const sign = val > 0 ? '+' : '';
-        const text = `${sign}${formatHoursAndMinutes(Math.abs(val), true)}`;
-
-        // Significant variance (> 30 mins): use full pill badge
-        if (Math.abs(val) > 0.5) {
-            const cls =
-                val > 0.5
-                    ? 'text-amber-600 border-amber-200 bg-amber-50/40'
-                    : 'text-rose-500 border-rose-200 bg-rose-50/40';
-            return <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${cls}`}>{text}</span>;
+    // ── Variance display ──
+    // ≤5 min: em dash (trivial rounding, not meaningful)
+    // 6–30 min: clean colored text
+    // >30 min: colored text with dot indicator
+    // ── Variance display ──
+    // ≤5 min: null (trivial, no sub-label)
+    // >5 min: clean text-xs colored text
+    const renderVariance = (val: number) => {
+        if (Math.abs(val) <= 5 / 60) {
+            return null;
         }
 
-        // Minor variance (<= 30 mins): simple clean text
-        const colorCls = val > 0 ? 'text-emerald-600' : 'text-rose-500';
-        return <span className={`text-[11px] font-medium ${colorCls}`}>{text}</span>;
+        const sign = val > 0 ? '+' : '';
+        const text = `${sign}${formatHoursAndMinutes(Math.abs(val), true)}`;
+        const colorCls = val > 0 ? 'text-amber-600' : 'text-rose-500';
+
+        return <span className={`text-xs font-medium tabular-nums ${colorCls}`}>{text}</span>;
     };
 
+    // ── Status indicator via left border ──
     const statusBorderColor =
-        ts.status === 'APPROVED' ? 'border-l-emerald-500' :
-        ts.status === 'REJECTED' ? 'border-l-rose-500' :
-        'border-l-amber-400';
+        ts.status === 'APPROVED' ? 'border-l-emerald-400' :
+        ts.status === 'REJECTED' ? 'border-l-rose-400' :
+        'border-l-amber-300';
 
-    const connectorColor =
-        ts.status === 'APPROVED' ? 'border-emerald-200' :
-        ts.status === 'REJECTED' ? 'border-rose-200' :
-        'border-amber-200';
+    // ── Meaningful flags for the expanded panel ──
+    const meaningfulFlags = automation.classification.flags.filter(
+        f => f !== 'EARLY_CLOCK_IN' && f !== 'GPS_OUTSIDE'
+    );
+    const hasExpandableContent = meaningfulFlags.length > 0 || ts.adminNote;
 
     return (
         <>
             <tr
-                className={`border-b border-gray-50 transition-all hover:bg-gray-50/60 cursor-pointer ${
-                    isSelected ? 'bg-blue-50/30 hover:bg-blue-50/40' : ''
-                }`}
-                onClick={() => setIsExpanded(!isExpanded)}
+                className={`border-b border-gray-50 transition-colors hover:bg-gray-50/50 ${
+                    isSelected ? 'bg-blue-50/20' : ''
+                } ${hasExpandableContent ? 'cursor-pointer' : ''}`}
+                onClick={() => hasExpandableContent && setIsExpanded(!isExpanded)}
             >
-                {/* Bulk Select Checkbox */}
-                <td className={`border-l-4 ${statusBorderColor} px-4 py-3`} onClick={(e) => e.stopPropagation()}>
+                {/* Checkbox */}
+                <td className={`border-l-[3px] ${statusBorderColor} px-4 py-3.5`} onClick={(e) => e.stopPropagation()}>
                     {ts.status === 'PENDING' && !ts.requiresAdminNote && ts.workedStart ? (
                         <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={onSelectToggle}
-                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
                         />
                     ) : (
                         <div className="w-4 h-4" />
                     )}
                 </td>
 
-                {/* Staff Info */}
-                <td className="px-5 py-4">
+                {/* Employee */}
+                <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                         {(() => {
                             const style = getAvatarStyle(staffName);
@@ -141,200 +136,133 @@ export default function TimesheetTableRow({
                     </div>
                 </td>
 
-                {/* Date & Day */}
-                <td className="px-5 py-4 text-gray-600 text-sm font-medium tabular-nums">
+                {/* Date */}
+                <td className="px-5 py-3.5 text-sm text-gray-600 tabular-nums">
                     {formatDate(ts.date.toDate())}
                 </td>
 
-                {/* Rostered Schedule */}
-                <td className="px-5 py-4">
+                {/* Rostered Shift — clean, no sub-text */}
+                <td className="px-5 py-3.5 text-sm text-gray-500 tabular-nums">
+                    {ts.approvedShiftStart
+                        ? `${formatTimeTo12Hour(ts.approvedShiftStart)}–${formatTimeTo12Hour(ts.approvedShiftEnd)}`
+                        : <span className="text-gray-300 italic">Unscheduled</span>
+                    }
+                </td>
+
+                {/* Clocked Time — clean, no sub-text */}
+                <td className="px-5 py-3.5 text-sm tabular-nums">
                     <div className="flex flex-col">
-                        <span className="text-gray-500 text-sm font-medium tabular-nums">
-                            {ts.approvedShiftStart ? `${formatTimeTo12Hour(ts.approvedShiftStart)}–${formatTimeTo12Hour(ts.approvedShiftEnd)}` : 'Unscheduled'}
-                        </span>
-                        {ts.approvedShiftStart && (
-                            <span className="text-[10px] text-gray-400 font-medium mt-0.5">{formatHoursAndMinutes(approvedHours, true)} rostered</span>
+                        {ts.workedStart ? (
+                            <span className="text-gray-900 font-medium">
+                                {formatTimeTo12Hour(ts.workedStart)}–{formatTimeTo12Hour(ts.workedEnd)}
+                            </span>
+                        ) : (
+                            <span className="text-amber-600">No clock-in</span>
                         )}
+                        <TimesheetSourceBadge source={ts.source} />
                     </div>
                 </td>
 
-                {/* Worked Actuals */}
-                <td className="px-5 py-4">
+                {/* Payable */}
+                <td className="px-5 py-3.5 text-sm tabular-nums">
                     <div className="flex flex-col">
-                        <span className={`text-sm font-medium tabular-nums ${!ts.workedStart ? 'text-amber-600' : 'text-gray-900'}`}>
-                            {ts.workedStart ? `${formatTimeTo12Hour(ts.workedStart)}–${formatTimeTo12Hour(ts.workedEnd)}` : 'No clock-in'}
+                        <span className="text-gray-900 font-semibold">
+                            {formatHoursAndMinutes(payableHours, true)}
                         </span>
-                        {ts.workedStart && (
-                            <span className="text-[10px] text-gray-400 font-medium mt-0.5">{formatHoursAndMinutes(workedHours, true)} clocked</span>
-                        )}
+                        {renderVariance(diff)}
                     </div>
                 </td>
 
-                {/* Variance */}
-                <td className="px-5 py-4">{getVarianceBadge(diff)}</td>
-
-                {/* Source & Integrity */}
-                <td className="px-5 py-4">
-                    <TimesheetSourceBadge source={ts.source} distanceMetres={ts.clockOutDistanceMetres} />
-                </td>
-
-                {/* Row Actions */}
-                <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-2 justify-end">
+                {/* Actions */}
+                <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1.5 justify-end">
                         {ts.status === 'PENDING' && (
                             <>
                                 {!ts.requiresAdminNote && ts.workedStart && (
                                     <button
                                         onClick={onQuickApprove}
-                                        title="Approve immediately"
-                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 rounded-full transition-all cursor-pointer shadow-3xs"
+                                        title="Approve"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
                                     >
-                                        <Check size={11} className="stroke-[2.5]" /> Approve
+                                        <Check size={13} className="stroke-[2.5]" /> Approve
                                     </button>
                                 )}
                                 <button
                                     onClick={onReview}
-                                    title={ts.requiresAdminNote ? "Requires admin review" : "Review & adjust details"}
-                                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-semibold border rounded-full transition-all cursor-pointer shadow-3xs ${
+                                    title={ts.requiresAdminNote ? 'Requires admin review' : 'Review & adjust'}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
                                         ts.requiresAdminNote || !ts.workedStart
-                                            ? "text-amber-700 bg-amber-50 border-amber-200/60 hover:bg-amber-100"
-                                            : "text-blue-700 bg-blue-50/50 border-blue-200/60 hover:bg-blue-100"
+                                            ? 'text-amber-700 hover:bg-amber-50'
+                                            : 'text-gray-600 hover:bg-gray-100'
                                     }`}
                                 >
-                                    <Edit2 size={11} className="stroke-[2.5]" /> Review
+                                    <Edit2 size={13} className="stroke-[2]" /> Review
                                 </button>
                                 <button
                                     onClick={onReject}
-                                    title="Reject shift"
-                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-semibold text-rose-600 bg-rose-50/50 hover:bg-rose-100 border border-rose-200/60 rounded-full transition-all cursor-pointer shadow-3xs"
+                                    title="Reject"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                 >
-                                    <X size={11} className="stroke-[2.5]" /> Reject
+                                    <X size={13} className="stroke-[2.5]" /> Reject
                                 </button>
                             </>
                         )}
                         {ts.status === 'APPROVED' && (
                             <button
                                 onClick={onReview}
-                                title="Submit correction / edit note"
-                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200/60 rounded-full hover:bg-slate-100 transition-colors cursor-pointer shadow-3xs"
+                                title="Submit correction"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                             >
-                                <Edit2 size={11} className="stroke-[2.5]" /> Correct
+                                <Edit2 size={13} className="stroke-[2]" /> Correct
                             </button>
                         )}
                         {ts.status === 'REJECTED' && (
                             <button
                                 onClick={onReview}
                                 title="Re-review & approve"
-                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] font-semibold text-slate-700 bg-slate-50 border border-slate-200/60 rounded-full hover:bg-slate-100 transition-colors cursor-pointer shadow-3xs"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                             >
-                                <Edit2 size={11} className="stroke-[2.5]" /> Review
+                                <Edit2 size={13} className="stroke-[2]" /> Review
                             </button>
                         )}
-                        {/* Expand toggle — icon pill */}
-                        <button
-                            onClick={() => setIsExpanded(!isExpanded)}
-                            title={isExpanded ? 'Collapse' : 'Expand details'}
-                            className="inline-flex items-center justify-center w-7 h-7 text-slate-400 border border-slate-200 hover:bg-slate-100 hover:text-slate-600 rounded-full transition-all cursor-pointer"
-                        >
-                            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                        </button>
+                        {/* Expand toggle — only shown if there's expandable content */}
+                        {hasExpandableContent && (
+                            <button
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                title={isExpanded ? 'Collapse' : 'View details'}
+                                className="inline-flex items-center justify-center w-7 h-7 text-gray-400 hover:bg-gray-100 hover:text-gray-600 rounded-lg transition-colors cursor-pointer"
+                            >
+                                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </button>
+                        )}
                     </div>
                 </td>
             </tr>
 
-            {/* Expanded Detailed Audit Panel — flows from parent row */}
-            {isExpanded && (
-                <tr className="bg-blue-50/10">
-                    <td colSpan={8} className="pb-4 pt-0 border-b border-gray-100">
-                        {/* Left connector bar — visually links to parent row */}
-                        <div className={`ml-[4.5rem] mr-6 border-l-2 ${connectorColor} pl-5`}>
-                            <div className="bg-slate-50/40 border border-slate-100 rounded-xl p-4.5 mb-2 mt-2 shadow-3xs flex flex-col gap-4">
-                                {/* Data columns */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+            {/* ── Compact Expanded Panel ── */}
+            {isExpanded && hasExpandableContent && (
+                <tr>
+                    <td colSpan={7} className="px-5 pb-4 pt-1 border-b border-gray-100 bg-gray-50/30">
+                        <div className="ml-12 flex flex-col gap-2.5">
 
-                                    <div className="flex gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 mt-0.5 border border-blue-100/60">
-                                            <Calendar size={15} />
-                                        </div>
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Rostered Shift</span>
-                                            <span className="text-sm font-semibold text-gray-800 tabular-nums mt-0.5 leading-tight">
-                                                {ts.approvedShiftStart ? `${formatTimeTo12Hour(ts.approvedShiftStart)} – ${formatTimeTo12Hour(ts.approvedShiftEnd)}` : '—'}
-                                            </span>
-                                            <span className="text-xs text-gray-500 mt-1 leading-none">
-                                                {ts.approvedShiftStart ? `${formatHoursAndMinutes(approvedHours)} expected` : 'Unscheduled shift'}
-                                            </span>
-                                        </div>
-                                    </div>
+                            {/* Flags — only if present */}
+                            {meaningfulFlags.length > 0 && (
+                                <div className="flex items-center gap-4 text-xs">
+                                    <span className="text-gray-400 font-medium uppercase tracking-wider">Flags</span>
+                                    <TimesheetFlagChips flags={meaningfulFlags} />
+                                </div>
+                            )}
 
-                                    <div className="flex gap-3">
-                                        <div className={`w-8 h-8 rounded-lg ${!ts.workedStart ? 'bg-amber-50 text-amber-600 border-amber-100/60' : 'bg-slate-50 text-slate-600 border-slate-100'} flex items-center justify-center shrink-0 mt-0.5 border`}>
-                                            <Clock size={15} />
-                                        </div>
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Clocked Actuals</span>
-                                            <span className={`text-sm font-semibold tabular-nums mt-0.5 leading-tight ${!ts.workedStart ? 'text-amber-700' : 'text-gray-800'}`}>
-                                                {ts.workedStart ? `${formatTimeTo12Hour(ts.workedStart)} – ${formatTimeTo12Hour(ts.workedEnd)}` : 'No clock-in'}
-                                            </span>
-                                            <span className="text-xs text-gray-500 mt-1 leading-none">
-                                                {ts.workedStart ? `${formatHoursAndMinutes(workedHours)} tracked` : 'No activity recorded'}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3">
-                                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-100/60">
-                                            <Check size={15} className="stroke-[2.5]" />
-                                        </div>
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payable Hours</span>
-                                            <span className="text-sm font-semibold text-emerald-700 tabular-nums mt-0.5 leading-tight">
-                                                {formatHoursAndMinutes(payableHours, true)}
-                                            </span>
-                                            <span className={`text-xs mt-1 leading-none font-semibold ${
-                                                !ts.approvedShiftStart ? 'text-gray-500'
-                                                : diff > 0.5 ? 'text-amber-600'
-                                                : diff > 0 ? 'text-emerald-600'
-                                                : diff < 0 ? 'text-rose-500'
-                                                : 'text-gray-500'
-                                            }`}>
-                                                {!ts.approvedShiftStart ? 'Unscheduled'
-                                                    : diff === 0 ? 'On time'
-                                                    : `${diff > 0 ? '+' : ''}${formatHoursAndMinutes(Math.abs(diff), true)} variance`}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3">
-                                        <div className={`w-8 h-8 rounded-lg ${automation.classification.flags.length > 0 ? 'bg-rose-50 text-rose-600 border-rose-100/60' : 'bg-slate-50 text-slate-500 border-slate-100'} flex items-center justify-center shrink-0 mt-0.5 border`}>
-                                            <AlertTriangle size={15} />
-                                        </div>
-                                        <div className="flex flex-col min-w-0 flex-1">
-                                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Integrity / Flags</span>
-                                            <div className="mt-1 flex flex-wrap gap-1">
-                                                {automation.classification.flags.length > 0
-                                                    ? <TimesheetFlagChips flags={automation.classification.flags} />
-                                                    : <span className="text-xs text-gray-500 font-medium mt-0.5 leading-none">None</span>
-                                                }
-                                            </div>
-                                            <span className="text-xs text-gray-400 mt-1.5 leading-none font-medium">
-                                                {ts.clockOutDistanceMetres != null ? `${ts.clockOutDistanceMetres}m from site` : 'GPS verified'}
-                                            </span>
-                                        </div>
+                            {/* Admin note — only if present */}
+                            {ts.adminNote && (
+                                <div className="flex items-start gap-2 text-xs bg-white border border-gray-100 rounded-lg p-3 mt-0.5">
+                                    <MessageSquare size={13} className="text-gray-400 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="text-gray-400 font-medium uppercase tracking-wider text-[10px]">Admin note</span>
+                                        <p className="text-gray-700 mt-0.5 leading-relaxed">{ts.adminNote}</p>
                                     </div>
                                 </div>
-
-                                {/* Admin note */}
-                                {ts.adminNote && (
-                                    <div className="pt-3.5 border-t border-slate-100 flex gap-2.5 items-start bg-white/60 p-3 rounded-lg border border-slate-100/50">
-                                        <MessageSquare size={14} className="text-slate-400 shrink-0 mt-0.5" />
-                                        <div>
-                                            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">Admin note</p>
-                                            <p className="text-xs text-slate-600 leading-relaxed font-semibold">{ts.adminNote}</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            )}
                         </div>
                     </td>
                 </tr>

@@ -206,6 +206,9 @@ export default function StaffHoursSection() {
                                     <div className="flex items-center justify-between text-xs font-medium text-slate-500 mt-1.5 h-4">
                                         <span>
                                             {formatTimeTo12Hour(ts.workedStart)} – {formatTimeTo12Hour(ts.workedEnd)}
+                                            {ts.isAdminModified && (
+                                                <span className="ml-1 text-amber-600 font-semibold text-[10px]">· Adjusted</span>
+                                            )}
                                         </span>
                                         <span className="font-semibold text-emerald-600 tabular-nums">
                                             {showPayInfo

@@ -188,6 +188,18 @@ export async function updateTimesheetStatus(
         if (workedEnd) updates.workedEnd = workedEnd;
         if (note !== undefined) updates.adminNote = note;
 
+        const isStartChanged = workedStart && workedStart !== timesheetData.workedStart;
+        const isEndChanged = workedEnd && workedEnd !== timesheetData.workedEnd;
+        if (isStartChanged || isEndChanged) {
+            updates.isAdminModified = true;
+            if (!timesheetData.originalWorkedStart) {
+                updates.originalWorkedStart = timesheetData.workedStart;
+            }
+            if (!timesheetData.originalWorkedEnd) {
+                updates.originalWorkedEnd = timesheetData.workedEnd;
+            }
+        }
+
         await db.collection('timesheets').doc(timesheetId).update(updates);
 
         // 6. Audit Log
@@ -313,6 +325,18 @@ export async function correctTimesheet(
         if (status === 'APPROVED') {
             updates.workedStart = newWorkedStart;
             updates.workedEnd = newWorkedEnd;
+
+            const isStartChanged = newWorkedStart !== timesheetData.workedStart;
+            const isEndChanged = newWorkedEnd !== timesheetData.workedEnd;
+            if (isStartChanged || isEndChanged) {
+                updates.isAdminModified = true;
+                if (!timesheetData.originalWorkedStart) {
+                    updates.originalWorkedStart = timesheetData.workedStart;
+                }
+                if (!timesheetData.originalWorkedEnd) {
+                    updates.originalWorkedEnd = timesheetData.workedEnd;
+                }
+            }
         }
 
         await db.collection('timesheets').doc(timesheetId).update(updates);

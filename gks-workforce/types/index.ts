@@ -150,6 +150,11 @@ export interface Timesheet {
     requiresAdminNote: boolean;       // true for OUTSIDE / OVERTIME / AUTO_CLOSED
     adminNote?: string;               // admin fills this when approving
 
+    // Audit and tracking for admin edits
+    isAdminModified?: boolean;
+    originalWorkedStart?: string;
+    originalWorkedEnd?: string;
+
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }

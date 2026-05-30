@@ -49,27 +49,27 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             {children}
             {notification && (
                 <div
-                    className={`fixed left-1/2 -translate-x-1/2 z-[9999] w-full max-w-[90%] md:max-w-md ${
+                    className={`fixed z-[9999] left-4 right-4 md:left-auto md:right-6 md:w-full md:max-w-sm ${
                         isStaffRoute
-                            ? 'bottom-28 pb-[env(safe-area-inset-bottom)]'
-                            : 'top-6 pt-[env(safe-area-inset-top)]'
+                            ? 'bottom-28 pb-[env(safe-area-inset-bottom)] animate-toast-up'
+                            : 'top-6 pt-[env(safe-area-inset-top)] animate-toast-down'
                     }`}
                     role="status"
                     aria-live="polite"
                 >
                     <div
-                        className={`px-4 py-3 rounded-xl shadow-md border flex items-center gap-3 w-full ${
-                            notification.type === 'success'
-                                ? 'bg-green-50 border-green-200 text-green-800'
-                                : 'bg-red-50 border-red-200 text-red-800'
-                        }`}
+                        className="px-4 py-2.5 rounded-xl shadow-xl border border-slate-800 flex items-center gap-3 w-full bg-slate-950/95 backdrop-blur-md text-slate-100"
                     >
-                        <Icon
-                            icon={notification.type === 'success' ? CheckCircle2 : AlertCircle}
-                            size="md"
-                            className={notification.type === 'success' ? 'text-green-500' : 'text-red-500'}
-                        />
-                        <span className="text-sm font-medium">{notification.message}</span>
+                        <div className="shrink-0">
+                            <Icon
+                                icon={notification.type === 'success' ? CheckCircle2 : AlertCircle}
+                                size="sm"
+                                className={notification.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}
+                            />
+                        </div>
+                        <span className="text-xs font-medium leading-normal tracking-tight">
+                            {notification.message}
+                        </span>
                     </div>
                 </div>
             )}

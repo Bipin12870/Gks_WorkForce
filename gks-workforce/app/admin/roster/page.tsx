@@ -260,7 +260,6 @@ export default function AdminRosterPage() {
                 <div className="shrink-0">
                 <AdminPageHeader
                     title="Roster & availability"
-                    description="Approve shifts against submitted availability for the selected week and day."
                 />
             </div>
 

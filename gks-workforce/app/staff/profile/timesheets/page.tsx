@@ -440,6 +440,9 @@ export default function StaffProfileTimesheetsPage() {
                                 <div className="flex items-center justify-between gap-4 mt-1.5 pl-[23px]">
                                     <span className="text-xs sm:text-sm text-slate-500 font-medium">
                                         {shift ? `Roster: ${formatTimeTo12Hour(shift.startTime)} – ${formatTimeTo12Hour(shift.endTime)}` : timesheet ? `Clocked: ${formatTimeTo12Hour(timesheet.workedStart)} – ${formatTimeTo12Hour(timesheet.workedEnd)}` : ''}
+                                        {timesheet?.isAdminModified && (
+                                            <span className="ml-1.5 text-amber-600 font-normal text-xs">   Adjusted</span>
+                                        )}
                                     </span>
                                     <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                         {timesheet ? (
@@ -501,7 +504,15 @@ export default function StaffProfileTimesheetsPage() {
                                                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Clocked</span>
                                                     <span className="text-sm font-semibold text-slate-800">
                                                         {formatTimeTo12Hour(timesheet.workedStart)} – {formatTimeTo12Hour(timesheet.workedEnd)}
+                                                        {timesheet.isAdminModified && (
+                                                            <span className="ml-1 text-[10px] font-semibold text-amber-600">(Adjusted)</span>
+                                                        )}
                                                     </span>
+                                                    {timesheet.isAdminModified && timesheet.originalWorkedStart && timesheet.originalWorkedEnd && (
+                                                        <span className="text-[10px] text-slate-400 font-medium">
+                                                            Originally: {formatTimeTo12Hour(timesheet.originalWorkedStart)} – {formatTimeTo12Hour(timesheet.originalWorkedEnd)}
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 <div className="flex flex-col gap-0.5">

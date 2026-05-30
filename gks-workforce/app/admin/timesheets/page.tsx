@@ -19,7 +19,6 @@ import Input from '@/components/ui/Input';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
 import Icon from '@/components/ui/Icon';
-import Badge from '@/components/ui/Badge';
 import { AlertTriangle, Clock } from 'lucide-react';
 import { Suspense } from 'react';
 
@@ -255,192 +254,179 @@ function AdminTimesheetsContent() {
 
     return (
         <>
-            <AdminPageHeader
-                title="Timesheet Approvals"
-                description="Review and approve the timesheets of your team."
-            />
+            <div className="flex flex-col h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-1.5rem)] min-h-0 overflow-hidden">
+                {/* ── Static header, banners, and filter bars ── */}
+            <div className="shrink-0">
+                <AdminPageHeader
+                    title="Timesheet Approvals"
+                />
 
-            {showFlaggedOnly && (
-                <div className="mb-5 p-3.5 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
-                    <div className="flex items-start gap-3">
-                        <Icon icon={AlertTriangle} size="md" className="text-amber-500 shrink-0 mt-0.5" />
-                        <div>
-                            <p className="text-sm font-medium text-amber-900">Flagged issues only</p>
-                            <p className="text-xs text-amber-700 mt-0.5">
-                                Pending timesheets with geofence or overtime violations this week.
-                            </p>
+                {showFlaggedOnly && (
+                    <div className="mb-5 p-3.5 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+                        <div className="flex items-start gap-3">
+                            <Icon icon={AlertTriangle} size="md" className="text-amber-500 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-sm font-medium text-amber-900">Flagged issues only</p>
+                                <p className="text-xs text-amber-700 mt-0.5">
+                                    Pending timesheets with geofence or overtime violations this week.
+                                </p>
+                            </div>
                         </div>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                                setShowFlaggedOnly(false);
+                                router.replace('/admin/timesheets');
+                            }}
+                        >
+                            Clear filter
+                        </Button>
                     </div>
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                            setShowFlaggedOnly(false);
-                            router.replace('/admin/timesheets');
-                        }}
-                    >
-                        Clear filter
-                    </Button>
-                </div>
-            )}
+                )}
 
-            <AdminFilterBar
-                weekStart={selectedWeek}
-                onWeekPrev={() => changeWeek('prev')}
-                onWeekNext={() => changeWeek('next')}
-                selectedDay={selectedDay}
-                onDayChange={setSelectedDay}
-                staffValue={selectedStaffFilter}
-                onStaffChange={(id) => {
-                    setSelectedStaffFilter(id);
-                    setSelectedTimesheetIds([]);
-                }}
-                staffOptions={staffOptions}
-            />
-
-            {/* ── Status Tab Filter ── */}
-            <div className="mb-4">
-                <AdminTabs
-                    tabs={[
-                        { id: 'PENDING', label: 'Pending', count: timesheets.filter(t => t.status === 'PENDING').length },
-                        { id: 'APPROVED', label: 'Approved', count: timesheets.filter(t => t.status === 'APPROVED').length },
-                        { id: 'REJECTED', label: 'Rejected', count: timesheets.filter(t => t.status === 'REJECTED').length },
-                        { id: 'ALL', label: 'All Records', count: timesheets.length },
-                    ]}
-                    activeId={statusFilter}
-                    onChange={(id) => {
-                        setStatusFilter(id as 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL');
+                <AdminFilterBar
+                    weekStart={selectedWeek}
+                    onWeekPrev={() => changeWeek('prev')}
+                    onWeekNext={() => changeWeek('next')}
+                    selectedDay={selectedDay}
+                    onDayChange={setSelectedDay}
+                    staffValue={selectedStaffFilter}
+                    onStaffChange={(id) => {
+                        setSelectedStaffFilter(id);
                         setSelectedTimesheetIds([]);
                     }}
+                    staffOptions={staffOptions}
                 />
-            </div>
 
-            {/* ── Floating Sticky Bulk Action Bar ── */}
-            {statusFilter === 'PENDING' && selectedTimesheetIds.length > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white border border-gray-200 text-gray-900 rounded-full px-5 py-2.5 shadow-xl flex items-center gap-5 z-50 animate-in fade-in slide-in-from-bottom-4">
-                    <span className="text-xs font-medium text-gray-400 whitespace-nowrap">
-                        <strong className="text-gray-800 font-semibold">{selectedTimesheetIds.length}</strong> selected
-                    </span>
-                    <div className="w-px h-4 bg-gray-100" />
-                    <button
-                        onClick={handleBulkApprove}
-                        className="inline-flex items-center justify-center text-emerald-600 border border-emerald-300 text-xs font-medium px-4 py-1.5 rounded-full hover:bg-emerald-50 transition-all cursor-pointer"
-                    >
-                        Approve Selected
-                    </button>
+                {/* ── Status Tab Filter ── */}
+                <div className="mb-4">
+                    <AdminTabs
+                        tabs={[
+                            { id: 'PENDING', label: 'Pending', count: timesheets.filter(t => t.status === 'PENDING').length },
+                            { id: 'APPROVED', label: 'Approved', count: timesheets.filter(t => t.status === 'APPROVED').length },
+                            { id: 'REJECTED', label: 'Rejected', count: timesheets.filter(t => t.status === 'REJECTED').length },
+                            { id: 'ALL', label: 'All Records', count: timesheets.length },
+                        ]}
+                        activeId={statusFilter}
+                        onChange={(id) => {
+                            setStatusFilter(id as 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL');
+                            setSelectedTimesheetIds([]);
+                        }}
+                    />
                 </div>
-            )}
+            </div>
 
-            {/* ── Desktop Table Layout ── */}
-            <div className="hidden lg:block w-full overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                {loading ? (
-                    <Spinner className="py-24" />
-                ) : unifiedTimesheets.length === 0 ? (
-                    <div className="py-24 text-center">
+            {/* ── Scrollable list section ── */}
+            <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden pb-12 pr-0.5 flex flex-col">
+                {/* ── Desktop Table Layout ── */}
+                <div className="hidden lg:flex flex-col flex-1 min-h-0 w-full rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                    {loading ? (
+                        <Spinner className="py-24" />
+                    ) : unifiedTimesheets.length === 0 ? (
+                        <div className="py-24 text-center">
+                            <EmptyState title="No timesheets" description="No timesheets match the active filters." icon={Clock} />
+                        </div>
+                    ) : (
+                        <div className="overflow-auto flex-1 min-h-0">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="sticky top-0 bg-gray-50 z-20">
+                                    <tr className="border-b border-gray-100 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                        <th className="px-5 py-3.5 w-12 bg-gray-50">
+                                            {statusFilter === 'PENDING' && (
+                                                <input
+                                                    type="checkbox"
+                                                    onChange={(e) => handleSelectAll(e.target.checked)}
+                                                    className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400 focus:ring-offset-0 cursor-pointer"
+                                                />
+                                            )}
+                                        </th>
+                                        <th className="px-5 py-3.5 bg-gray-50">Employee</th>
+                                        <th className="px-5 py-3.5 bg-gray-50">Date</th>
+                                        <th className="px-5 py-3.5 bg-gray-50">Rostered Shift</th>
+                                        <th className="px-5 py-3.5 bg-gray-50">Clocked Time</th>
+                                        <th className="px-5 py-3.5 bg-gray-50">Payable</th>
+                                        <th className="px-5 py-3.5 text-right bg-gray-50">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {unifiedTimesheets.map((item) => (
+                                        <TimesheetTableRow
+                                            key={item.id}
+                                            timesheet={item.timesheet}
+                                            staffName={staffMap[item.staffId]?.name || 'Staff member'}
+                                            isSelected={selectedTimesheetIds.includes(item.id)}
+                                            onSelectToggle={() => handleSelectToggle(item.id)}
+                                            onQuickApprove={() => handleUpdateStatus(item.id, 'APPROVED')}
+                                            onReview={() => openAdjustModal(item.timesheet)}
+                                            onReject={() => handleUpdateStatus(item.id, 'REJECTED')}
+                                        />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Mobile/Tablet List Layout (Clean SaaS List) ── */}
+                <div className="lg:hidden flex-1 overflow-y-auto">
+                    {loading ? (
+                        <Spinner className="py-16" />
+                    ) : unifiedTimesheets.length === 0 ? (
                         <EmptyState title="No timesheets" description="No timesheets match the active filters." icon={Clock} />
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                                    <th className="px-5 py-3.5 w-12">
-                                        {statusFilter === 'PENDING' && (
-                                            <input
-                                                type="checkbox"
-                                                onChange={(e) => handleSelectAll(e.target.checked)}
-                                                className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-400 focus:ring-offset-0 cursor-pointer"
-                                            />
-                                        )}
-                                    </th>
-                                    <th className="px-5 py-3.5">Employee</th>
-                                    <th className="px-5 py-3.5">Date</th>
-                                    <th className="px-5 py-3.5">Rostered Shift</th>
-                                    <th className="px-5 py-3.5">Clocked Time</th>
-                                    <th className="px-5 py-3.5">Variance</th>
-                                    <th className="px-5 py-3.5">Integrity & Source</th>
-                                    <th className="px-5 py-3.5 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {unifiedTimesheets.map((item) => (
-                                    <TimesheetTableRow
-                                        key={item.id}
-                                        timesheet={item.timesheet}
-                                        staffName={staffMap[item.staffId]?.name || 'Staff member'}
-                                        isSelected={selectedTimesheetIds.includes(item.id)}
-                                        onSelectToggle={() => handleSelectToggle(item.id)}
-                                        onQuickApprove={() => handleUpdateStatus(item.id, 'APPROVED')}
-                                        onReview={() => openAdjustModal(item.timesheet)}
-                                        onReject={() => handleUpdateStatus(item.id, 'REJECTED')}
-                                    />
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* ── Mobile/Tablet List Layout (Clean SaaS List) ── */}
-            <div className="lg:hidden">
-                {loading ? (
-                    <Spinner className="py-16" />
-                ) : unifiedTimesheets.length === 0 ? (
-                    <EmptyState title="No timesheets" description="No timesheets match the active filters." icon={Clock} />
-                ) : (
-                    <div className="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-50 shadow-sm overflow-hidden">
-                        {unifiedTimesheets.map((item) => (
-                            <div key={item.id} className="p-5 flex flex-col gap-4 hover:bg-gray-50/50 transition-colors">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="text-sm font-medium text-gray-900">
-                                            {staffMap[item.staffId]?.name || 'Staff member'}
-                                        </span>
-                                        <span className="text-xs text-gray-400">
-                                            {formatDate(item.date)}
-                                        </span>
+                    ) : (
+                        <div className="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-50 shadow-sm overflow-hidden">
+                            {unifiedTimesheets.map((item) => (
+                                <div key={item.id} className="p-4 flex flex-col gap-3 hover:bg-gray-50/30 transition-colors">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-sm font-medium text-gray-900">
+                                                {staffMap[item.staffId]?.name || 'Staff member'}
+                                            </span>
+                                            <span className="text-xs text-gray-400">
+                                                {formatDate(item.date)}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <Badge variant={item.status === 'PENDING' ? 'warning' : item.status === 'APPROVED' ? 'success' : 'danger'}>
-                                        {item.status}
-                                    </Badge>
-                                </div>
 
-                                <div className="grid grid-cols-2 gap-4 text-xs">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-gray-400 font-semibold uppercase tracking-wider text-[9px]">Roster</span>
-                                        <span className="font-medium text-gray-600">
-                                            {item.timesheet.approvedShiftStart ? `${formatTimeTo12Hour(item.timesheet.approvedShiftStart)}–${formatTimeTo12Hour(item.timesheet.approvedShiftEnd)}` : 'Unscheduled'}
-                                        </span>
+                                    <div className="grid grid-cols-2 gap-3 text-xs">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-gray-400 font-medium uppercase tracking-wider text-[10px]">Roster</span>
+                                            <span className="text-gray-600">
+                                                {item.timesheet.approvedShiftStart ? `${formatTimeTo12Hour(item.timesheet.approvedShiftStart)}–${formatTimeTo12Hour(item.timesheet.approvedShiftEnd)}` : 'Unscheduled'}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-gray-400 font-medium uppercase tracking-wider text-[10px]">Clocked</span>
+                                            <span className={`${!item.timesheet.workedStart ? 'text-amber-600' : 'text-gray-800'}`}>
+                                                {item.timesheet.workedStart ? `${formatTimeTo12Hour(item.timesheet.workedStart)}–${formatTimeTo12Hour(item.timesheet.workedEnd)}` : 'No clock-in'}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-gray-400 font-semibold uppercase tracking-wider text-[9px]">Clocked</span>
-                                        <span className={`font-medium ${item.isMissed ? 'text-red-500' : 'text-gray-800'}`}>
-                                            {item.timesheet.workedStart ? `${formatTimeTo12Hour(item.timesheet.workedStart)}–${formatTimeTo12Hour(item.timesheet.workedEnd)}` : 'No clock-in'}
-                                        </span>
-                                    </div>
-                                </div>
 
-                                <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                                    <button
-                                        onClick={() => openAdjustModal(item.timesheet)}
-                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium border border-gray-200 rounded-full hover:bg-gray-50 text-gray-500 transition-all cursor-pointer"
-                                    >
-                                        Review
-                                    </button>
-                                    {item.status === 'PENDING' && (
+                                    <div className="flex justify-end gap-2 pt-2.5 border-t border-gray-100">
                                         <button
-                                            onClick={() => handleUpdateStatus(item.id, 'APPROVED')}
-                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-emerald-600 border border-emerald-300 rounded-full hover:bg-emerald-50 transition-all cursor-pointer"
+                                            onClick={() => openAdjustModal(item.timesheet)}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                                         >
-                                            Approve
+                                            Review
                                         </button>
-                                    )}
+                                        {item.status === 'PENDING' && !item.timesheet.requiresAdminNote && item.timesheet.workedStart && (
+                                            <button
+                                                onClick={() => handleUpdateStatus(item.id, 'APPROVED')}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                            >
+                                                Approve
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
+        </div>
 
             {/* ── Adjustment Modal ── */}
             <AdminFormModal
@@ -557,6 +543,22 @@ function AdminTimesheetsContent() {
                     </>
                 )}
             </AdminFormModal>
+
+            {/* ── Floating Sticky Bulk Action Bar ── */}
+            {statusFilter === 'PENDING' && selectedTimesheetIds.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white border border-gray-200 text-gray-900 rounded-full px-5 py-2.5 shadow-xl flex items-center gap-5 z-50 animate-in fade-in slide-in-from-bottom-4">
+                    <span className="text-xs font-medium text-gray-400 whitespace-nowrap">
+                        <strong className="text-gray-800 font-semibold">{selectedTimesheetIds.length}</strong> selected
+                    </span>
+                    <div className="w-px h-4 bg-gray-100" />
+                    <button
+                        onClick={handleBulkApprove}
+                        className="inline-flex items-center justify-center text-emerald-600 border border-emerald-300 text-xs font-medium px-4 py-1.5 rounded-full hover:bg-emerald-50 transition-all cursor-pointer"
+                    >
+                        Approve Selected
+                    </button>
+                </div>
+            )}
         </>
     );
 }

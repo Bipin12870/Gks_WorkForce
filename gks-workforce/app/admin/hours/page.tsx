@@ -91,12 +91,13 @@ export default function AdminHoursPage() {
         <>
             <AdminPageHeader
                 title="Hours & payroll"
-                description="Approved timesheet hours and estimated gross labor for the selected week."
             />
 
             <div className="admin-toolbar mb-6">
                 <AdminWeekPicker weekStart={selectedWeek} onPrev={() => changeWeek('prev')} onNext={() => changeWeek('next')} />
-                <Badge variant="success">Approved timesheets only</Badge>
+                <span className="text-xs font-semibold text-emerald-600">
+                    Approved timesheets only
+                </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

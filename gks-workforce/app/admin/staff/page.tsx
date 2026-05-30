@@ -188,7 +188,6 @@ export default function AdminStaffPage() {
         <>
             <AdminPageHeader
                 title="Staff management"
-                description="Profiles, hourly rates, credentials, and account status."
                 actions={
                     <Button
                         variant={showCreateForm ? 'secondary' : 'primary'}

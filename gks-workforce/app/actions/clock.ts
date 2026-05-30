@@ -259,12 +259,15 @@ export async function clockOut(
             clockOutTimestamp = admin.firestore.Timestamp.fromMillis(serverNow);
         }
 
-        // 8. Distance calculation
+        // 8. Distance calculation & geofence enforcement
         let distanceMetres: number | null = null;
         let withinRange: boolean | null = null;
         if (!isAutoClose) {
             distanceMetres = Math.round(getDistanceMetres(lat, lng, shop.lat, shop.lng));
             withinRange = distanceMetres <= shop.radiusMetres;
+            if (!withinRange) {
+                throw new Error(`Out of range: You are ${distanceMetres}m from the shop (radius is ${shop.radiusMetres}m). Please clock out on-site.`);
+            }
         }
 
         // 9. Run Server-Side Payroll/Automation Engine

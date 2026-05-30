@@ -124,7 +124,7 @@ export async function createShift(shiftData: {
         return { success: true, id: docRef.id };
     } catch (error) {
         console.error('Error in createShift:', error);
-        throw new Error((error as Error).message);
+        return { success: false, error: (error as Error).message };
     }
 }
 
@@ -248,7 +248,7 @@ export async function updateShift(
         return { success: true };
     } catch (error) {
         console.error('Error in updateShift:', error);
-        throw new Error((error as Error).message);
+        return { success: false, error: (error as Error).message };
     }
 }
 
@@ -289,6 +289,6 @@ export async function deleteShift(shiftId: string) {
         return { success: true };
     } catch (error) {
         console.error('Error in deleteShift:', error);
-        throw new Error((error as Error).message);
+        return { success: false, error: (error as Error).message };
     }
 }

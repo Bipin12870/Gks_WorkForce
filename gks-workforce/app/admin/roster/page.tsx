@@ -196,11 +196,15 @@ export default function AdminRosterPage() {
         setIsProcessing(true);
         try {
             if (isEditingShift && editingShiftId) {
-                await updateShift(editingShiftId, {
+                const result = await updateShift(editingShiftId, {
                     startTime: shiftForm.startTime,
                     endTime: shiftForm.endTime,
                     forceOverride,
                 });
+                if (!result.success) {
+                    showNotification(result.error || 'Failed to update shift', 'error');
+                    return;
+                }
                 showNotification('Shift updated successfully!', 'success');
             } else {
                 const dayDate = new Date(selectedWeek);
@@ -208,7 +212,7 @@ export default function AdminRosterPage() {
                 const finalDay = shiftDay === -1 ? new Date().getDay() : shiftDay;
                 dayDate.setDate(dayDate.getDate() + (finalDay === 0 ? 6 : finalDay - 1));
                 dayDate.setHours(0, 0, 0, 0);
-                await createShift({
+                const result = await createShift({
                     staffId: selectedStaff.id,
                     dateMs: dayDate.getTime(),
                     startTime: shiftForm.startTime,
@@ -216,6 +220,10 @@ export default function AdminRosterPage() {
                     forceOverride,
                     timezoneOffset: new Date().getTimezoneOffset(),
                 });
+                if (!result.success) {
+                    showNotification(result.error || 'Failed to create shift', 'error');
+                    return;
+                }
                 showNotification('Shift approved successfully!', 'success');
             }
             setShowApprovalModal(false);
@@ -237,7 +245,11 @@ export default function AdminRosterPage() {
         if (!window.confirm(`Remove ${staffMap[shift?.staffId ?? '']?.name || 'this staff'} from this shift?`)) return;
         setIsProcessing(true);
         try {
-            await deleteShift(shiftId);
+            const result = await deleteShift(shiftId);
+            if (!result.success) {
+                showNotification(result.error || 'Failed to remove shift', 'error');
+                return;
+            }
             showNotification('Shift removed successfully', 'success');
         } catch (error) {
             console.error('Error removing shift:', error);

@@ -39,7 +39,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (notification) {
             const timer = setTimeout(() => {
                 setNotification(null);
-            }, 5000);
+            }, 2000);
             return () => clearTimeout(timer);
         }
     }, [notification]);

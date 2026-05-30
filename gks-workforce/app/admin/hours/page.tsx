@@ -66,7 +66,7 @@ export default function AdminHoursPage() {
                 setStaffHours(hours);
             } catch (error: unknown) {
                 console.error('Error loading hours data:', error);
-                showNotification('Failed to load hours data. Please try again.', 'error');
+                showNotification((error as Error).message || 'Failed to load hours data. Please try again.', 'error');
             } finally {
                 setLoading(false);
             }

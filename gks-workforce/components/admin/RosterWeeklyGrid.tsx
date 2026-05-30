@@ -72,11 +72,11 @@ export default function RosterWeeklyGrid({
     };
 
     return (
-        <div className="w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-md overflow-hidden">
+        <div className="w-full max-h-[calc(100vh-240px)] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-md">
             <div className="min-w-[900px]">
                 {/* Header Row */}
-                <div className="flex border-b border-slate-200 bg-slate-50/80 backdrop-blur-xs">
-                    <div className="w-48 shrink-0 border-r border-slate-200 px-5 py-4 flex flex-col justify-center bg-slate-50/40">
+                <div className="flex border-b border-slate-200 bg-slate-50/95 backdrop-blur-md sticky top-0 z-20 shadow-sm">
+                    <div className="w-48 shrink-0 border-r border-slate-200 px-5 py-4 flex flex-col justify-center bg-slate-50">
                         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Staff Member</span>
                     </div>
                     {weekDates.map((date) => {

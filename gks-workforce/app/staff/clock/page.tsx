@@ -423,7 +423,7 @@ export default function ClockInOutPage() {
             await processClockOut(activeRecord, shift, false);
         } catch (error) {
             console.error('Error clocking out:', error);
-            showNotification('Failed to clock out.', 'error');
+            showNotification((error as Error).message || 'Failed to clock out.', 'error');
         } finally {
             setProcessing(false);
         }

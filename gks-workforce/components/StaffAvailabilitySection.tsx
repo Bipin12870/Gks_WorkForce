@@ -187,7 +187,7 @@ export default function StaffAvailabilitySection() {
             if (shopConfig?.shopCloseTime) setShopCloseTime(shopConfig.shopCloseTime);
         } catch (error) {
             console.error('Error loading availability:', error);
-            showNotification('Failed to load your availability. Please set it again.', 'error');
+            showNotification((error as Error).message || 'Failed to load your availability. Please set it again.', 'error');
         } finally {
             setLoading(false);
             draftReady.current = true;
@@ -349,7 +349,7 @@ export default function StaffAvailabilitySection() {
             showNotification('Copied availability from last week (rostered days unchanged)', 'success');
         } catch (error) {
             console.error('Error copying availability:', error);
-            showNotification('Failed to copy past week availability', 'error');
+            showNotification((error as Error).message || 'Failed to copy past week availability', 'error');
         } finally {
             setLoading(false);
         }

@@ -53,7 +53,7 @@ export default function AdminStaffPage() {
             setStaff(loadedStaff);
         } catch (error) {
             console.error('Error loading staff:', error);
-            showNotification('Failed to load staff list.', 'error');
+            showNotification((error as Error).message || 'Failed to load staff list.', 'error');
         } finally {
             setLoading(false);
         }

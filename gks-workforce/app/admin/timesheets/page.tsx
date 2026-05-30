@@ -230,7 +230,7 @@ function AdminTimesheetsContent() {
             setSelectedTimesheetIds([]);
         } catch (error) {
             console.error('Error in bulk approval:', error);
-            showNotification('Failed to bulk approve timesheets.', 'error');
+            showNotification((error as Error).message || 'Failed to bulk approve timesheets.', 'error');
         }
     };
 
@@ -320,7 +320,7 @@ function AdminTimesheetsContent() {
             {/* ── Scrollable list section ── */}
             <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden pb-12 pr-0.5 flex flex-col">
                 {/* ── Desktop Table Layout ── */}
-                <div className="hidden lg:flex flex-col flex-1 min-h-0 w-full rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                <div className="hidden lg:flex flex-col flex-1 min-h-0 w-full max-h-[calc(100vh-250px)] rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
                     {loading ? (
                         <Spinner className="py-24" />
                     ) : unifiedTimesheets.length === 0 ? (
@@ -330,9 +330,9 @@ function AdminTimesheetsContent() {
                     ) : (
                         <div className="overflow-auto flex-1 min-h-0">
                             <table className="w-full text-left border-collapse">
-                                <thead className="sticky top-0 bg-gray-50 z-20">
-                                    <tr className="border-b border-gray-100 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                        <th className="px-5 py-3.5 w-12 bg-gray-50">
+                                <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-20 shadow-sm">
+                                    <tr className="border-b border-gray-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                        <th className="px-5 py-3.5 w-12 bg-transparent">
                                             {statusFilter === 'PENDING' && (
                                                 <input
                                                     type="checkbox"
@@ -341,12 +341,12 @@ function AdminTimesheetsContent() {
                                                 />
                                             )}
                                         </th>
-                                        <th className="px-5 py-3.5 bg-gray-50">Employee</th>
-                                        <th className="px-5 py-3.5 bg-gray-50">Date</th>
-                                        <th className="px-5 py-3.5 bg-gray-50">Rostered Shift</th>
-                                        <th className="px-5 py-3.5 bg-gray-50">Clocked Time</th>
-                                        <th className="px-5 py-3.5 bg-gray-50">Payable</th>
-                                        <th className="px-5 py-3.5 text-right bg-gray-50">Actions</th>
+                                        <th className="px-5 py-3.5 bg-transparent">Employee</th>
+                                        <th className="px-5 py-3.5 bg-transparent">Date</th>
+                                        <th className="px-5 py-3.5 bg-transparent">Rostered Shift</th>
+                                        <th className="px-5 py-3.5 bg-transparent">Clocked Time</th>
+                                        <th className="px-5 py-3.5 bg-transparent">Payable</th>
+                                        <th className="px-5 py-3.5 text-right bg-transparent">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">

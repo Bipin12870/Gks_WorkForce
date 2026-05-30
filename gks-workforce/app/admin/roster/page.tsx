@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import {
@@ -15,7 +15,6 @@ import { Availability, Shift, User, TimeRange } from '@/types';
 import { getWeekStart, getDayName, isWithinAvailability, formatTimeTo12Hour } from '@/lib/utils';
 import { createShift, updateShift, deleteShift } from '@/app/actions/shifts';
 import { useNotification } from '@/contexts/NotificationContext';
-import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminFilterBar from '@/components/admin/AdminFilterBar';
 import AdminTabs from '@/components/admin/AdminTabs';
 import AdminFormModal from '@/components/admin/AdminFormModal';
@@ -47,6 +46,11 @@ export default function AdminRosterPage() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [forceOverride, setForceOverride] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    const filteredStaffList = useMemo(() => {
+        if (!staffFilter) return staffList;
+        return staffList.filter((s) => s.id === staffFilter);
+    }, [staffList, staffFilter]);
 
     // Load staff data
     useEffect(() => {
@@ -277,11 +281,6 @@ export default function AdminRosterPage() {
     return (
         <>
             <div className="flex flex-col h-[calc(100vh-120px)] lg:h-auto overflow-hidden lg:overflow-visible min-h-0">
-                <div className="shrink-0">
-                <AdminPageHeader
-                    title="Roster & availability"
-                />
-            </div>
 
             <div className="shrink-0">
                 <AdminFilterBar
@@ -296,7 +295,8 @@ export default function AdminRosterPage() {
                         setFilterMode('HARD');
                     }}
                     staffOptions={staffOptions}
-                    showDayAndStaff={viewMode !== 'grid'}
+                    showDay={viewMode !== 'grid'}
+                    showStaff={true}
                     extra={
                         <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                             <button
@@ -329,13 +329,34 @@ export default function AdminRosterPage() {
             {/* ── DESKTOP: Grid view ─────────────────────────────────────── */}
             {viewMode === 'grid' && (
                 <div className="hidden lg:block mb-8">
-                    <div className="mb-3">
-                        <h3 className="text-section-title">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
+                        <h3 className="text-section-title shrink-0">
                             Weekly Roster
                         </h3>
+                        <div className="flex flex-wrap items-center justify-end gap-x-3.5 lg:gap-x-4 text-[10px] font-medium text-slate-400 ml-auto">
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-sm bg-blue-600 border border-blue-700" />
+                                <span>Scheduled Shift</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-sm bg-amber-50 border border-amber-300" />
+                                <span>Availability Override</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <span>Available Time Window</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-sm bg-red-50/50 border border-red-100" />
+                                <span>Staff Unavailable</span>
+                            </div>
+                            <div className="hidden xl:block ml-2 text-[9px] text-slate-400 font-medium italic border-l border-slate-200 pl-3">
+                                Click any cell to schedule, modify, or delete a shift
+                            </div>
+                        </div>
                     </div>
                     <RosterWeeklyGrid
-                        staff={staffList}
+                        staff={filteredStaffList}
                         shifts={shifts}
                         availability={availability}
                         weekStart={selectedWeek}

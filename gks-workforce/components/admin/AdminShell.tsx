@@ -15,10 +15,21 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     const router = useRouter();
     const { userData, logout } = useAuth();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
 
     const handleLogout = async () => {
         await logout();
         router.push('/login');
+    };
+
+    const getPageTitle = (path: string) => {
+        if (path.startsWith('/admin/roster')) return 'Roster & availability';
+        if (path.startsWith('/admin/timesheets')) return 'Timesheet Approvals';
+        if (path.startsWith('/admin/hours')) return 'Hours & Pay';
+        if (path.startsWith('/admin/staff')) return 'Staff';
+        if (path.startsWith('/admin/analytics')) return 'Analytics';
+        if (path.startsWith('/admin/settings')) return 'Settings';
+        return 'Dashboard';
     };
 
     const navContent = (
@@ -42,14 +53,24 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     );
 
     return (
-        <div className="h-screen bg-background flex overflow-hidden">
+        <div className={`h-screen bg-background flex overflow-hidden ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
             {/* Desktop sidebar */}
-            <aside className="hidden lg:flex lg:w-60 xl:w-64 flex-col border-r border-gray-200 bg-white shrink-0 sticky top-0 h-screen pb-4">
+            <aside className={`${sidebarOpen ? 'hidden lg:flex' : 'hidden'} lg:w-60 xl:w-64 flex-col border-r border-gray-200 bg-white shrink-0 sticky top-0 h-screen pb-4`}>
                 <div className="px-4 py-5 border-b border-gray-100">
-                    <Link href="/dashboard" className="flex items-center gap-2.5">
-                        <Logo size={36} />
-                        <span className="font-semibold text-gray-900 tracking-tight text-sm">GKS Workforce</span>
-                    </Link>
+                    <div className="flex items-center justify-between gap-2">
+                        <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0">
+                            <Logo size={36} className="shrink-0" />
+                            <span className="font-semibold text-gray-900 tracking-tight text-sm truncate">GKS Workforce</span>
+                        </Link>
+                        <button
+                            type="button"
+                            onClick={() => setSidebarOpen(false)}
+                            className="hidden lg:flex h-9 w-9 items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 cursor-pointer shrink-0"
+                            aria-label="Collapse sidebar"
+                        >
+                            <Icon icon={Menu} size="sm" />
+                        </button>
+                    </div>
                     <p className="admin-kicker mt-3 truncate">{userData?.name ?? 'Admin'}</p>
                 </div>
                 <div className="flex-1 overflow-y-auto">{navContent}</div>
@@ -99,21 +120,25 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             </aside>
 
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                <header className="lg:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-3 bg-white/95 backdrop-blur-sm border-b border-gray-200">
+                {/* Unified top navigation header bar (always visible) */}
+                <header className="sticky top-0 z-30 flex items-center gap-3 px-4 py-2 bg-white/95 backdrop-blur-sm border-b border-gray-200 shrink-0 animate-in fade-in duration-200">
                     <button
                         type="button"
-                        onClick={() => setMobileOpen(true)}
-                        className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50"
-                        aria-label="Open menu"
+                        onClick={() => {
+                            if (window.innerWidth >= 1024) {
+                                setSidebarOpen(!sidebarOpen);
+                            } else {
+                                setMobileOpen(true);
+                            }
+                        }}
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-500 hover:text-gray-900 cursor-pointer shrink-0 ${sidebarOpen ? 'lg:hidden' : ''}`}
+                        aria-label="Toggle sidebar"
                     >
-                        <Icon icon={Menu} size="md" />
+                        <Icon icon={Menu} size="sm" />
                     </button>
-                    <div className="flex-1 min-w-0">
-                        <p className="admin-kicker">Operations</p>
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                            {ADMIN_NAV.find((i) => isAdminNavActive(pathname, i))?.label ?? 'Admin'}
-                        </p>
-                    </div>
+                    <span className="text-sm font-semibold text-gray-900 truncate">
+                        {getPageTitle(pathname)}
+                    </span>
                 </header>
 
                 <main className="flex-1 overflow-y-auto admin-main">{children}</main>

@@ -45,7 +45,8 @@ export default function StaffHoursSection() {
         const timesheetsQ = query(
             collection(db, 'timesheets'),
             where('staffId', '==', userData.id),
-            where('weekStartDate', '==', Timestamp.fromDate(weekStart))
+            where('date', '>=', Timestamp.fromDate(weekStart)),
+            where('date', '<', Timestamp.fromDate(weekEnd))
         );
 
         const unsubTimesheets = onSnapshot(timesheetsQ, (snapshot) => {

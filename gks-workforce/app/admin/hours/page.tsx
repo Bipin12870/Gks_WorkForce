@@ -6,7 +6,6 @@ import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore
 import { User, Timesheet } from '@/types';
 import { getWeekStart, calculatePayrollRecord, formatHoursAndMinutes } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
-import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminWeekPicker from '@/components/admin/AdminWeekPicker';
 import AdminStatCard from '@/components/admin/AdminStatCard';
 import AdminDataTable, {
@@ -43,9 +42,12 @@ export default function AdminHoursPage() {
                 setStaffMap(map);
 
                 const weekStart = new Date(selectedWeek);
+                const weekEnd = new Date(selectedWeek);
+                weekEnd.setDate(weekEnd.getDate() + 7);
                 const timesheetsQ = query(
                     collection(db, 'timesheets'),
-                    where('weekStartDate', '==', Timestamp.fromDate(weekStart)),
+                    where('date', '>=', Timestamp.fromDate(weekStart)),
+                    where('date', '<', Timestamp.fromDate(weekEnd)),
                     where('status', '==', 'APPROVED')
                 );
                 const timesheetsSnapshot = await getDocs(timesheetsQ);
@@ -89,10 +91,6 @@ export default function AdminHoursPage() {
 
     return (
         <>
-            <AdminPageHeader
-                title="Hours & payroll"
-            />
-
             <div className="admin-toolbar mb-6">
                 <AdminWeekPicker weekStart={selectedWeek} onPrev={() => changeWeek('prev')} onNext={() => changeWeek('next')} />
                 <span className="text-xs font-semibold text-emerald-600">

@@ -187,7 +187,6 @@ export default function AdminStaffPage() {
     return (
         <>
             <AdminPageHeader
-                title="Staff management"
                 actions={
                     <Button
                         variant={showCreateForm ? 'secondary' : 'primary'}

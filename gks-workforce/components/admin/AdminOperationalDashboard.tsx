@@ -252,7 +252,6 @@ export default function AdminOperationalDashboard() {
         <div className="space-y-6">
             {/* ── Greeting Banner ── */}
             <AdminPageHeader
-                title="Good Evening, Tony"
                 description={`Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}. There are currently ${activeWorkingCount} staff clocked in.`}
             />
 

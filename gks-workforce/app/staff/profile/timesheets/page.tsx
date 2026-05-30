@@ -130,7 +130,8 @@ export default function StaffProfileTimesheetsPage() {
         const timesheetsQuery = query(
             collection(db, 'timesheets'),
             where('staffId', '==', userData.id),
-            where('weekStartDate', '==', Timestamp.fromDate(weekStart))
+            where('date', '>=', Timestamp.fromDate(weekStart)),
+            where('date', '<', Timestamp.fromDate(weekEnd))
         );
 
         const unsubscribeTimesheets = onSnapshot(timesheetsQuery,

@@ -9,7 +9,6 @@ import { getWeekStart, formatDate, formatTimeTo12Hour } from '@/lib/utils';
 import { updateTimesheetStatus, correctTimesheet } from '@/app/actions/timesheets';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useNotification } from '@/contexts/NotificationContext';
-import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminFilterBar from '@/components/admin/AdminFilterBar';
 import AdminTabs from '@/components/admin/AdminTabs';
 import AdminFormModal, { AdminModalFooter } from '@/components/admin/AdminFormModal';
@@ -266,9 +265,6 @@ function AdminTimesheetsContent() {
             <div className="flex flex-col h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-1.5rem)] min-h-0 overflow-hidden">
                 {/* ── Static header, banners, and filter bars ── */}
             <div className="shrink-0">
-                <AdminPageHeader
-                    title="Timesheet Approvals"
-                />
 
                 {showFlaggedOnly && (
                     <div className="mb-5 p-3.5 bg-amber-50 border border-amber-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">

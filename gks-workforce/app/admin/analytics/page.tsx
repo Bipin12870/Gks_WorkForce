@@ -216,7 +216,6 @@ export default function AnalyticsPage() {
     return (
         <>
             <AdminPageHeader
-                title="Analytics"
                 description="Labor cost, hours trends, and roster coverage for the selected week."
             />
 

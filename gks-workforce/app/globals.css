@@ -232,7 +232,7 @@ body, input, select, textarea, button {
   }
 
   .admin-toolbar {
-    @apply bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between;
+    @apply flex flex-col gap-4 md:flex-row md:items-center md:justify-between;
   }
 
   .admin-section-card {

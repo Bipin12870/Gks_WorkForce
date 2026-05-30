@@ -72,10 +72,10 @@ export default function RosterWeeklyGrid({
     };
 
     return (
-        <div className="w-full max-h-[calc(100vh-240px)] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-md">
+        <div className="w-full max-h-[calc(100vh-240px)] overflow-auto rounded-xl border border-slate-200 bg-white shadow-xs">
             <div className="min-w-[900px]">
                 {/* Header Row */}
-                <div className="flex border-b border-slate-200 bg-slate-50/95 backdrop-blur-md sticky top-0 z-20 shadow-sm">
+                <div className="flex border-b border-slate-200 bg-slate-50/95 backdrop-blur-md sticky top-0 z-20 shadow-xs">
                     <div className="w-48 shrink-0 border-r border-slate-200 px-5 py-4 flex flex-col justify-center bg-slate-50">
                         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Staff Member</span>
                     </div>
@@ -84,8 +84,8 @@ export default function RosterWeeklyGrid({
                         const isToday = new Date().toDateString() === date.toDateString();
                         const isPast = isPastDate(date);
                         return (
-                            <div 
-                                key={date.toISOString()} 
+                            <div
+                                key={date.toISOString()}
                                 className={`flex-1 border-r border-slate-200 last:border-r-0 px-3 py-3 text-center transition-all ${
                                     isToday ? 'bg-blue-50/40 relative' : isPast ? 'bg-slate-100/30' : ''
                                 }`}
@@ -131,7 +131,7 @@ export default function RosterWeeklyGrid({
                             const avail = getAvailability(member.id, dayOfWeek);
                             const shift = getShift(member.id, date);
                             const isPast = isPastDate(date);
-                            
+
                             const hasAvail = avail && avail.timeRanges && avail.timeRanges.length > 0;
                             const isUnavailable = !hasAvail;
 
@@ -140,11 +140,11 @@ export default function RosterWeeklyGrid({
                                     key={`${member.id}-${date.toISOString()}`}
                                     className={`flex-1 border-r border-slate-100 last:border-r-0 p-2 relative group cursor-pointer transition-all flex items-center justify-center ${
                                         isPast
-                                            ? isUnavailable 
+                                            ? isUnavailable
                                                 ? 'bg-slate-100/40 border-slate-100'
                                                 : 'bg-slate-50/30 hover:bg-slate-100/40'
-                                            : isUnavailable 
-                                                ? 'bg-red-50/30 border-red-100/30 hover:bg-red-50/50' 
+                                            : isUnavailable
+                                                ? 'bg-red-50/30 border-red-100/30 hover:bg-red-50/50'
                                                 : hasAvail
                                                     ? 'bg-emerald-50/20 hover:bg-emerald-50/50 hover:ring-1 hover:ring-emerald-300/40'
                                                     : 'hover:bg-blue-50/40 hover:ring-1 hover:ring-blue-300/50'
@@ -152,14 +152,15 @@ export default function RosterWeeklyGrid({
                                     onClick={() => onCellClick(member.id, dayOfWeek, shift)}
                                 >
                                     {shift ? (
-                                        <div className={`w-full h-full rounded-xl border flex flex-col justify-center items-center px-1 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-                                            isPast
-                                                ? 'bg-slate-100 border-slate-200 text-slate-500' 
-                                                : shift.availabilityOverride 
-                                                    ? 'bg-amber-50 border-amber-300 text-amber-900' 
-                                                    : 'bg-blue-600 border-blue-700 text-white'
-                                        }`}
-                                        title={`${getDurationHrs(shift.startTime, shift.endTime)} hrs total`}
+                                        <div
+                                            className={`w-full h-full rounded-lg border flex flex-col justify-center items-center px-1 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                                                isPast
+                                                    ? 'bg-slate-100 border-slate-200 text-slate-500'
+                                                    : shift.availabilityOverride
+                                                        ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                                        : 'bg-blue-600 border-blue-700 text-white'
+                                            }`}
+                                            title={`${getDurationHrs(shift.startTime, shift.endTime)} hrs total`}
                                         >
                                             <span className="text-[11px] font-semibold tracking-tight whitespace-nowrap group-hover:hidden">
                                                 {formatTimeTo12Hour(shift.startTime)}–{formatTimeTo12Hour(shift.endTime)}
@@ -170,23 +171,19 @@ export default function RosterWeeklyGrid({
                                             </div>
                                         </div>
                                     ) : isUnavailable ? (
-                                        // Quiet, borderless Unavailable label
                                         <span className={`text-[11px] font-medium tracking-tight ${
                                             isPast ? 'text-slate-400/80' : 'text-rose-600/70'
                                         }`}>
                                             Unavailable
                                         </span>
                                     ) : (
-                                        // Available but no shift - fully visible
                                         <div className="w-full h-full flex flex-col justify-center items-center transition-all">
-                                            {/* Hover State: Click to Add */}
                                             <div className="hidden group-hover:flex flex-col items-center justify-center">
-                                                <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/90 px-2 py-1.5 rounded-lg border border-blue-200 shadow-xs hover:bg-blue-600 hover:text-white transition-colors">
+                                                <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/90 px-2.5 py-1 rounded-md border border-blue-200 shadow-xs hover:bg-blue-600 hover:text-white transition-colors">
                                                     + Add Shift
                                                 </span>
                                             </div>
-                                            
-                                            {/* Normal State: Show Available Hours clearly */}
+
                                             <div className="group-hover:hidden flex flex-col items-center justify-center text-center">
                                                 <span className={`text-[11px] font-semibold tracking-tight ${isPast ? 'text-slate-400' : 'text-slate-700'}`}>
                                                     {formatTimeTo12Hour(avail.timeRanges[0].start)}–{formatTimeTo12Hour(avail.timeRanges[0].end)}
@@ -202,29 +199,6 @@ export default function RosterWeeklyGrid({
                         })}
                     </div>
                 ))}
-            </div>
-            
-            {/* Legend */}
-            <div className="flex flex-wrap items-center gap-5 px-5 py-3.5 border-t border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-500">
-                <div className="flex items-center gap-2">
-                    <div className="w-3.5 h-3.5 rounded-full bg-blue-600 shadow-xs border border-blue-700" />
-                    <span>Scheduled Shift</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3.5 h-3.5 rounded-full bg-amber-50 border border-amber-300" />
-                    <span>Availability Override</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span>Available Time Window</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3.5 h-3.5 rounded bg-red-50/50 border border-red-100/50" />
-                    <span>Staff Unavailable</span>
-                </div>
-                <div className="ml-auto text-[11px] text-slate-400 font-medium italic">
-                    Click any cell to schedule, modify, or delete a shift
-                </div>
             </div>
         </div>
     );

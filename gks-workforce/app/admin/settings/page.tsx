@@ -82,7 +82,7 @@ export default function AdminSettingsPage() {
         setSavingLocation(true);
         try {
             await saveShopLocation(parsedLat, parsedLng, parsedRadius, name);
-            setCurrent({ lat: parsedLat, lng: parsedLng, radiusMetres: parsedRadius, name: name });
+            setCurrent({ ...current, lat: parsedLat, lng: parsedLng, radiusMetres: parsedRadius, name: name } as ShopLocation);
             showNotification('Location saved successfully!', 'success');
         } catch (err) {
             showNotification((err as Error).message || 'Failed to save location.', 'error');
@@ -132,7 +132,7 @@ export default function AdminSettingsPage() {
                     {/* Capture Button */}
                     <div>
                         <Button 
-                            variant="outline" 
+                            variant="secondary" 
                             className="w-full sm:w-auto"
                             onClick={handleUseMyLocation}
                             disabled={locating}

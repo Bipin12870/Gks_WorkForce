@@ -5,7 +5,7 @@ import * as admin from 'firebase-admin';
 import { requireStaff } from './shared/auth';
 import { logAuditEvent } from '@/lib/audit-logger';
 import { calculatePayrollServer } from '@/lib/payroll-engine';
-import { getWeekStart, isWithinShopHours, getClientLocalDate, parseTime, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
+import { getWeekStart, isWithinShopHours, getClientLocalDate, parseTime, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, getShopTimezoneOffset } from '@/lib/utils';
 
 /**
  * Pure Haversine distance calculator.
@@ -65,6 +65,9 @@ export async function clockIn(
         const db = getAdminDb();
 
         const serverNow = Date.now();
+        // Force the server to calculate the offset for Australia/Sydney, ignoring the client's offset
+        timezoneOffset = getShopTimezoneOffset(serverNow);
+
         // 1. Clock drift check (max 2 minutes)
         if (Math.abs(serverNow - clientTimeMs) > 120000) {
             throw new Error('Client clock drift detected. Please synchronize your system time.');
@@ -221,6 +224,9 @@ export async function clockOut(
         const db = getAdminDb();
 
         const serverNow = Date.now();
+        // Force the server to calculate the offset for Australia/Sydney, ignoring the client's offset
+        timezoneOffset = getShopTimezoneOffset(serverNow);
+
         // 1. Clock drift check (max 2 minutes) if not auto-closing
         if (!isAutoClose && Math.abs(serverNow - clientTimeMs) > 120000) {
             throw new Error('Client clock drift detected. Please synchronize your system time.');

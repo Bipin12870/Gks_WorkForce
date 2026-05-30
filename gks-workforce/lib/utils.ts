@@ -3,6 +3,19 @@
  */
 export const SHOP_OPEN_TIME = '09:00';
 export const SHOP_CLOSE_TIME = '23:59';
+export const SHOP_TIMEZONE = 'Australia/Sydney';
+
+/**
+ * Dynamically calculates the standard JS timezoneOffset (UTC - Local) for the shop's timezone 
+ * at a specific point in time, correctly handling Daylight Saving Time (DST).
+ */
+export function getShopTimezoneOffset(dateMs: number): number {
+    const d = new Date(dateMs);
+    const utcStr = d.toLocaleString('en-US', { timeZone: 'UTC' });
+    const shopStr = d.toLocaleString('en-US', { timeZone: SHOP_TIMEZONE });
+    const diffMinutes = (new Date(shopStr).getTime() - new Date(utcStr).getTime()) / 60000;
+    return -diffMinutes; // JS offset is UTC - Local
+}
 
 /**
  * Get the Monday (00:00) of the week containing the given date

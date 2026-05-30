@@ -43,6 +43,7 @@ function AdminTimesheetsContent() {
     const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('ALL');
     const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
     const [statusFilter, setStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL'>('PENDING');
+    const [isProcessing, setIsProcessing] = useState(false);
 
     // Bulk selection state
     const [selectedTimesheetIds, setSelectedTimesheetIds] = useState<string[]>([]);
@@ -152,6 +153,8 @@ function AdminTimesheetsContent() {
         workedEnd?: string,
         note?: string
     ) => {
+        if (isProcessing) return;
+        setIsProcessing(true);
         try {
             await updateTimesheetStatus(timesheetId, status, workedStart, workedEnd, note);
             showNotification(`Timesheet ${status.toLowerCase()} successfully`, 'success');
@@ -159,6 +162,8 @@ function AdminTimesheetsContent() {
         } catch (error) {
             console.error('Error updating timesheet:', error);
             showNotification((error as Error).message || 'Failed to update timesheet', 'error');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -210,7 +215,8 @@ function AdminTimesheetsContent() {
 
     // Bulk approval actions
     const handleBulkApprove = async () => {
-        if (selectedTimesheetIds.length === 0) return;
+        if (selectedTimesheetIds.length === 0 || isProcessing) return;
+        setIsProcessing(true);
 
         // Collect timesheets matching selection that do NOT require admin notes
         const toApprove = unifiedTimesheets.filter(
@@ -219,6 +225,7 @@ function AdminTimesheetsContent() {
 
         if (toApprove.length === 0) {
             showNotification('Only clean timesheets (no geofence/overtime flags) can be approved in bulk.', 'error');
+            setIsProcessing(false);
             return;
         }
 
@@ -231,6 +238,8 @@ function AdminTimesheetsContent() {
         } catch (error) {
             console.error('Error in bulk approval:', error);
             showNotification((error as Error).message || 'Failed to bulk approve timesheets.', 'error');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -447,11 +456,13 @@ function AdminTimesheetsContent() {
                         <AdminModalFooter
                             onCancel={() => setShowAdjustModal(false)}
                             onPrimary={async () => {
+                                if (isProcessing) return;
                                 if (selectedTimesheet.status === 'APPROVED') {
                                     if (!adminNote.trim()) {
                                         showNotification('Admin note is required to explain this correction', 'error');
                                         return;
                                     }
+                                    setIsProcessing(true);
                                     try {
                                         const finalStatus = voidTimesheet ? 'REJECTED' : 'APPROVED';
                                         await correctTimesheet(selectedTimesheet.id!, adjustStart, adjustEnd, adminNote, finalStatus);
@@ -463,6 +474,8 @@ function AdminTimesheetsContent() {
                                     } catch (error) {
                                         console.error('Error correcting timesheet:', error);
                                         showNotification((error as Error).message || 'Failed to update timesheet', 'error');
+                                    } finally {
+                                        setIsProcessing(false);
                                     }
                                 } else {
                                     if (selectedTimesheet.requiresAdminNote && !adminNote.trim()) {

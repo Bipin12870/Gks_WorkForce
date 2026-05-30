@@ -68,7 +68,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                             />
                         </div>
                         <span className="text-xs font-medium leading-normal tracking-tight">
-                            {notification.message}
+                            {notification.type === 'error' && !notification.message.startsWith('Error') ? `Error: ${notification.message}` : notification.message}
                         </span>
                     </div>
                 </div>

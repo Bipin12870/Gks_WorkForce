@@ -46,6 +46,7 @@ export default function AdminRosterPage() {
     const [filterMode, setFilterMode] = useState<'HARD' | 'HIGHLIGHT'>('HARD');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [forceOverride, setForceOverride] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     // Load staff data
     useEffect(() => {
@@ -191,7 +192,8 @@ export default function AdminRosterPage() {
 
     // ── Save (list-view modal) ────────────────────────────────────────────────
     const handleSaveShift = async () => {
-        if (!selectedStaff || !userData) return;
+        if (!selectedStaff || !userData || isProcessing) return;
+        setIsProcessing(true);
         try {
             if (isEditingShift && editingShiftId) {
                 await updateShift(editingShiftId, {
@@ -224,18 +226,24 @@ export default function AdminRosterPage() {
         } catch (error) {
             console.error('Error saving shift:', error);
             showNotification((error as Error).message || 'Failed to save shift. Please try again.', 'error');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
     const handleRemoveShift = async (shiftId: string) => {
+        if (isProcessing) return;
         const shift = shifts.find((s) => s.id === shiftId);
         if (!window.confirm(`Remove ${staffMap[shift?.staffId ?? '']?.name || 'this staff'} from this shift?`)) return;
+        setIsProcessing(true);
         try {
             await deleteShift(shiftId);
             showNotification('Shift removed successfully', 'success');
         } catch (error) {
             console.error('Error removing shift:', error);
             showNotification((error as Error).message || 'Failed to remove shift', 'error');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -512,6 +520,7 @@ export default function AdminRosterPage() {
                                             handleRemoveShift(editingShiftId);
                                             setShowApprovalModal(false);
                                         }}
+                                        disabled={isProcessing}
                                     >
                                         Delete Shift
                                     </Button>
@@ -528,9 +537,9 @@ export default function AdminRosterPage() {
                                         type="button"
                                         variant="primary"
                                         onClick={handleSaveShift}
-                                        disabled={hasConflict && !forceOverride}
+                                        disabled={(hasConflict && !forceOverride) || isProcessing}
                                     >
-                                        {isEditingShift ? 'Update Shift' : 'Approve Shift'}
+                                        {isProcessing ? 'Saving...' : isEditingShift ? 'Update Shift' : 'Approve Shift'}
                                     </Button>
                                 </div>
                             </div>

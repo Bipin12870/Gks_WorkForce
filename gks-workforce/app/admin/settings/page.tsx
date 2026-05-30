@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { saveShopLocation, saveAvailabilitySettings } from '@/app/actions/settings';
+import { saveShopLocation, saveAvailabilitySettings, saveOperationalSettings } from '@/app/actions/settings';
 import { getShopLocation } from '@/lib/geofence';
 import { ShopLocation } from '@/types';
 import { useNotification } from '@/contexts/NotificationContext';
@@ -26,6 +26,12 @@ export default function AdminSettingsPage() {
     const [allowMultipleRanges, setAllowMultipleRanges] = useState(false);
     const [savingRangeToggle, setSavingRangeToggle] = useState(false);
 
+    // Operational Settings
+    const [shopOpenTime, setShopOpenTime] = useState('09:00');
+    const [shopCloseTime, setShopCloseTime] = useState('23:59');
+    const [preventEarlyClockInMins, setPreventEarlyClockInMins] = useState('5');
+    const [savingOperational, setSavingOperational] = useState(false);
+
     // Load existing shop location on mount
     useEffect(() => {
         (async () => {
@@ -37,6 +43,9 @@ export default function AdminSettingsPage() {
                 setRadius(String(loc.radiusMetres));
                 setName(loc.name);
                 setAllowMultipleRanges(loc.allowMultipleAvailabilityRanges ?? false);
+                setShopOpenTime(loc.shopOpenTime || '09:00');
+                setShopCloseTime(loc.shopCloseTime || '23:59');
+                setPreventEarlyClockInMins(String(loc.preventEarlyClockInMins ?? 5));
             }
             setLoadingCurrent(false);
         })();
@@ -122,6 +131,35 @@ export default function AdminSettingsPage() {
             showNotification((err as Error).message || 'Failed to save setting.', 'error');
         } finally {
             setSavingRangeToggle(false);
+        }
+    };
+
+    const handleSaveOperational = async () => {
+        const preventEarlyMins = parseInt(preventEarlyClockInMins, 10);
+        if (isNaN(preventEarlyMins) || preventEarlyMins < 0) {
+            showNotification('Early clock-in threshold must be a valid positive number.', 'error');
+            return;
+        }
+
+        setSavingOperational(true);
+        try {
+            await saveOperationalSettings(shopOpenTime, shopCloseTime, preventEarlyMins);
+            showNotification('Operational settings saved successfully!', 'success');
+            
+            // update current state
+            if (current) {
+                setCurrent({
+                    ...current,
+                    shopOpenTime,
+                    shopCloseTime,
+                    preventEarlyClockInMins: preventEarlyMins
+                });
+            }
+        } catch (err) {
+            console.error('Error saving operational settings:', err);
+            showNotification((err as Error).message || 'Failed to save operational settings.', 'error');
+        } finally {
+            setSavingOperational(false);
         }
     };
 
@@ -331,6 +369,70 @@ export default function AdminSettingsPage() {
                             </li>
                         </ul>
                     </div>
+                    {/* Operational Settings Card */}
+                    <div className="admin-section-card p-6">
+                        <div className="mb-5">
+                            <h2 className="text-section-title">Operational Settings</h2>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Configure business hours and early clock-in limits.
+                            </p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Shop Opening Time
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={shopOpenTime}
+                                        onChange={(e) => setShopOpenTime(e.target.value)}
+                                        className="admin-input-base w-full"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Shop Closing Time
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={shopCloseTime}
+                                        onChange={(e) => setShopCloseTime(e.target.value)}
+                                        className="admin-input-base w-full"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Early Clock-In Threshold (minutes)
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="number"
+                                        value={preventEarlyClockInMins}
+                                        onChange={(e) => setPreventEarlyClockInMins(e.target.value)}
+                                        className="admin-input-base flex-1"
+                                        placeholder="e.g. 5"
+                                        min="0"
+                                        max="60"
+                                    />
+                                    <Button 
+                                        variant="primary" 
+                                        onClick={handleSaveOperational}
+                                        disabled={savingOperational}
+                                    >
+                                        {savingOperational ? 'Saving...' : 'Save Settings'}
+                                    </Button>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Staff won't be able to clock in if they arrive more than this many minutes before their shift starts.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Availability Settings Card */}
                     <div className="admin-section-card p-6">
                         <div className="mb-5">

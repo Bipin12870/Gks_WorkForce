@@ -5,7 +5,7 @@ import * as admin from 'firebase-admin';
 import { requireStaff } from './shared/auth';
 import { logAuditEvent } from '@/lib/audit-logger';
 import { calculatePayrollServer } from '@/lib/payroll-engine';
-import { getWeekStart, isWithinShopHours, getClientLocalDate } from '@/lib/utils';
+import { getWeekStart, isWithinShopHours, getClientLocalDate, parseTime, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
 
 /**
  * Pure Haversine distance calculator.
@@ -75,14 +75,7 @@ export async function clockIn(
             throw new Error('GPS accuracy too low to clock in.');
         }
 
-        // 3. Prevent double clock-in
-        const activeRecords = await db.collection('timeRecords')
-            .where('staffId', '==', user.id)
-            .where('clockOutTime', '==', null)
-            .get();
-        if (!activeRecords.empty) {
-            throw new Error('You are already clocked in.');
-        }
+        // 3. (Check moved inside transaction at step 8)
 
         // 4. Verify clock-in cooling period (10 seconds)
         const lastRecords = await db.collection('timeRecords')
@@ -114,9 +107,11 @@ export async function clockIn(
         }
 
         // 6. Rounding and shop hours check
+        const shopOpenTime = shop.shopOpenTime || SHOP_OPEN_TIME;
+        const shopCloseTime = shop.shopCloseTime || SHOP_CLOSE_TIME;
         const clockInRounded = getClientLocalTimeRounded(serverNow, timezoneOffset);
-        if (!isWithinShopHours(clockInRounded)) {
-            throw new Error(`Clock-in is only allowed between 09:00 and 23:59.`);
+        if (!isWithinShopHours(clockInRounded, shopOpenTime, shopCloseTime)) {
+            throw new Error(`Clock-in is only allowed between ${shopOpenTime} and ${shopCloseTime}.`);
         }
 
         // 7. Find matching shift
@@ -134,32 +129,60 @@ export async function clockIn(
             if (hasCompleted) {
                 // Roster shift was already completed/auto-closed today. Treat this clock-in as unscheduled.
                 shift = null;
+            } else {
+                // Enforce Early Clock-in limit
+                const preventMins = shop.preventEarlyClockInMins ?? 5;
+                if (preventMins > 0) {
+                    const shiftStart = shift.data().startTime;
+                    const shiftStartParsed = parseTime(shiftStart);
+                    const clockInParsed = parseTime(clockInRounded);
+                    const shiftTotal = shiftStartParsed.hours * 60 + shiftStartParsed.minutes;
+                    const clockInTotal = clockInParsed.hours * 60 + clockInParsed.minutes;
+                    
+                    if (shiftTotal - clockInTotal > preventMins) {
+                        throw new Error(`You cannot clock in more than ${preventMins} minutes before your shift starts (${shiftStart}).`);
+                    }
+                }
             }
         }
 
-        // 8. Create time record
-        const recordPayload = {
-            staffId: user.id,
-            clockInTime: admin.firestore.Timestamp.fromMillis(serverNow),
-            clockInRounded,
-            clockInLat: lat,
-            clockInLng: lng,
-            clockInAccuracy: accuracy,
-            clockOutTime: null,
-            clockOutRounded: null,
-            clockOutLat: null,
-            clockOutLng: null,
-            clockOutAccuracy: null,
-            clockOutWithinGeofence: null,
-            hoursWorked: null,
-            shiftId: shift ? shift.id : null,
-            timesheetId: null,
-            source: 'GPS',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
+        // 8. Create time record transactionally
+        let docRefId = '';
+        await db.runTransaction(async (transaction: admin.firestore.Transaction) => {
+            // Prevent double clock-in (transactional check)
+            const activeQuery = db.collection('timeRecords')
+                .where('staffId', '==', user.id)
+                .where('clockOutTime', '==', null);
+            const activeRecords = await transaction.get(activeQuery);
+            if (!activeRecords.empty) {
+                throw new Error('You are already clocked in.');
+            }
 
-        const docRef = await db.collection('timeRecords').add(recordPayload);
+            const docRef = db.collection('timeRecords').doc();
+            docRefId = docRef.id;
+            
+            const recordPayload = {
+                staffId: user.id,
+                clockInTime: admin.firestore.Timestamp.fromMillis(serverNow),
+                clockInRounded,
+                clockInLat: lat,
+                clockInLng: lng,
+                clockInAccuracy: accuracy,
+                clockOutTime: null,
+                clockOutRounded: null,
+                clockOutLat: null,
+                clockOutLng: null,
+                clockOutAccuracy: null,
+                clockOutWithinGeofence: null,
+                hoursWorked: null,
+                shiftId: shift ? shift.id : null,
+                timesheetId: null,
+                source: 'GPS',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+            transaction.set(docRef, recordPayload);
+        });
 
         // 9. Log audit log
         await logAuditEvent({
@@ -167,14 +190,14 @@ export async function clockIn(
             actorRole: user.role,
             action: 'CLOCK_IN',
             targetCollection: 'timeRecords',
-            targetDocumentId: docRef.id,
+            targetDocumentId: docRefId,
             newValues: {
                 clockInRounded,
                 shiftId: shift ? shift.id : null,
             },
         });
 
-        return { success: true, id: docRef.id };
+        return { success: true, id: docRefId };
     } catch (error) {
         console.error('Error in clockIn action:', error);
         return { success: false, id: null, error: (error as Error).message };
@@ -276,7 +299,7 @@ export async function clockOut(
             gpsEvents.push({ type: 'OUTSIDE' as const, time: clockOutRounded });
         }
 
-        const automationResult = calculatePayrollServer({
+        const automationResult = await calculatePayrollServer({
             clockIn: recordData.clockInRounded,
             clockOut: clockOutRounded,
             roster: shift ? { start: shift.startTime, end: shift.endTime } : undefined,

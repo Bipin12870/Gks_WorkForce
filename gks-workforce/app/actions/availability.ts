@@ -4,7 +4,7 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { requireStaff } from './shared/auth';
 import { logAuditEvent } from '@/lib/audit-logger';
-import { isWithinShopHours, isTimeBefore, getWeekStartForOffset } from '@/lib/utils';
+import { isWithinShopHours, isTimeBefore, getWeekStartForOffset, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
 
 /**
  * Format date as YYYY-MM-DD without timezone offset drift.
@@ -40,6 +40,12 @@ export async function submitAvailability(
         const weekStart = getWeekStartForOffset(weekStartDateMs, offset);
         const weekStartStr = formatLocalDateKeyServer(weekStart, offset);
         const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStart);
+
+        // Fetch dynamic operational settings
+        const shopDoc = await db.collection('config').doc('shopLocation').get();
+        const shopConfig = shopDoc.exists ? shopDoc.data() : {};
+        const shopOpenTime = shopConfig?.shopOpenTime || SHOP_OPEN_TIME;
+        const shopCloseTime = shopConfig?.shopCloseTime || SHOP_CLOSE_TIME;
 
         const weekStartLocalCalendar = new Date(weekStart.getTime() - (offset * 60 * 1000));
         const todayLocalCalendar = new Date(Date.now() - (offset * 60 * 1000));
@@ -84,8 +90,8 @@ export async function submitAvailability(
 
             // Validate shop hours and durations
             for (const r of sortedRanges) {
-                if (!isWithinShopHours(r.start) || !isWithinShopHours(r.end)) {
-                    throw new Error(`Availability must be within shop hours (09:00 - 23:59).`);
+                if (!isWithinShopHours(r.start, shopOpenTime, shopCloseTime) || !isWithinShopHours(r.end, shopOpenTime, shopCloseTime)) {
+                    throw new Error(`Availability must be within shop hours (${shopOpenTime} - ${shopCloseTime}).`);
                 }
                 if (!isTimeBefore(r.start, r.end)) {
                     throw new Error(`Invalid duration: End time must be after start time.`);

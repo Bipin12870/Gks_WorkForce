@@ -169,6 +169,12 @@ export interface ShopLocation {
     radiusMetres: number;   // geofence radius, default 100
     name: string;           // e.g. "GKS Shop"
     allowMultipleAvailabilityRanges?: boolean; // admin toggle — defaults to false
+    
+    // Operational Settings
+    shopOpenTime?: string;
+    shopCloseTime?: string;
+    preventEarlyClockInMins?: number;
+    
     setAt: Timestamp;
     setBy: string;          // admin uid
 }

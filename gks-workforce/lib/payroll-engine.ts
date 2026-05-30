@@ -1,5 +1,6 @@
 import 'server-only';
 import { processTimesheetAutomation, PayrollEngineResult } from './utils';
+import { getAdminDb } from './firebase-admin';
 
 export interface PayrollInput {
     clockIn: string;
@@ -14,12 +15,20 @@ export interface PayrollInput {
  * Wraps the exact same processTimesheetAutomation logic from utils.ts
  * to guarantee identical calculations on client and server.
  */
-export function calculatePayrollServer(input: PayrollInput): PayrollEngineResult {
+export async function calculatePayrollServer(input: PayrollInput): Promise<PayrollEngineResult> {
+    const db = getAdminDb();
+    const configDoc = await db.collection('config').doc('shopLocation').get();
+    const config = configDoc.exists ? configDoc.data() : {};
+    
     return processTimesheetAutomation(
         input.clockIn,
         input.clockOut,
         input.roster,
         input.gpsEvents,
-        input.isManualEdit ?? false
+        input.isManualEdit ?? false,
+        {
+            shopOpenTime: config?.shopOpenTime,
+            shopCloseTime: config?.shopCloseTime,
+        }
     );
 }

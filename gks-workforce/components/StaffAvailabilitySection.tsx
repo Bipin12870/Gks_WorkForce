@@ -83,10 +83,10 @@ function _clearDraft(userId: string, weekStart: Date): void {
 }
 // ──────────────────────────────────────────────────────────────────────────────
 
-function rangeHasIssue(range: TimeRange): string | null {
+function rangeHasIssue(range: TimeRange, shopOpen: string, shopClose: string): string | null {
     if (!range.start || !range.end) return null;
-    if (!isWithinShopHours(range.start) || !isWithinShopHours(range.end)) {
-        return `Times must be between ${SHOP_OPEN_TIME} and ${SHOP_CLOSE_TIME}`;
+    if (!isWithinShopHours(range.start, shopOpen, shopClose) || !isWithinShopHours(range.end, shopOpen, shopClose)) {
+        return `Times must be between ${shopOpen} and ${shopClose}`;
     }
     if (!isTimeBefore(range.start, range.end)) {
         return 'End time must be after start time';
@@ -107,6 +107,11 @@ export default function StaffAvailabilitySection() {
     const [openDay, setOpenDay] = useState<number | null>(new Date().getDay());
     const { showNotification } = useNotification();
     const [allowMultipleRanges, setAllowMultipleRanges] = useState(false);
+    
+    // Operational config
+    const [shopOpenTime, setShopOpenTime] = useState(SHOP_OPEN_TIME);
+    const [shopCloseTime, setShopCloseTime] = useState(SHOP_CLOSE_TIME);
+
     // Prevents saving draft during initial Firestore load
     const draftReady = useRef(false);
 
@@ -175,9 +180,11 @@ export default function StaffAvailabilitySection() {
             setIsRecurring(finalRecurring);
             setLockedDays(daysWithShifts);
 
-            // Load admin toggle for multiple ranges (no auth required — public config)
+            // Load admin toggle and operational config
             const shopConfig = await getShopLocation();
             setAllowMultipleRanges(shopConfig?.allowMultipleAvailabilityRanges ?? false);
+            if (shopConfig?.shopOpenTime) setShopOpenTime(shopConfig.shopOpenTime);
+            if (shopConfig?.shopCloseTime) setShopCloseTime(shopConfig.shopCloseTime);
         } catch (error) {
             console.error('Error loading availability:', error);
             showNotification('Failed to load your availability. Please set it again.', 'error');
@@ -223,7 +230,7 @@ export default function StaffAvailabilitySection() {
 
         const existingRanges = availability[dayOfWeek] || [];
 
-        let start = SHOP_OPEN_TIME;
+        let start = shopOpenTime;
         let end = '17:00';
 
         if (existingRanges.length > 0) {
@@ -232,14 +239,14 @@ export default function StaffAvailabilitySection() {
             ];
             start = lastRange.end;
 
-            if (start === '24:00' || !isTimeBefore(start, SHOP_CLOSE_TIME)) {
+            if (start === '24:00' || !isTimeBefore(start, shopCloseTime)) {
                 showNotification('No more space for additional ranges on this day', 'error');
                 return;
             }
 
             end = incrementTime(start, 60);
-            if (isTimeBefore(SHOP_CLOSE_TIME, end)) {
-                end = SHOP_CLOSE_TIME;
+            if (isTimeBefore(shopCloseTime, end)) {
+                end = shopCloseTime;
             }
         }
 
@@ -365,7 +372,7 @@ export default function StaffAvailabilitySection() {
                 );
 
                 for (const range of sortedRanges) {
-                    const issue = rangeHasIssue(range);
+                    const issue = rangeHasIssue(range, shopOpenTime, shopCloseTime);
                     if (issue) {
                         showNotification(`${getDayName(dayOfWeek)}: ${issue}`, 'error');
                         setLoading(false);
@@ -563,7 +570,7 @@ export default function StaffAvailabilitySection() {
                                         ) : (
                                             <div className="space-y-2">
                                                 {ranges.map((range, index) => {
-                                                    const issue = !dayLocked ? rangeHasIssue(range) : null;
+                                                    const issue = !dayLocked ? rangeHasIssue(range, shopOpenTime, shopCloseTime) : null;
                                                     return (
                                                         <div key={index} className="space-y-1.5 min-w-0 w-full">
                                                             <div

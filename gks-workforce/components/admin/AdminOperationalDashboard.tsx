@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, onSnapshot, Timestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, Timestamp, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminStatCard from '@/components/admin/AdminStatCard';
@@ -66,11 +66,12 @@ export default function AdminOperationalDashboard() {
 
     // 2. Real-time listeners for dashboard alerts & status
     useEffect(() => {
-        const qAll = query(collection(db, 'timesheets'), where('status', '==', 'PENDING'));
+        const qAll = query(collection(db, 'timesheets'), where('status', '==', 'PENDING'), limit(100));
         const qFlagged = query(
             collection(db, 'timesheets'),
             where('status', '==', 'PENDING'),
-            where('requiresAdminNote', '==', true)
+            where('requiresAdminNote', '==', true),
+            limit(100)
         );
 
         const startOfToday = new Date();

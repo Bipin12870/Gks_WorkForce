@@ -225,55 +225,33 @@ export async function deleteStaffAccountFull(staffId: string) {
                 throw error;
             }
         }
+        
+        // 3. Update Firestore to set isActive: false and append (Deleted)
+        const deletedName = `${userData.name} (Deleted)`;
+        await db.collection('users').doc(staffId).update({
+            name: deletedName,
+            isActive: false,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
 
-        // 3. Query all related documents to delete
-        const batch = db.batch();
-
-        // - Shifts
-        const shiftsSnap = await db.collection('shifts').where('staffId', '==', staffId).get();
-        shiftsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
-
-        // - Availability
-        const availSnap = await db.collection('availability').where('staffId', '==', staffId).get();
-        availSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
-
-        // - TimeRecords
-        const timeRecordsSnap = await db.collection('timeRecords').where('staffId', '==', staffId).get();
-        timeRecordsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
-
-        // - Roster Audit Logs
-        const rosterLogsSnap = await db.collection('rosterAuditLogs').where('staffId', '==', staffId).get();
-        rosterLogsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
-
-        // - Timesheets
-        const timesheetsSnap = await db.collection('timesheets').where('staffId', '==', staffId).get();
-        timesheetsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
-
-        // - User document
-        batch.delete(db.collection('users').doc(staffId));
-
-        // 4. Commit Firestore batch
-        await batch.commit();
-
-        // 5. Log Audit Event
+        // 4. Log Audit Event
         await logAuditEvent({
             actorId: adminUser.id,
             actorRole: adminUser.role,
-            action: 'STAFF_DELETE_FULL',
+            action: 'STAFF_DELETE_SOFT',
             targetCollection: 'users',
             targetDocumentId: staffId,
             previousValues: {
-                name: userData.name,
-                email: userData.email,
-                username: userData.username,
-                role: userData.role,
-                hourlyRate: userData.hourlyRate,
+                isActive: userData.isActive,
+            },
+            newValues: {
+                isActive: false,
             },
         });
 
         return { success: true };
     } catch (error) {
-        console.error('Error in deleteStaffAccountFull:', error);
+        console.error('Error in deleteStaffAccountFull (Soft Delete):', error);
         throw new Error((error as Error).message);
     }
 }

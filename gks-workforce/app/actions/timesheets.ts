@@ -161,6 +161,7 @@ export async function updateTimesheetStatus(
             const approvedTimesheets = await db.collection('timesheets')
                 .where('staffId', '==', timesheetData.staffId)
                 .where('status', '==', 'APPROVED')
+                .where('date', '==', timesheetData.date)
                 .get();
 
             const targetDateStr = timesheetData.date.toDate().toDateString();
@@ -284,6 +285,7 @@ export async function correctTimesheet(
             const approvedTimesheets = await db.collection('timesheets')
                 .where('staffId', '==', timesheetData.staffId)
                 .where('status', '==', 'APPROVED')
+                .where('date', '==', timesheetData.date)
                 .get();
 
             const targetDateStr = timesheetData.date.toDate().toDateString();

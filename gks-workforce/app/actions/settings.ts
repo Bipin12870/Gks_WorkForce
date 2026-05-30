@@ -101,3 +101,48 @@ export async function saveAvailabilitySettings(allowMultipleRanges: boolean) {
         throw new Error((error as Error).message);
     }
 }
+
+/**
+ * Saves operational business rules (Shop Hours, Clock-in constraints).
+ */
+export async function saveOperationalSettings(
+    shopOpenTime: string,
+    shopCloseTime: string,
+    preventEarlyClockInMins: number
+) {
+    try {
+        const adminUser = await requireAdmin();
+        const db = getAdminDb();
+
+        const docRef = db.collection('config').doc('shopLocation');
+        const existingDoc = await docRef.get();
+        const previousValues = existingDoc.exists ? existingDoc.data() : null;
+
+        const newValues = {
+            shopOpenTime,
+            shopCloseTime,
+            preventEarlyClockInMins,
+        };
+
+        await docRef.set(newValues, { merge: true });
+
+        await logAuditEvent({
+            actorId: adminUser.id,
+            actorRole: adminUser.role,
+            action: 'UPDATE_OPERATIONAL_SETTINGS',
+            targetCollection: 'config',
+            targetDocumentId: 'shopLocation',
+            previousValues: {
+                shopOpenTime: previousValues?.shopOpenTime ?? null,
+                shopCloseTime: previousValues?.shopCloseTime ?? null,
+                preventEarlyClockInMins: previousValues?.preventEarlyClockInMins ?? null,
+            },
+            newValues,
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error in saveOperationalSettings:', error);
+        throw new Error((error as Error).message);
+    }
+}

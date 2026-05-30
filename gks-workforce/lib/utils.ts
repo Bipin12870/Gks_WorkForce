@@ -1,7 +1,7 @@
 /**
  * Operating hours constants
  */
-export const SHOP_OPEN_TIME = '05:00'; // TODO: revert to '09:00' after testing
+export const SHOP_OPEN_TIME = '09:00';
 export const SHOP_CLOSE_TIME = '23:59';
 
 /**
@@ -111,7 +111,8 @@ export function processTimesheetAutomation(
     clockOut: string,
     roster?: { start: string; end: string },
     gpsEvents?: { type: 'OUTSIDE' | 'INSIDE'; time: string }[],
-    isManualEdit: boolean = false
+    isManualEdit: boolean = false,
+    options?: { shopOpenTime?: string; shopCloseTime?: string }
 ): PayrollEngineResult {
     const flags: string[] = [];
     
@@ -155,8 +156,14 @@ export function processTimesheetAutomation(
     result.payroll.roundedPayableMinutes = Math.round(rawMinutes / 5) * 5;
 
     // 4. CLASSIFICATION ENGINE (Flags & Bounds)
-    const shopOpenTotal = 5 * 60;
-    const shopCloseTotal = 23 * 60 + 59;
+    const openTimeStr = options?.shopOpenTime || SHOP_OPEN_TIME;
+    const closeTimeStr = options?.shopCloseTime || SHOP_CLOSE_TIME;
+    
+    const parsedOpen = parseTime(openTimeStr);
+    const parsedClose = parseTime(closeTimeStr);
+    
+    const shopOpenTotal = parsedOpen.hours * 60 + parsedOpen.minutes;
+    const shopCloseTotal = parsedClose.hours * 60 + parsedClose.minutes;
 
     if (startTotal < shopOpenTotal || endTotal > shopCloseTotal) {
         flags.push('AFTER_HOURS');
@@ -270,12 +277,13 @@ export function calculatePayrollRecord(
     workedStart: string,
     workedEnd: string,
     rosteredEnd?: string,
-    isGpsOutside?: boolean
+    isGpsOutside?: boolean,
+    options?: { shopOpenTime?: string; shopCloseTime?: string }
 ): { isValid: boolean; rawMinutes: number; payableMinutes: number; flags: string[] } {
     const roster = rosteredEnd ? { start: workedStart, end: rosteredEnd } : undefined;
     const gpsEvents: { type: 'OUTSIDE' | 'INSIDE'; time: string }[] = isGpsOutside ? [{ type: 'OUTSIDE', time: workedEnd }] : [];
     
-    const result = processTimesheetAutomation(workedStart, workedEnd, roster, gpsEvents);
+    const result = processTimesheetAutomation(workedStart, workedEnd, roster, gpsEvents, false, options);
     
     return {
         isValid: result.validation.isValid,
@@ -286,11 +294,11 @@ export function calculatePayrollRecord(
 }
 
 /**
- * Check if a time string is within the strictly enforced shop hours (09:00-23:59)
+ * Check if a time string is within the strictly enforced shop hours
  */
-export function isWithinShopHours(timeStr: string): boolean {
+export function isWithinShopHours(timeStr: string, shopOpen: string = SHOP_OPEN_TIME, shopClose: string = SHOP_CLOSE_TIME): boolean {
     if (!timeStr) return false;
-    return !isTimeBefore(timeStr, SHOP_OPEN_TIME) && !isTimeBefore(SHOP_CLOSE_TIME, timeStr);
+    return !isTimeBefore(timeStr, shopOpen) && !isTimeBefore(shopClose, timeStr);
 }
 
 /**

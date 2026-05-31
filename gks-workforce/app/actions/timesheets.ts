@@ -4,7 +4,7 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { requireStaff, requireAdmin } from './shared/auth';
 import { logAuditEvent } from '@/lib/audit-logger';
-import { getWeekStart, parseTime, isWithinShopHours, hasOverlap } from '@/lib/utils';
+import { getWeekStart, parseTime, isWithinShopHours, hasOverlap, getShopLocalDateStr } from '@/lib/utils';
 
 /**
  * Helper to check if a clock-out time represents significant overtime (> 30 mins)
@@ -158,17 +158,21 @@ export async function updateTimesheetStatus(
 
         // 4. Overlap Check for Approvals
         if (status === 'APPROVED') {
+            const weekStart = getWeekStart(timesheetData.date.toDate());
+            const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStart);
+
             const approvedTimesheets = await db.collection('timesheets')
                 .where('staffId', '==', timesheetData.staffId)
                 .where('status', '==', 'APPROVED')
-                .where('date', '==', timesheetData.date)
+                .where('weekStartDate', '==', weekStartTimestamp)
                 .get();
 
-            const targetDateStr = timesheetData.date.toDate().toDateString();
+            const targetDateStr = getShopLocalDateStr(timesheetData.date.toDate());
             const overlapsApproved = approvedTimesheets.docs.some((doc: admin.firestore.QueryDocumentSnapshot) => {
                 if (doc.id === timesheetId) return false;
                 const t = doc.data();
-                return t.date.toDate().toDateString() === targetDateStr &&
+                const tDateStr = getShopLocalDateStr(t.date.toDate());
+                return tDateStr === targetDateStr &&
                     hasOverlap(
                         { start: finalStart, end: finalEnd },
                         [{ start: t.workedStart, end: t.workedEnd }]
@@ -282,17 +286,21 @@ export async function correctTimesheet(
             }
 
             // 4. Overlap Check (excluding current timesheet ID)
+            const weekStart = getWeekStart(timesheetData.date.toDate());
+            const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStart);
+
             const approvedTimesheets = await db.collection('timesheets')
                 .where('staffId', '==', timesheetData.staffId)
                 .where('status', '==', 'APPROVED')
-                .where('date', '==', timesheetData.date)
+                .where('weekStartDate', '==', weekStartTimestamp)
                 .get();
 
-            const targetDateStr = timesheetData.date.toDate().toDateString();
+            const targetDateStr = getShopLocalDateStr(timesheetData.date.toDate());
             const overlapsApproved = approvedTimesheets.docs.some((doc: admin.firestore.QueryDocumentSnapshot) => {
                 if (doc.id === timesheetId) return false;
                 const t = doc.data();
-                return t.date.toDate().toDateString() === targetDateStr &&
+                const tDateStr = getShopLocalDateStr(t.date.toDate());
+                return tDateStr === targetDateStr &&
                     hasOverlap(
                         { start: newWorkedStart, end: newWorkedEnd },
                         [{ start: t.workedStart, end: t.workedEnd }]

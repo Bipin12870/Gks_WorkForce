@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase-db';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Shift } from '@/types';
-import { getWeekStart, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
+import { getWeekStart, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour, getShopDayOfWeek, getShopLocalDateStr } from '@/lib/utils';
 import StaffPageShell from '@/components/staff/StaffPageShell';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import StaffStatCard from '@/components/staff/StaffStatCard';
@@ -33,19 +33,15 @@ export default function StaffRosterPage() {
 
     const isToday = (dayIndex: number) => {
         const dayDate = getDayDate(dayIndex);
-        const today = new Date();
-        return dayDate.getDate() === today.getDate() &&
-            dayDate.getMonth() === today.getMonth() &&
-            dayDate.getFullYear() === today.getFullYear();
+        return getShopLocalDateStr(dayDate) === getShopLocalDateStr(new Date());
     };
 
     const isPastWeek = () => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const todayStr = getShopLocalDateStr(new Date());
         const weekEnd = new Date(selectedWeek);
         weekEnd.setDate(weekEnd.getDate() + 7);
-        weekEnd.setHours(0, 0, 0, 0);
-        return weekEnd.getTime() <= today.getTime();
+        const weekEndStr = getShopLocalDateStr(weekEnd);
+        return weekEndStr <= todayStr;
     };
 
     useEffect(() => {
@@ -81,7 +77,7 @@ export default function StaffRosterPage() {
     };
 
     const getShiftsForDay = (dayOfWeek: number) =>
-        shifts.filter((shift) => shift.date.toDate().getDay() === dayOfWeek);
+        shifts.filter((shift) => getShopDayOfWeek(shift.date.toDate()) === dayOfWeek);
 
     const totalHours = shifts.reduce((sum, s) => sum + calculateHours(s.startTime, s.endTime), 0);
     const projectedPay = totalHours * (userData?.hourlyRate || 0);
@@ -151,19 +147,16 @@ export default function StaffRosterPage() {
                                     const formattedDate = dayDate.toLocaleDateString('en-US', {
                                         weekday: 'long',
                                         month: 'short',
-                                        day: 'numeric'
+                                        day: 'numeric',
+                                        timeZone: 'Australia/Sydney'
                                     });
 
                                     const isFirst = idx === 0;
                                     const isLast = idx === WEEK_DAYS.length - 1;
 
-                                    const today = new Date();
-                                    today.setHours(0, 0, 0, 0);
-
-                                    const checkDate = new Date(dayDate);
-                                    checkDate.setHours(0, 0, 0, 0);
-
-                                    const isPast = checkDate.getTime() < today.getTime();
+                                    const todayStr = getShopLocalDateStr(new Date());
+                                    const checkDateStr = getShopLocalDateStr(dayDate);
+                                    const isPast = checkDateStr < todayStr;
 
                                     let lineColor = "bg-slate-200";
                                     let dotColor = "bg-slate-200";

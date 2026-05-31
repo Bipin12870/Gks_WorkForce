@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase-db';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Shift, Timesheet, TimeRecord } from '@/types';
-import { getWeekStart, getDayName, formatDate, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
+import { getWeekStart, getDayName, formatDate, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour, getShopDayOfWeek, getShopTimezoneOffset } from '@/lib/utils';
 import { useNotification } from '@/contexts/NotificationContext';
 import { createManualTimesheet } from '@/app/actions/timesheets';
 import StaffSubpageShell from '@/components/staff/StaffSubpageShell';
@@ -190,18 +190,25 @@ export default function StaffProfileTimesheetsPage() {
 
     const isFutureShift = (shift: Shift) => {
         const shiftDate = shift.date.toDate();
+        const offset = getShopTimezoneOffset(shiftDate.getTime());
+        const shifted = new Date(shiftDate.getTime() - (offset * 60 * 1000));
+        
+        const year = shifted.getUTCFullYear();
+        const month = shifted.getUTCMonth();
+        const day = shifted.getUTCDate();
+        
+        const [startHours, startMinutes] = shift.startTime.split(':').map(Number);
         const [endHours, endMinutes] = shift.endTime.split(':').map(Number);
         
-        const shiftEnd = new Date(shiftDate);
-        shiftEnd.setHours(endHours, endMinutes, 0, 0);
-
-        // Handle overnight shifts (e.g. 22:00 to 06:00)
-        const [startHours, startMinutes] = shift.startTime.split(':').map(Number);
+        let endUtcMs = Date.UTC(year, month, day, endHours, endMinutes, 0, 0);
+        
+        // Handle overnight shifts
         if (endHours < startHours || (endHours === startHours && endMinutes < startMinutes)) {
-            shiftEnd.setDate(shiftEnd.getDate() + 1);
+            endUtcMs += 24 * 60 * 60 * 1000;
         }
-
-        return new Date() < shiftEnd;
+        
+        const shiftEndActualMs = endUtcMs + (offset * 60 * 1000);
+        return Date.now() < shiftEndActualMs;
     };
 
     const handleStartEdit = (shift: Shift) => {
@@ -352,7 +359,7 @@ export default function StaffProfileTimesheetsPage() {
                                     <div>
                                         <span className="text-section-title">{formatDate(item.date.toDate())}</span>
                                         <p className="text-label mt-1">
-                                            {getDayName(item.date.toDate().getDay())} · Roster: {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}
+                                            {getDayName(getShopDayOfWeek(item.date.toDate()))} · Roster: {formatTimeTo12Hour(shift.startTime)} – {formatTimeTo12Hour(shift.endTime)}
                                         </p>
                                     </div>
                                     <div className="space-y-3">
@@ -398,7 +405,8 @@ export default function StaffProfileTimesheetsPage() {
                         const formattedLongDate = dateObj.toLocaleDateString('en-US', {
                             weekday: 'long',
                             month: 'short',
-                            day: 'numeric'
+                            day: 'numeric',
+                            timeZone: 'Australia/Sydney'
                         });
 
                         return (

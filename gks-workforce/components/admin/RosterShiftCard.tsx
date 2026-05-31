@@ -1,7 +1,7 @@
 'use client';
 
 import { Shift } from '@/types';
-import { formatDate, getDayName, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
+import { formatDate, getDayName, calculateHours, formatHoursAndMinutes, formatTimeTo12Hour, getShopDayOfWeek } from '@/lib/utils';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Icon from '@/components/ui/Icon';
@@ -47,7 +47,7 @@ export default function RosterShiftCard({
                     <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold text-gray-900 truncate">{staffName}</p>
                         {showDayBadge && (
-                            <Badge variant="neutral">{getDayName(shift.date.toDate().getDay()).slice(0, 3)}</Badge>
+                            <Badge variant="neutral">{getDayName(getShopDayOfWeek(shift.date.toDate())).slice(0, 3)}</Badge>
                         )}
                     </div>
                     <p className="text-label mt-0.5">{formatDate(shift.date.toDate())}</p>

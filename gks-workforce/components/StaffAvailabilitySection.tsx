@@ -17,6 +17,8 @@ import {
     incrementTime,
     hasOverlap,
     isWithinShopHours,
+    getShopDayOfWeek,
+    getShopLocalDateStr,
 } from '@/lib/utils';
 import { submitAvailability } from '@/app/actions/availability';
 import { getShopLocation } from '@/lib/geofence';
@@ -104,7 +106,7 @@ export default function StaffAvailabilitySection() {
     const [isRecurring, setIsRecurring] = useState(false);
     const [loading, setLoading] = useState(false);
     const [lockedDays, setLockedDays] = useState<Set<number>>(new Set());
-    const [openDay, setOpenDay] = useState<number | null>(new Date().getDay());
+    const [openDay, setOpenDay] = useState<number | null>(getShopDayOfWeek(new Date()));
     const { showNotification } = useNotification();
     const [allowMultipleRanges, setAllowMultipleRanges] = useState(false);
     
@@ -159,7 +161,7 @@ export default function StaffAvailabilitySection() {
             const daysWithShifts = new Set<number>();
             shiftsSnapshot.forEach((d) => {
                 const shift = d.data();
-                daysWithShifts.add(shift.date.toDate().getDay());
+                daysWithShifts.add(getShopDayOfWeek(shift.date.toDate()));
             });
 
             // Merge draft for days that have no submitted Firestore record and aren't locked
@@ -199,27 +201,26 @@ export default function StaffAvailabilitySection() {
         loadAvailability();
     }, [loadAvailability]);
 
-    const isPastDay = useCallback((dayOfWeek: number) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
+    const getDayDate = useCallback((dayOfWeek: number) => {
         const dayDate = new Date(selectedWeek);
-        dayDate.setDate(dayDate.getDate() + (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-        dayDate.setHours(0, 0, 0, 0);
-
-        return dayDate.getTime() < today.getTime();
+        const offset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        dayDate.setDate(dayDate.getDate() + offset);
+        return dayDate;
     }, [selectedWeek]);
+
+    const isPastDay = useCallback((dayOfWeek: number) => {
+        const todayStr = getShopLocalDateStr(new Date());
+        const dayDate = getDayDate(dayOfWeek);
+        const dayDateStr = getShopLocalDateStr(dayDate);
+        return dayDateStr < todayStr;
+    }, [getDayDate]);
 
     const isToday = useCallback((dayOfWeek: number) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const dayDate = new Date(selectedWeek);
-        dayDate.setDate(dayDate.getDate() + (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-        dayDate.setHours(0, 0, 0, 0);
-
-        return dayDate.getTime() === today.getTime();
-    }, [selectedWeek]);
+        const todayStr = getShopLocalDateStr(new Date());
+        const dayDate = getDayDate(dayOfWeek);
+        const dayDateStr = getShopLocalDateStr(dayDate);
+        return dayDateStr === todayStr;
+    }, [getDayDate]);
 
     const isDayLocked = useCallback((dayOfWeek: number) => {
         return lockedDays.has(dayOfWeek) || isPastDay(dayOfWeek);

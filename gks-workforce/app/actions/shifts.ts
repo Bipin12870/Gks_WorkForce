@@ -4,7 +4,7 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { requireAdmin } from './shared/auth';
 import { logAuditEvent } from '@/lib/audit-logger';
-import { getWeekStart, parseTime, isWithinShopHours, hasOverlap, isWithinAvailability, getClientLocalDate, getWeekStartForOffset, getDayOfWeekForOffset } from '@/lib/utils';
+import { getWeekStart, parseTime, isWithinShopHours, hasOverlap, isWithinAvailability, getClientLocalDate, getWeekStartForOffset, getDayOfWeekForOffset, getShopTimezoneOffset, getShopDayOfWeek } from '@/lib/utils';
 
 /**
  * Creates a new rostered shift (Admin only).
@@ -39,7 +39,7 @@ export async function createShift(shiftData: {
         }
 
         // Determine target day and week start (timezone-aware)
-        const offset = timezoneOffset ?? 0;
+        const offset = getShopTimezoneOffset(dateMs);
         const targetDate = getClientLocalDate(dateMs, offset);
         const dayOfWeek = getDayOfWeekForOffset(dateMs, offset);
         const weekStartDate = getWeekStartForOffset(dateMs, offset);
@@ -169,7 +169,7 @@ export async function updateShift(
 
         // Determine target day and week start from existing shift
         const targetDate = existingShift.date.toDate();
-        const dayOfWeek = targetDate.getDay();
+        const dayOfWeek = getShopDayOfWeek(targetDate);
         const weekStartDate = getWeekStart(targetDate);
         const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStartDate);
 

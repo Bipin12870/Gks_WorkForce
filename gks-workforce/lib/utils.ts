@@ -21,12 +21,8 @@ export function getShopTimezoneOffset(dateMs: number): number {
  * Get the Monday (00:00) of the week containing the given date
  */
 export function getWeekStart(date: Date): Date {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-    const monday = new Date(d.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
-    return monday;
+    const offset = getShopTimezoneOffset(date.getTime());
+    return getWeekStartForOffset(date.getTime(), offset);
 }
 
 /**
@@ -40,6 +36,19 @@ export function getClientLocalDate(serverTimeMs: number, timezoneOffset: number)
     const day = shifted.getUTCDate();
     const utcMidnight = Date.UTC(year, month, day, 0, 0, 0, 0);
     return new Date(utcMidnight + (timezoneOffset * 60 * 1000));
+}
+
+/**
+ * Returns a Date representing midnight (00:00) of the given date in the shop's timezone.
+ */
+export function getShopMidnight(date: Date): Date {
+    const offset = getShopTimezoneOffset(date.getTime());
+    const shifted = new Date(date.getTime() - (offset * 60 * 1000));
+    const year = shifted.getUTCFullYear();
+    const month = shifted.getUTCMonth();
+    const day = shifted.getUTCDate();
+    const utcMidnight = Date.UTC(year, month, day, 0, 0, 0, 0);
+    return new Date(utcMidnight + (offset * 60 * 1000));
 }
 
 /**
@@ -80,14 +89,35 @@ export function getDayName(dayOfWeek: number): string {
 }
 
 /**
- * Format date as "Mon, Jan 27"
+ * Format date as "Mon, Jan 27" in shop timezone
  */
 export function formatDate(date: Date): string {
     return date.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
-        day: 'numeric'
+        day: 'numeric',
+        timeZone: SHOP_TIMEZONE
     });
+}
+
+/**
+ * Returns the weekday number (0-6) of the given Date in the shop's timezone
+ */
+export function getShopDayOfWeek(date: Date): number {
+    const offset = getShopTimezoneOffset(date.getTime());
+    return getDayOfWeekForOffset(date.getTime(), offset);
+}
+
+/**
+ * Returns the local date string in YYYY-MM-DD format in the shop's timezone
+ */
+export function getShopLocalDateStr(date: Date): string {
+    const offset = getShopTimezoneOffset(date.getTime());
+    const shifted = new Date(date.getTime() - (offset * 60 * 1000));
+    const year = shifted.getUTCFullYear();
+    const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(shifted.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 export interface PayrollEngineResult {

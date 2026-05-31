@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { Availability, Shift, User } from '@/types';
-import { getDayName, parseTime, formatTimeTo12Hour } from '@/lib/utils';
+import { getDayName, parseTime, formatTimeTo12Hour, getShopDayOfWeek, getShopLocalDateStr } from '@/lib/utils';
 import { Clock } from 'lucide-react';
 
 interface RosterWeeklyGridProps {
@@ -32,11 +32,9 @@ export default function RosterWeeklyGrid({
     }, [weekStart]);
 
     const isPastDate = (date: Date) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const d = new Date(date);
-        d.setHours(0, 0, 0, 0);
-        return d.getTime() < today.getTime();
+        const todayStr = getShopLocalDateStr(new Date());
+        const dateStr = getShopLocalDateStr(date);
+        return dateStr < todayStr;
     };
 
     // Helpers to quickly look up availability and shifts
@@ -45,9 +43,10 @@ export default function RosterWeeklyGrid({
     };
 
     const getShift = (staffId: string, targetDate: Date) => {
+        const targetDateStr = getShopLocalDateStr(targetDate);
         return shifts.find((s) => {
             const shiftDate = s.date instanceof Date ? s.date : (s.date as { toDate: () => Date }).toDate();
-            return s.staffId === staffId && shiftDate.toDateString() === targetDate.toDateString();
+            return s.staffId === staffId && getShopLocalDateStr(shiftDate) === targetDateStr;
         });
     };
 
@@ -80,8 +79,8 @@ export default function RosterWeeklyGrid({
                         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Staff Member</span>
                     </div>
                     {weekDates.map((date) => {
-                        const dayOfWeek = date.getDay();
-                        const isToday = new Date().toDateString() === date.toDateString();
+                        const dayOfWeek = getShopDayOfWeek(date);
+                        const isToday = getShopLocalDateStr(new Date()) === getShopLocalDateStr(date);
                         const isPast = isPastDate(date);
                         return (
                             <div
@@ -97,7 +96,7 @@ export default function RosterWeeklyGrid({
                                     {getDayName(dayOfWeek)}
                                 </span>
                                 <span className={`block text-sm font-semibold mt-0.5 ${isToday ? 'text-blue-700 font-semibold' : isPast ? 'text-slate-500 font-normal' : 'text-slate-800'}`}>
-                                    {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Australia/Sydney' })}
                                 </span>
                             </div>
                         );
@@ -127,7 +126,7 @@ export default function RosterWeeklyGrid({
 
                         {/* Day Cells */}
                         {weekDates.map((date) => {
-                            const dayOfWeek = date.getDay();
+                            const dayOfWeek = getShopDayOfWeek(date);
                             const avail = getAvailability(member.id, dayOfWeek);
                             const shift = getShift(member.id, date);
                             const isPast = isPastDate(date);

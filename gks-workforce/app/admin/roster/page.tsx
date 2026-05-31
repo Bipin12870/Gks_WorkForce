@@ -12,7 +12,7 @@ import {
     Timestamp,
 } from 'firebase/firestore';
 import { Availability, Shift, User, TimeRange } from '@/types';
-import { getWeekStart, getDayName, isWithinAvailability, formatTimeTo12Hour } from '@/lib/utils';
+import { getWeekStart, getDayName, isWithinAvailability, formatTimeTo12Hour, getShopDayOfWeek, getShopLocalDateStr, getShopMidnight } from '@/lib/utils';
 import { createShift, updateShift, deleteShift } from '@/app/actions/shifts';
 import { useNotification } from '@/contexts/NotificationContext';
 import AdminFilterBar from '@/components/admin/AdminFilterBar';
@@ -30,7 +30,7 @@ export default function AdminRosterPage() {
     const { userData } = useAuth();
     const { showNotification } = useNotification();
     const [selectedWeek, setSelectedWeek] = useState<Date>(getWeekStart(new Date()));
-    const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
+    const [selectedDay, setSelectedDay] = useState<number>(getShopDayOfWeek(new Date()));
     const [availability, setAvailability] = useState<Availability[]>([]);
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [staffMap, setStaffMap] = useState<Record<string, User>>({});
@@ -111,19 +111,17 @@ export default function AdminRosterPage() {
         if (!userData || userData.role !== 'ADMIN') return;
 
         const weekStart = new Date(selectedWeek);
-        const weekEnd = new Date(selectedWeek);
-        weekEnd.setDate(weekEnd.getDate() + 7);
+        const weekEnd = new Date(selectedWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
 
         // Grid view always loads the full week; list view filters by day
         let startDate = weekStart;
         let endDate = weekEnd;
 
         if (viewMode === 'list' && selectedDay !== -1) {
-            const dayDate = new Date(selectedWeek);
-            dayDate.setDate(dayDate.getDate() + (selectedDay === 0 ? 6 : selectedDay - 1));
-            dayDate.setHours(0, 0, 0, 0);
-            const nextDay = new Date(dayDate);
-            nextDay.setDate(nextDay.getDate() + 1);
+            const offset = selectedDay === 0 ? 6 : selectedDay - 1;
+            const targetDate = new Date(selectedWeek.getTime() + offset * 24 * 60 * 60 * 1000);
+            const dayDate = getShopMidnight(targetDate);
+            const nextDay = getShopMidnight(new Date(dayDate.getTime() + 25 * 60 * 60 * 1000));
             startDate = dayDate;
             endDate = nextDay;
         }
@@ -181,7 +179,7 @@ export default function AdminRosterPage() {
     const openEditModal = (shift: Shift) => {
         const staff = staffMap[shift.staffId];
         if (!staff) return;
-        const shiftDay = shift.date.toDate().getDay();
+        const shiftDay = getShopDayOfWeek(shift.date.toDate());
         const staffAvail = availability.find(
             (a) => a.staffId === shift.staffId && a.dayOfWeek === shiftDay
         );
@@ -211,18 +209,17 @@ export default function AdminRosterPage() {
                 }
                 showNotification('Shift updated successfully!', 'success');
             } else {
-                const dayDate = new Date(selectedWeek);
                 const shiftDay = selectedStaff.dayOfWeek ?? selectedDay;
-                const finalDay = shiftDay === -1 ? new Date().getDay() : shiftDay;
-                dayDate.setDate(dayDate.getDate() + (finalDay === 0 ? 6 : finalDay - 1));
-                dayDate.setHours(0, 0, 0, 0);
+                const finalDay = shiftDay === -1 ? getShopDayOfWeek(new Date()) : shiftDay;
+                const offset = finalDay === 0 ? 6 : finalDay - 1;
+                const targetDate = new Date(selectedWeek.getTime() + offset * 24 * 60 * 60 * 1000);
+                const dayDate = getShopMidnight(targetDate);
                 const result = await createShift({
                     staffId: selectedStaff.id,
                     dateMs: dayDate.getTime(),
                     startTime: shiftForm.startTime,
                     endTime: shiftForm.endTime,
                     forceOverride,
-                    timezoneOffset: new Date().getTimezoneOffset(),
                 });
                 if (!result.success) {
                     showNotification(result.error || 'Failed to create shift', 'error');
@@ -436,7 +433,7 @@ export default function AdminRosterPage() {
                             ) : (
                                 dayAvailability.map((avail) => {
                                     const rosteredForDay = shifts.some((s) => {
-                                        const shiftDay = s.date.toDate().getDay();
+                                        const shiftDay = getShopDayOfWeek(s.date.toDate());
                                         return s.staffId === avail.staffId && shiftDay === avail.dayOfWeek;
                                     });
                                     return (
@@ -511,7 +508,7 @@ export default function AdminRosterPage() {
                         ) : (
                             dayAvailability.map((avail) => {
                                 const rosteredForDay = shifts.some((s) => {
-                                    const shiftDay = s.date.toDate().getDay();
+                                    const shiftDay = getShopDayOfWeek(s.date.toDate());
                                     return s.staffId === avail.staffId && shiftDay === avail.dayOfWeek;
                                 });
                                 return (
@@ -585,15 +582,15 @@ export default function AdminRosterPage() {
                         const hasConflict = !isWithinAvailability(shiftForm.startTime, shiftForm.endTime, selectedStaff.ranges || []);
                         
                         // Check if target date is in the past
-                        const targetDate = new Date(selectedWeek);
                         const shiftDay = selectedStaff.dayOfWeek ?? selectedDay;
-                        const finalDay = shiftDay === -1 ? new Date().getDay() : shiftDay;
-                        targetDate.setDate(targetDate.getDate() + (finalDay === 0 ? 6 : finalDay - 1));
-                        targetDate.setHours(0, 0, 0, 0);
+                        const finalDay = shiftDay === -1 ? getShopDayOfWeek(new Date()) : shiftDay;
+                        const offset = finalDay === 0 ? 6 : finalDay - 1;
+                        const targetDate = new Date(selectedWeek.getTime() + offset * 24 * 60 * 60 * 1000);
+                        const dayDate = getShopMidnight(targetDate);
                         
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const isPastDate = targetDate.getTime() < today.getTime();
+                        const todayStr = getShopLocalDateStr(new Date());
+                        const dayDateStr = getShopLocalDateStr(dayDate);
+                        const isPastDate = dayDateStr < todayStr;
 
                         return (
                             <>

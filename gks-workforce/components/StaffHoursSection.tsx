@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase-db';
 import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Timesheet } from '@/types';
-import { getWeekStart, calculatePayrollRecord, formatHoursAndMinutes, formatTimeTo12Hour } from '@/lib/utils';
+import { getWeekStart, calculatePayrollRecord, formatHoursAndMinutes, formatTimeTo12Hour, formatDate } from '@/lib/utils';
 import StaffWeekPicker from '@/components/staff/StaffWeekPicker';
 import Spinner from '@/components/ui/Spinner';
 import EmptyState from '@/components/ui/EmptyState';
@@ -166,11 +166,7 @@ export default function StaffHoursSection() {
                             const isLast = idx === approvedTimesheets.length - 1;
 
                             const dateObj = ts.date.toDate();
-                            const formattedDate = dateObj.toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric'
-                            });
+                            const formattedDate = formatDate(dateObj);
 
                             return (
                                 <div

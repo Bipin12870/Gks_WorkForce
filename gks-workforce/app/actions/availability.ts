@@ -4,7 +4,7 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import * as admin from 'firebase-admin';
 import { requireStaff } from './shared/auth';
 import { logAuditEvent } from '@/lib/audit-logger';
-import { isWithinShopHours, isTimeBefore, getWeekStartForOffset, SHOP_OPEN_TIME, SHOP_CLOSE_TIME } from '@/lib/utils';
+import { isWithinShopHours, isTimeBefore, getWeekStartForOffset, SHOP_OPEN_TIME, SHOP_CLOSE_TIME, getShopTimezoneOffset, getShopDayOfWeek } from '@/lib/utils';
 
 /**
  * Format date as YYYY-MM-DD without timezone offset drift.
@@ -36,7 +36,7 @@ export async function submitAvailability(
         const user = await requireStaff();
         const db = getAdminDb();
 
-        const offset = timezoneOffset ?? 0;
+        const offset = getShopTimezoneOffset(weekStartDateMs);
         const weekStart = getWeekStartForOffset(weekStartDateMs, offset);
         const weekStartStr = formatLocalDateKeyServer(weekStart, offset);
         const weekStartTimestamp = admin.firestore.Timestamp.fromDate(weekStart);
@@ -72,7 +72,7 @@ export async function submitAvailability(
 
         const lockedDays = new Set<number>();
         shiftsSnap.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => {
-            lockedDays.add(doc.data().date.toDate().getDay());
+            lockedDays.add(getShopDayOfWeek(doc.data().date.toDate()));
         });
 
         // 2. Validate availability inputs

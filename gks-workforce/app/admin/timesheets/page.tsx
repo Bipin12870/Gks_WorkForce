@@ -155,7 +155,10 @@ function AdminTimesheetsContent() {
         if (isProcessing) return;
         setIsProcessing(true);
         try {
-            await updateTimesheetStatus(timesheetId, status, workedStart, workedEnd, note);
+            const res = await updateTimesheetStatus(timesheetId, status, workedStart, workedEnd, note);
+            if (!res.success) {
+                throw new Error(res.error);
+            }
             showNotification(`Timesheet ${status.toLowerCase()} successfully`, 'success');
             setShowAdjustModal(false);
         } catch (error) {
@@ -229,9 +232,13 @@ function AdminTimesheetsContent() {
         }
 
         try {
-            await Promise.all(
+            const results = await Promise.all(
                 toApprove.map(item => updateTimesheetStatus(item.id, 'APPROVED'))
             );
+            const failed = results.find(r => !r.success);
+            if (failed) {
+                throw new Error(failed.error);
+            }
             showNotification(`Bulk approved ${toApprove.length} timesheets successfully!`, 'success');
             setSelectedTimesheetIds([]);
         } catch (error) {
@@ -461,7 +468,10 @@ function AdminTimesheetsContent() {
                                     setIsProcessing(true);
                                     try {
                                         const finalStatus = voidTimesheet ? 'REJECTED' : 'APPROVED';
-                                        await correctTimesheet(selectedTimesheet.id!, adjustStart, adjustEnd, adminNote, finalStatus);
+                                        const res = await correctTimesheet(selectedTimesheet.id!, adjustStart, adjustEnd, adminNote, finalStatus);
+                                        if (!res.success) {
+                                            throw new Error(res.error);
+                                        }
                                         showNotification(
                                             voidTimesheet ? 'Timesheet voided and rejected successfully' : 'Timesheet corrected successfully',
                                             'success'

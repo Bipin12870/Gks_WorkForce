@@ -109,7 +109,7 @@ export async function createManualTimesheet(shiftId: string, workedStart: string
         return { success: true, id: docRef.id };
     } catch (error) {
         console.error('Error in createManualTimesheet:', error);
-        throw new Error((error as Error).message);
+        return { success: false, error: (error as Error).message };
     }
 }
 
@@ -144,16 +144,18 @@ export async function updateTimesheetStatus(
         const finalEnd = workedEnd || timesheetData.workedEnd;
 
         // 3. Validation
-        if (!isWithinShopHours(finalStart) || !isWithinShopHours(finalEnd)) {
-            throw new Error('Times must be within shop hours (09:00 - 23:59).');
-        }
+        if (status !== 'REJECTED') {
+            if (!isWithinShopHours(finalStart) || !isWithinShopHours(finalEnd)) {
+                throw new Error('Times must be within shop hours (09:00 - 23:59).');
+            }
 
-        const start = parseTime(finalStart);
-        const end = parseTime(finalEnd);
-        const startTotal = start.hours * 60 + start.minutes;
-        const endTotal = end.hours * 60 + end.minutes;
-        if (endTotal <= startTotal) {
-            throw new Error('Invalid duration. Worked end must be after start time.');
+            const start = parseTime(finalStart);
+            const end = parseTime(finalEnd);
+            const startTotal = start.hours * 60 + start.minutes;
+            const endTotal = end.hours * 60 + end.minutes;
+            if (endTotal <= startTotal) {
+                throw new Error('Invalid duration. Worked end must be after start time.');
+            }
         }
 
         // 4. Overlap Check for Approvals
@@ -235,7 +237,7 @@ export async function updateTimesheetStatus(
         return { success: true };
     } catch (error) {
         console.error('Error in updateTimesheetStatus:', error);
-        throw new Error((error as Error).message);
+        return { success: false, error: (error as Error).message };
     }
 }
 
@@ -375,6 +377,6 @@ export async function correctTimesheet(
         return { success: true, id: correctionDocRef.id };
     } catch (error) {
         console.error('Error in correctTimesheet:', error);
-        throw new Error((error as Error).message);
+        return { success: false, error: (error as Error).message };
     }
 }

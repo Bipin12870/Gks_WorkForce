@@ -239,6 +239,8 @@ export default function StaffProfileTimesheetsPage() {
             if (result.success) {
                 showNotification('Manual timesheet submitted successfully', 'success');
                 setEditMode(null);
+            } else {
+                throw new Error(result.error);
             }
         } catch (error) {
             console.error('Error submitting timesheet:', error);
